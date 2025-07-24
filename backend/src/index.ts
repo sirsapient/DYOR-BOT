@@ -292,7 +292,7 @@ app.post('/api/research', async (req, res) => {
         'Accept': 'application/json',
         'Content-Type': 'text/plain',
       },
-      body: `search "${projectName}"; fields name,summary,platforms.name,genres.name,first_release_date,rating,cover.url,websites.url; limit 1;`,
+      body: `search "${projectName}"; fields name,summary,platforms.name,genres.name,first_release_date,rating,cover.url,websites.url,involved_companies.company.name,involved_companies.developer,involved_companies.publisher; limit 1;`,
     });
     if (igdbRes.ok) {
       const igdbJson = await igdbRes.json();
@@ -306,6 +306,36 @@ app.post('/api/research', async (req, res) => {
             if (dom) aliases.push(dom);
           }
         }
+      }
+      // 1. Update IGDB query to include involved_companies
+      // 2. Fetch company details for each involved company
+      // 3. Determine if studio is a developer, and if this is their first project
+      // 4. Add studioAssessment to research report
+      if (igdbData && igdbData.involved_companies && Array.isArray(igdbData.involved_companies)) {
+        const studioAssessment = [];
+        for (const company of igdbData.involved_companies) {
+          if (company.developer) {
+            const companyRes = await fetch(`https://api.igdb.com/v4/companies/${company.company}`, {
+              method: 'GET',
+              headers: {
+                'Client-ID': process.env.IGDB_CLIENT_ID,
+                'Authorization': `Bearer ${igdbToken}`,
+                'Accept': 'application/json',
+              },
+            });
+            if (companyRes.ok) {
+              const companyJson = await companyRes.json();
+              const isFirstProject = companyJson.first_project_date ? new Date(companyJson.first_project_date * 1000).toISOString() : 'N/A';
+              studioAssessment.push({
+                companyName: companyJson.name,
+                isDeveloper: true,
+                isPublisher: companyJson.publisher,
+                firstProjectDate: isFirstProject,
+              });
+            }
+          }
+        }
+        igdbData.studioAssessment = studioAssessment;
       }
     } else {
       igdbData = { error: `IGDB: ${igdbRes.status} ${igdbRes.statusText}` };
@@ -1205,6 +1235,7 @@ ${JSON.stringify({cgData, igdbData, steamData, discordData, etherscanData, solsc
     securitySummary,
     reviewSummary,
     glassdoorSummary,
+    studioAssessment: igdbData?.studioAssessment,
   };
   res.json(researchReport);
 });
