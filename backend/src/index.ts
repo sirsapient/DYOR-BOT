@@ -3,6 +3,7 @@ import cors from 'cors';
 // @ts-ignore
 const fetch = require('node-fetch');
 require('dotenv').config();
+import { ethers } from 'ethers';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -33,13 +34,14 @@ if (missingVars.length > 0) {
 
 app.post('/api/research', async (req, res) => {
   console.log('Received POST /api/research', req.body);
-  const { projectName, tokenSymbol, contractAddress } = req.body;
+  const { projectName, tokenSymbol, contractAddress, roninContractAddress } = req.body;
   if (!projectName) {
     return res.status(400).json({ error: 'Missing projectName' });
   }
 
   const sourcesUsed = [];
   let cgData = null, igdbData = null, steamData = null, discordData = null, etherscanData = null, solscanData = null, youtubeData = null, aiSummary = null, aiRiskScore = null, nftData = null, preLaunch = false, devTimeYears = null, fundingType = 'unknown', tokenomics = {}, steamReviewSummary = '', githubRepo = null, githubStats = null, steamChartsSummary = '', redditSummary = '', openseaSummary = '', magicEdenSummary = '', crunchbaseSummary = '', duneSummary = '', securitySummary = '', reviewSummary = '', linkedinSummary = '', glassdoorSummary = '', twitterSummary = '', blogSummary = '', telegramSummary = '';
+  let roninTokenInfo = null;
 
   // Enhanced CoinGecko fetch
   try {
@@ -848,6 +850,7 @@ ${JSON.stringify({cgData, igdbData, steamData, discordData, etherscanData, solsc
     },
     financialData: {
       marketCap: cgData?.market_data?.market_cap?.usd,
+      roninTokenInfo,
     },
     teamAnalysis: {},
     technicalAssessment: {},
