@@ -161,12 +161,27 @@ async function extractTokenomicsFromWhitepaper(websiteUrl: string): Promise<any 
   return json;
 }
 
+function extractDomain(url: string): string | null {
+  try {
+    const u = new URL(url);
+    return u.hostname.replace(/^www\./, '').split('.')[0];
+  } catch {
+    return null;
+  }
+}
+
 app.post('/api/research', async (req, res) => {
   console.log('Received POST /api/research', req.body);
   const { projectName, tokenSymbol, contractAddress, roninContractAddress } = req.body;
   if (!projectName) {
     return res.status(400).json({ error: 'Missing projectName' });
   }
+
+  // --- Alias collection logic ---
+  let aliases = [projectName];
+  if (tokenSymbol) aliases.push(tokenSymbol);
+  // Try to get from CoinGecko and IGDB after fetch
+  // Try to get from website domain after fetch
 
   const sourcesUsed = [];
   let cgData = null, igdbData = null, steamData = null, discordData = null, etherscanData = null, solscanData = null, youtubeData = null, aiSummary = null, aiRiskScore = null, nftData = null, preLaunch = false, devTimeYears = null, fundingType = 'unknown', tokenomics = {}, steamReviewSummary = '', githubRepo = null, githubStats = null, steamChartsSummary = '', redditSummary = '', openseaSummary = '', magicEdenSummary = '', crunchbaseSummary = '', duneSummary = '', securitySummary = '', reviewSummary = '', linkedinSummary = '', glassdoorSummary = '', twitterSummary = '', blogSummary = '', telegramSummary = '';
@@ -181,44 +196,66 @@ app.post('/api/research', async (req, res) => {
       if (contractRes.ok) {
         cgData = await contractRes.json();
         sourcesUsed.push('CoinGecko');
+        if (cgData.name) aliases.push(cgData.name);
+        if (cgData.symbol) aliases.push(cgData.symbol);
+        if (cgData.links && cgData.links.homepage && cgData.links.homepage[0]) {
+          const dom = extractDomain(cgData.links.homepage[0]);
+          if (dom) aliases.push(dom);
+        }
       } else {
         cgData = { error: `CoinGecko contract: ${contractRes.status} ${contractRes.statusText}` };
       }
     } else {
-      // 2. Otherwise, fetch all coins and try to match
+      // 2. Otherwise, fetch all coins and try to match using all aliases
       const listRes = await fetch('https://api.coingecko.com/api/v3/coins/list');
       if (listRes.ok) {
         const coins: any[] = await listRes.json();
-        // Try to match by id, name, or symbol (case-insensitive, partial/fuzzy)
-        const lowerName = projectName.toLowerCase();
-        let candidates = coins.filter((c: any) => c.id.toLowerCase() === lowerName || c.name.toLowerCase() === lowerName);
+        // Try all aliases for id, name, symbol, partial/fuzzy
+        let candidates: any[] = [];
+        for (const alias of aliases) {
+          const lowerAlias = alias.toLowerCase();
+          candidates = coins.filter((c: any) => c.id.toLowerCase() === lowerAlias || c.name.toLowerCase() === lowerAlias);
+          if (candidates.length) break;
+        }
         if (!candidates.length && tokenSymbol) {
           candidates = coins.filter((c: any) => c.symbol.toLowerCase() === tokenSymbol.toLowerCase());
         }
         if (!candidates.length) {
-          // Partial/fuzzy match by name or id
-          candidates = coins.filter((c: any) => c.id.toLowerCase().includes(lowerName) || c.name.toLowerCase().includes(lowerName));
+          for (const alias of aliases) {
+            const lowerAlias = alias.toLowerCase();
+            candidates = coins.filter((c: any) => c.id.toLowerCase().includes(lowerAlias) || c.name.toLowerCase().includes(lowerAlias));
+            if (candidates.length) break;
+          }
         }
         if (!candidates.length && tokenSymbol) {
           candidates = coins.filter((c: any) => c.symbol.toLowerCase().includes(tokenSymbol.toLowerCase()));
         }
         if (candidates.length) {
-          // Prefer exact id match, then name, then symbol, then partial
           coinId = candidates[0].id;
           const cgRes = await fetch(`https://api.coingecko.com/api/v3/coins/${coinId}`);
           if (cgRes.ok) {
             cgData = await cgRes.json();
             sourcesUsed.push('CoinGecko');
+            if (cgData.name) aliases.push(cgData.name);
+            if (cgData.symbol) aliases.push(cgData.symbol);
+            if (cgData.links && cgData.links.homepage && cgData.links.homepage[0]) {
+              const dom = extractDomain(cgData.links.homepage[0]);
+              if (dom) aliases.push(dom);
+            }
           } else {
             cgData = { error: `CoinGecko: ${cgRes.status} ${cgRes.statusText}` };
           }
         } else {
-          // Fallback: LLM-powered web search for contract address
-          const llmAddress = await searchContractAddressWithLLM(projectName);
+          // Fallback: LLM-powered web search for contract address using all aliases
+          let llmAddress = null;
+          for (const alias of aliases) {
+            llmAddress = await searchContractAddressWithLLM(alias);
+            if (llmAddress) break;
+          }
           if (llmAddress) {
             cgData = { fallback_contract_address: llmAddress };
           } else {
-            cgData = { error: 'No matching token found on CoinGecko (checked id, name, symbol, partial matches), and LLM web search did not find a contract address.' };
+            cgData = { error: 'No matching token found on CoinGecko (checked id, name, symbol, partial matches, all aliases), and LLM web search did not find a contract address.' };
           }
         }
       } else {
@@ -248,11 +285,102 @@ app.post('/api/research', async (req, res) => {
       const igdbJson = await igdbRes.json();
       igdbData = igdbJson[0] || null;
       if (igdbData) sourcesUsed.push('IGDB');
+      if (igdbData && igdbData.name) aliases.push(igdbData.name);
+      if (igdbData && igdbData.websites && Array.isArray(igdbData.websites)) {
+        for (const w of igdbData.websites) {
+          if (w.url) {
+            const dom = extractDomain(w.url);
+            if (dom) aliases.push(dom);
+          }
+        }
+      }
     } else {
       igdbData = { error: `IGDB: ${igdbRes.status} ${igdbRes.statusText}` };
     }
   } catch (e) {
     igdbData = { error: 'IGDB fetch failed' };
+  }
+
+  // Deduplicate and prioritize aliases
+  aliases = Array.from(new Set(aliases.map(a => a.trim().toLowerCase()).filter(Boolean)));
+
+  // Enhanced CoinGecko fetch
+  try {
+    let coinId = null;
+    // 1. If contract address is provided, try contract endpoint (Ethereum only for now)
+    if (contractAddress) {
+      const contractRes = await fetch(`https://api.coingecko.com/api/v3/coins/ethereum/contract/${contractAddress}`);
+      if (contractRes.ok) {
+        cgData = await contractRes.json();
+        sourcesUsed.push('CoinGecko');
+        if (cgData.name) aliases.push(cgData.name);
+        if (cgData.symbol) aliases.push(cgData.symbol);
+        if (cgData.links && cgData.links.homepage && cgData.links.homepage[0]) {
+          const dom = extractDomain(cgData.links.homepage[0]);
+          if (dom) aliases.push(dom);
+        }
+      } else {
+        cgData = { error: `CoinGecko contract: ${contractRes.status} ${contractRes.statusText}` };
+      }
+    } else {
+      // 2. Otherwise, fetch all coins and try to match using all aliases
+      const listRes = await fetch('https://api.coingecko.com/api/v3/coins/list');
+      if (listRes.ok) {
+        const coins: any[] = await listRes.json();
+        // Try all aliases for id, name, symbol, partial/fuzzy
+        let candidates: any[] = [];
+        for (const alias of aliases) {
+          const lowerAlias = alias.toLowerCase();
+          candidates = coins.filter((c: any) => c.id.toLowerCase() === lowerAlias || c.name.toLowerCase() === lowerAlias);
+          if (candidates.length) break;
+        }
+        if (!candidates.length && tokenSymbol) {
+          candidates = coins.filter((c: any) => c.symbol.toLowerCase() === tokenSymbol.toLowerCase());
+        }
+        if (!candidates.length) {
+          for (const alias of aliases) {
+            const lowerAlias = alias.toLowerCase();
+            candidates = coins.filter((c: any) => c.id.toLowerCase().includes(lowerAlias) || c.name.toLowerCase().includes(lowerAlias));
+            if (candidates.length) break;
+          }
+        }
+        if (!candidates.length && tokenSymbol) {
+          candidates = coins.filter((c: any) => c.symbol.toLowerCase().includes(tokenSymbol.toLowerCase()));
+        }
+        if (candidates.length) {
+          coinId = candidates[0].id;
+          const cgRes = await fetch(`https://api.coingecko.com/api/v3/coins/${coinId}`);
+          if (cgRes.ok) {
+            cgData = await cgRes.json();
+            sourcesUsed.push('CoinGecko');
+            if (cgData.name) aliases.push(cgData.name);
+            if (cgData.symbol) aliases.push(cgData.symbol);
+            if (cgData.links && cgData.links.homepage && cgData.links.homepage[0]) {
+              const dom = extractDomain(cgData.links.homepage[0]);
+              if (dom) aliases.push(dom);
+            }
+          } else {
+            cgData = { error: `CoinGecko: ${cgRes.status} ${cgRes.statusText}` };
+          }
+        } else {
+          // Fallback: LLM-powered web search for contract address using all aliases
+          let llmAddress = null;
+          for (const alias of aliases) {
+            llmAddress = await searchContractAddressWithLLM(alias);
+            if (llmAddress) break;
+          }
+          if (llmAddress) {
+            cgData = { fallback_contract_address: llmAddress };
+          } else {
+            cgData = { error: 'No matching token found on CoinGecko (checked id, name, symbol, partial matches, all aliases), and LLM web search did not find a contract address.' };
+          }
+        }
+      } else {
+        cgData = { error: `CoinGecko list: ${listRes.status} ${listRes.statusText}` };
+      }
+    }
+  } catch (e) {
+    cgData = { error: 'CoinGecko fetch failed' };
   }
 
   // Steam fetch
