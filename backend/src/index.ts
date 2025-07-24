@@ -655,7 +655,36 @@ app.post('/api/research', async (req, res) => {
         deliveryStatus = `Released: ${steamData.release_date.date}`;
       }
       // Compose AI prompt
-      const aiPrompt = `You are an expert game project analyst. Given the following data about a game or Web3 project, write a concise, insightful summary for users.\n\n- Reference the hierarchy: Studio > Game Loop/Product > Community > Economy > Blockchain.\n- Explain the risk score and investment grade in this context.\n- Cross-reference project scale (team size: ${teamSize}, funding: ${funding}, fundingType: ${fundingType}) with delivery and community sentiment (sentiment: ${communitySentiment}, delivery: ${deliveryStatus}).\n- If the project is pre-launch (preLaunch: ${preLaunch}), do NOT red-flag missing tokens or NFTs; instead, note it as context.\n- Consider how long the project has been in development (devTimeYears: ${devTimeYears}).\n- If there are community comments about delays or lack of progress (see steamReviewSummary, redditSummary), mention them, but interpret them in the context of team size and funding.\n- Analyze tokenomics and holder distribution for sustainability and risk of VC/team dumps.\n- Note if the project is self-funded or VC-backed.\n- Analyze GitHub activity (see githubStats) for real dev progress and transparency.\n- Analyze SteamCharts player trends (see steamChartsSummary) for real user engagement.\n- Analyze Reddit sentiment (see redditSummary) for community mood.\n- Analyze NFT market activity (see openseaSummary, magicEdenSummary) for real engagement.\n- Analyze Crunchbase funding/team info (see crunchbaseSummary) for legitimacy.\n- Analyze Dune/Nansen/Arkham on-chain analytics (see duneSummary) for token flows and whale activity.\n- Analyze security audits and bug bounties (see securitySummary) for vulnerabilities and project safety.\n- Analyze professional/user reviews (see reviewSummary) for critical and user reception.\n- Analyze LinkedIn for team size and notable members (see linkedinSummary).\n- Analyze Glassdoor for employee sentiment (see glassdoorSummary).\n- Analyze Twitter/X for recent news, engagement, and sentiment (see twitterSummary).\n- Analyze Medium/Blog for recent updates (see blogSummary).\n- Analyze Telegram for group activity (see telegramSummary).\n- Highlight red flags and positive indicators.\n- Be honest, specific, and clear.\n\nData:\n${JSON.stringify({cgData, igdbData, steamData, discordData, etherscanData, solscanData, youtubeData, nftData, preLaunch, devTimeYears, fundingType, tokenomics, steamReviewSummary, githubRepo, githubStats, steamChartsSummary, redditSummary, openseaSummary, magicEdenSummary, crunchbaseSummary, duneSummary, securitySummary, reviewSummary, linkedinSummary, glassdoorSummary, twitterSummary, blogSummary, telegramSummary}, null, 2)}\n`;
+      const aiPrompt = `You are an expert game project analyst. Given the following data about a game or Web3 project, write a concise, insightful summary for users.
+
+- Reference the hierarchy: Studio > Game Loop/Product > Community > Economy > Blockchain.
+- Explain the risk score and investment grade in this context.
+- Cross-reference project scale (team size: ${teamSize}, funding: ${funding}, fundingType: ${fundingType}) with delivery and community sentiment (sentiment: ${communitySentiment}, delivery: ${deliveryStatus}).
+- If the project is pre-launch (preLaunch: ${preLaunch}), do NOT red-flag missing tokens or NFTs; instead, note it as context.
+- Consider how long the project has been in development (devTimeYears: ${devTimeYears}).
+- If there are community comments about delays or lack of progress (see steamReviewSummary, redditSummary), mention them, but interpret them in the context of team size and funding.
+- Analyze tokenomics and holder distribution for sustainability and risk of VC/team dumps.
+- Note if the project is self-funded or VC-backed.
+- Analyze GitHub activity (see githubStats) for real dev progress and transparency.
+- Analyze SteamCharts player trends (see steamChartsSummary) for real user engagement.
+- Analyze Reddit sentiment (see redditSummary) for community mood.
+- Analyze NFT market activity (see openseaSummary, magicEdenSummary) for real engagement.
+- Analyze Crunchbase funding/team info (see crunchbaseSummary) for legitimacy.
+- Analyze Dune/Nansen/Arkham on-chain analytics (see duneSummary) for token flows and whale activity.
+- Analyze security audits and bug bounties (see securitySummary) for vulnerabilities and project safety.
+- Analyze professional/user reviews (see reviewSummary) for critical and user reception.
+- Analyze LinkedIn for team size and notable members (see linkedinSummary).
+- Analyze Glassdoor for employee sentiment (see glassdoorSummary).
+- Analyze Twitter/X for recent news, engagement, and sentiment (see twitterSummary).
+- Analyze Medium/Blog for recent updates (see blogSummary).
+- Analyze Telegram for group activity (see telegramSummary).
+- Highlight red flags and positive indicators.
+- Be honest, specific, and clear.
+- IMPORTANT: If data for a category is missing, say 'No data found' or 'Could not verify' rather than 'does not exist.' Only state that something does not exist if you are certain from the data. Missing data may be due to unavailable sources, not necessarily absence. Avoid red-flagging solely due to missing data unless there is strong evidence. Do NOT include a 'Key Findings' section.
+
+Data:
+${JSON.stringify({cgData, igdbData, steamData, discordData, etherscanData, solscanData, youtubeData, nftData, preLaunch, devTimeYears, fundingType, tokenomics, steamReviewSummary, githubRepo, githubStats, steamChartsSummary, redditSummary, openseaSummary, magicEdenSummary, crunchbaseSummary, duneSummary, securitySummary, reviewSummary, linkedinSummary, glassdoorSummary, twitterSummary, blogSummary, telegramSummary}, null, 2)}
+`;
       const aiRes = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
