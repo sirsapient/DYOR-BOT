@@ -33,7 +33,7 @@ if (missingVars.length > 0) {
 
 app.post('/api/research', async (req, res) => {
   console.log('Received POST /api/research', req.body);
-  const { projectName } = req.body;
+  const { projectName, tokenSymbol, contractAddress } = req.body;
   if (!projectName) {
     return res.status(400).json({ error: 'Missing projectName' });
   }
@@ -41,14 +41,52 @@ app.post('/api/research', async (req, res) => {
   const sourcesUsed = [];
   let cgData = null, igdbData = null, steamData = null, discordData = null, etherscanData = null, solscanData = null, youtubeData = null, aiSummary = null, aiRiskScore = null, nftData = null, preLaunch = false, devTimeYears = null, fundingType = 'unknown', tokenomics = {}, steamReviewSummary = '', githubRepo = null, githubStats = null, steamChartsSummary = '', redditSummary = '', openseaSummary = '', magicEdenSummary = '', crunchbaseSummary = '', duneSummary = '', securitySummary = '', reviewSummary = '', linkedinSummary = '', glassdoorSummary = '', twitterSummary = '', blogSummary = '', telegramSummary = '';
 
-  // CoinGecko fetch
+  // Enhanced CoinGecko fetch
   try {
-    const cgRes = await fetch(`https://api.coingecko.com/api/v3/coins/${encodeURIComponent(projectName.toLowerCase())}`);
-    if (cgRes.ok) {
-      cgData = await cgRes.json();
-      sourcesUsed.push('CoinGecko');
+    let coinId = null;
+    // 1. If contract address is provided, try contract endpoint (Ethereum only for now)
+    if (contractAddress) {
+      const contractRes = await fetch(`https://api.coingecko.com/api/v3/coins/ethereum/contract/${contractAddress}`);
+      if (contractRes.ok) {
+        cgData = await contractRes.json();
+        sourcesUsed.push('CoinGecko');
+      } else {
+        cgData = { error: `CoinGecko contract: ${contractRes.status} ${contractRes.statusText}` };
+      }
     } else {
-      cgData = { error: `CoinGecko: ${cgRes.status} ${cgRes.statusText}` };
+      // 2. Otherwise, fetch all coins and try to match
+      const listRes = await fetch('https://api.coingecko.com/api/v3/coins/list');
+      if (listRes.ok) {
+        const coins: any[] = await listRes.json();
+        // Try to match by id, name, or symbol (case-insensitive, partial/fuzzy)
+        const lowerName = projectName.toLowerCase();
+        let candidates = coins.filter((c: any) => c.id.toLowerCase() === lowerName || c.name.toLowerCase() === lowerName);
+        if (!candidates.length && tokenSymbol) {
+          candidates = coins.filter((c: any) => c.symbol.toLowerCase() === tokenSymbol.toLowerCase());
+        }
+        if (!candidates.length) {
+          // Partial/fuzzy match by name or id
+          candidates = coins.filter((c: any) => c.id.toLowerCase().includes(lowerName) || c.name.toLowerCase().includes(lowerName));
+        }
+        if (!candidates.length && tokenSymbol) {
+          candidates = coins.filter((c: any) => c.symbol.toLowerCase().includes(tokenSymbol.toLowerCase()));
+        }
+        if (candidates.length) {
+          // Prefer exact id match, then name, then symbol, then partial
+          coinId = candidates[0].id;
+          const cgRes = await fetch(`https://api.coingecko.com/api/v3/coins/${coinId}`);
+          if (cgRes.ok) {
+            cgData = await cgRes.json();
+            sourcesUsed.push('CoinGecko');
+          } else {
+            cgData = { error: `CoinGecko: ${cgRes.status} ${cgRes.statusText}` };
+          }
+        } else {
+          cgData = { error: 'No matching token found on CoinGecko (checked id, name, symbol, partial matches)' };
+        }
+      } else {
+        cgData = { error: `CoinGecko list: ${listRes.status} ${listRes.statusText}` };
+      }
     }
   } catch (e) {
     cgData = { error: 'CoinGecko fetch failed' };
