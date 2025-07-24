@@ -4,8 +4,11 @@
     "ts-node": "^10.9.2"
   },
   "dependencies": {
+    "@types/node-fetch": "^2.6.12",
     "axios": "^1.11.0",
     "cheerio": "^1.1.2",
+    "dotenv": "^17.2.0",
+    "node-fetch": "^2.7.0",
     "steam-search": "^1.0.0"
   }
 }
