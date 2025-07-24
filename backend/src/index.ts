@@ -4,6 +4,11 @@ import cors from 'cors';
 const fetch = require('node-fetch');
 require('dotenv').config();
 import { ethers } from 'ethers';
+const pdfParse = require('pdf-parse');
+const cheerio = require('cheerio');
+const https = require('https');
+const http = require('http');
+const { URL } = require('url');
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -30,6 +35,130 @@ const REQUIRED_ENV_VARS = [
 const missingVars = REQUIRED_ENV_VARS.filter((v) => !process.env[v]);
 if (missingVars.length > 0) {
   console.warn('WARNING: Missing required environment variables:', missingVars.join(', '));
+}
+
+const serpApiKey = process.env.SERPAPI_KEY;
+
+async function searchContractAddressWithLLM(projectName: string): Promise<string | null> {
+  if (!serpApiKey || !process.env.ANTHROPIC_API_KEY) return null;
+  // 1. Use SerpAPI to search for the contract address
+  const serpRes = await fetch(`https://serpapi.com/search.json?q=${encodeURIComponent(projectName + ' token contract address')}&api_key=${serpApiKey}`);
+  if (!serpRes.ok) return null;
+  const serpJson = await serpRes.json();
+  // Collect snippets from organic results
+  const snippets = (serpJson.organic_results || []).map((r: any) => r.snippet || r.title || '').filter(Boolean).join('\n');
+  if (!snippets) return null;
+  // 2. Use Anthropic Claude to extract the contract address
+  const prompt = `Given the following web search results, extract the most likely Ethereum contract address for the project ${projectName}. Only return the address, or say 'not found' if you are not sure.\n\nResults:\n${snippets}`;
+  const aiRes = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'x-api-key': process.env.ANTHROPIC_API_KEY,
+      'content-type': 'application/json',
+      'anthropic-version': '2023-06-01',
+    },
+    body: JSON.stringify({
+      model: 'claude-opus-4-20250514',
+      max_tokens: 64,
+      messages: [
+        { role: 'user', content: prompt }
+      ]
+    })
+  });
+  if (!aiRes.ok) return null;
+  const aiJson = await aiRes.json();
+  const text = aiJson.content?.[0]?.text || '';
+  // Extract Ethereum address (0x...)
+  const match = text.match(/0x[a-fA-F0-9]{40}/);
+  return match ? match[0] : null;
+}
+
+async function fetchWhitepaperUrl(websiteUrl: string): Promise<string | null> {
+  // Fetch the homepage and look for links containing 'whitepaper' or 'tokenomics'
+  try {
+    const res = await fetch(websiteUrl);
+    if (!res.ok) return null;
+    const html = await res.text();
+    const $ = cheerio.load(html);
+    let found = null;
+    $('a').each((_: any, el: any) => {
+      const href = $(el).attr('href');
+      if (href && /whitepaper|tokenomics/i.test(href)) {
+        found = href.startsWith('http') ? href : new URL(href, websiteUrl).toString();
+        return false;
+      }
+    });
+    return found;
+  } catch (e) {
+    return null;
+  }
+}
+
+async function fetchPdfBuffer(url: string): Promise<Buffer | null> {
+  return new Promise((resolve, reject) => {
+    const client = url.startsWith('https') ? https : http;
+    client.get(url, (res: any) => {
+      if (res.statusCode !== 200) return resolve(null);
+      const data: any[] = [];
+      res.on('data', (chunk: any) => data.push(chunk));
+      res.on('end', () => resolve(Buffer.concat(data)));
+    }).on('error', () => resolve(null));
+  });
+}
+
+async function extractTokenomicsFromWhitepaper(websiteUrl: string): Promise<any | null> {
+  const whitepaperUrl = await fetchWhitepaperUrl(websiteUrl);
+  if (!whitepaperUrl) return null;
+  let text = '';
+  if (/\.pdf$/i.test(whitepaperUrl)) {
+    // PDF extraction
+    const pdfBuffer = await fetchPdfBuffer(whitepaperUrl);
+    if (!pdfBuffer) return null;
+    const pdfData = await pdfParse(pdfBuffer);
+    text = pdfData.text;
+  } else {
+    // HTML extraction
+    try {
+      const res = await fetch(whitepaperUrl);
+      if (!res.ok) return null;
+      const html = await res.text();
+      const $ = cheerio.load(html);
+      // Try to extract main content (look for <main>, <article>, or fallback to body)
+      let mainText = $('main').text() || $('article').text() || $('body').text();
+      // Clean up whitespace
+      text = mainText.replace(/\s+/g, ' ').trim();
+    } catch (e) {
+      return null;
+    }
+  }
+  if (!text) return null;
+  // Use Anthropic Claude to extract tokenomics
+  const prompt = `Given the following text from a crypto project whitepaper or tokenomics page, extract the tokenomics details (total supply, distribution breakdown, vesting schedule, etc.). Return as structured JSON.\n\nText:\n${text.substring(0, 12000)}`;
+  const aiRes = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'x-api-key': process.env.ANTHROPIC_API_KEY,
+      'content-type': 'application/json',
+      'anthropic-version': '2023-06-01',
+    },
+    body: JSON.stringify({
+      model: 'claude-opus-4-20250514',
+      max_tokens: 256,
+      messages: [
+        { role: 'user', content: prompt }
+      ]
+    })
+  });
+  if (!aiRes.ok) return null;
+  const aiJson = await aiRes.json();
+  let json = null;
+  try {
+    json = JSON.parse(aiJson.content?.[0]?.text || '');
+  } catch (e) {
+    // fallback: return raw text
+    json = { extracted: aiJson.content?.[0]?.text || '' };
+  }
+  return json;
 }
 
 app.post('/api/research', async (req, res) => {
@@ -84,7 +213,13 @@ app.post('/api/research', async (req, res) => {
             cgData = { error: `CoinGecko: ${cgRes.status} ${cgRes.statusText}` };
           }
         } else {
-          cgData = { error: 'No matching token found on CoinGecko (checked id, name, symbol, partial matches)' };
+          // Fallback: LLM-powered web search for contract address
+          const llmAddress = await searchContractAddressWithLLM(projectName);
+          if (llmAddress) {
+            cgData = { fallback_contract_address: llmAddress };
+          } else {
+            cgData = { error: 'No matching token found on CoinGecko (checked id, name, symbol, partial matches), and LLM web search did not find a contract address.' };
+          }
         }
       } else {
         cgData = { error: `CoinGecko list: ${listRes.status} ${listRes.statusText}` };
@@ -178,7 +313,11 @@ app.post('/api/research', async (req, res) => {
 
   // Etherscan fetch
   try {
-    const ethAddress = cgData?.platforms?.ethereum;
+    let ethAddress = cgData?.platforms?.ethereum;
+    // Use fallback contract address if found by LLM
+    if (!ethAddress && cgData?.fallback_contract_address) {
+      ethAddress = cgData.fallback_contract_address;
+    }
     if (ethAddress && process.env.ETHERSCAN_API_KEY) {
       const etherscanRes = await fetch(`https://api.etherscan.io/api?module=token&action=tokeninfo&contractaddress=${ethAddress}&apikey=${process.env.ETHERSCAN_API_KEY}`);
       if (etherscanRes.ok) {
@@ -402,6 +541,10 @@ app.post('/api/research', async (req, res) => {
       holders: etherscanData && etherscanData.holders,
       // Add more fields as needed
     };
+  } else if (cgData && cgData.links && cgData.links.homepage && cgData.links.homepage[0]) {
+    // Fallback: try to extract from whitepaper
+    const extracted = await extractTokenomicsFromWhitepaper(cgData.links.homepage[0]);
+    if (extracted) tokenomics = extracted;
   }
 
   // Steam review sentiment summary (basic)
