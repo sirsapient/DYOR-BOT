@@ -183,6 +183,83 @@ function extractSocialLinksFromHtml(html: string): {discord?: string, twitter?: 
   return { discord, twitter };
 }
 
+// List of Nitter instances to try
+const NITTER_INSTANCES = [
+  'https://nitter.net',
+  'https://nitter.privacydev.net',
+  'https://nitter.1d4.us',
+  'https://nitter.poast.org',
+  'https://nitter.moomoo.me',
+];
+
+async function fetchTwitterProfileAndTweets(handle: string) {
+  for (const base of NITTER_INSTANCES) {
+    try {
+      const res = await fetch(`${base}/${handle}`);
+      if (res.ok) {
+        const html = await res.text();
+        // Extract profile bio
+        const bioMatch = html.match(/<div class="profile-bio">([\s\S]*?)<\/div>/);
+        const bio = bioMatch ? bioMatch[1].replace(/<[^>]+>/g, '').trim() : '';
+        // Extract follower count
+        const followerMatch = html.match(/<li><span class="profile-stat-num">([\d,]+)<\/span> Followers<\/li>/);
+        const followers = followerMatch ? followerMatch[1] : '';
+        // Extract pinned tweet
+        const pinnedMatch = html.match(/<div class="pinned">([\s\S]*?)<\/div>\s*<div class="tweet-content media-body">([\s\S]*?)<\/div>/);
+        const pinned = pinnedMatch ? pinnedMatch[2].replace(/<[^>]+>/g, '').trim() : '';
+        // Extract last 10 tweets
+        const tweetMatches = [...html.matchAll(/<div class="tweet-content media-body">([\s\S]*?)<\/div>/g)];
+        let tweets = tweetMatches.slice(0, 10).map(m => m[1].replace(/<[^>]+>/g, '').trim());
+        // Extract likes/retweets
+        const likeMatches = [...html.matchAll(/<span class="icon-heart"><\/span>\s*(\d+)/g)];
+        const rtMatches = [...html.matchAll(/<span class="icon-retweet"><\/span>\s*(\d+)/g)];
+        let likes = likeMatches.slice(0, 10).map(m => m[1]);
+        let rts = rtMatches.slice(0, 10).map(m => m[1]);
+        // Sentiment
+        let pos = 0, neg = 0;
+        for (const t of tweets) {
+          if (/(great|excite|love|win|success|launch|update|active|good|moon|hype)/i.test(t)) pos++;
+          if (/(delay|scam|rug|problem|concern|down|bad|fail|fud|abandon|inactive)/i.test(t)) neg++;
+        }
+        return {
+          bio,
+          followers,
+          pinned,
+          tweets,
+          likes,
+          rts,
+          sentiment: { pos, neg },
+        };
+      }
+    } catch (e) { /* try next instance */ }
+  }
+  return null;
+}
+
+async function fetchSteamDescription(appid: string): Promise<string> {
+  try {
+    const res = await fetch(`https://store.steampowered.com/api/appdetails?appids=${appid}`);
+    if (res.ok) {
+      const json = await res.json();
+      const data = json[appid]?.data;
+      if (data && data.short_description) return data.short_description;
+    }
+  } catch (e) {}
+  return '';
+}
+
+async function fetchWebsiteAboutSection(url: string): Promise<string> {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return '';
+    const html = await res.text();
+    const $ = cheerio.load(html);
+    // Try to find About/Game section
+    let about = $('section:contains("About")').text() || $('section:contains("Game")').text() || $('body').text();
+    return about.replace(/\s+/g, ' ').trim().substring(0, 2000);
+  } catch (e) { return ''; }
+}
+
 app.post('/api/research', async (req, res) => {
   console.log('Received POST /api/research', req.body);
   const { projectName, tokenSymbol, contractAddress, roninContractAddress } = req.body;
@@ -555,24 +632,9 @@ app.post('/api/research', async (req, res) => {
   // Fetch Twitter data if found
   if (twitterHandle) {
     try {
-      const twRes = await fetch(`https://nitter.net/${twitterHandle}`); // Use Nitter as a public proxy
-      if (twRes.ok) {
-        const html = await twRes.text();
-        // Extract last 5 tweets (very basic)
-        const tweetMatches = [...html.matchAll(/<div class="tweet-content media-body">([\s\S]*?)<\/div>/g)];
-        let tweets = tweetMatches.slice(0, 5).map(m => m[1].replace(/<[^>]+>/g, '').trim());
-        // Extract likes/retweets (very basic)
-        const likeMatches = [...html.matchAll(/<span class="icon-heart"><\/span>\s*(\d+)/g)];
-        const rtMatches = [...html.matchAll(/<span class="icon-retweet"><\/span>\s*(\d+)/g)];
-        let likes = likeMatches.slice(0, 5).map(m => m[1]);
-        let rts = rtMatches.slice(0, 5).map(m => m[1]);
-        // Basic sentiment: count positive/negative words
-        let pos = 0, neg = 0;
-        for (const t of tweets) {
-          if (/(great|excite|love|win|success|launch|update|active|good|moon|hype)/i.test(t)) pos++;
-          if (/(delay|scam|rug|problem|concern|down|bad|fail|fud|abandon|inactive)/i.test(t)) neg++;
-        }
-        twitterSummary = `Twitter (@${twitterHandle}): Last 5 tweets: ${tweets.map((t, i) => `"${t}" (${likes[i] || 0} likes, ${rts[i] || 0} RTs)`).join(' | ')}. Sentiment: ${pos} positive, ${neg} negative.`;
+      const twData = await fetchTwitterProfileAndTweets(twitterHandle);
+      if (twData) {
+        twitterSummary = `Twitter (@${twitterHandle}): Bio: ${twData.bio} | Followers: ${twData.followers} | Pinned: ${twData.pinned} | Last 5 tweets: ${twData.tweets.slice(0,5).map((t, i) => `"${t}" (${twData.likes[i] || 0} likes, ${twData.rts[i] || 0} RTs)`).join(' | ')}. Sentiment: ${twData.sentiment.pos} positive, ${twData.sentiment.neg} negative.`;
       }
     } catch (e) { /* ignore */ }
   }
@@ -1042,6 +1104,25 @@ app.post('/api/research', async (req, res) => {
     } catch (e) { /* ignore */ }
   }
 
+  // --- Enhanced project and studio description logic ---
+  let gameDescription = '';
+  if (igdbData && (igdbData.summary || igdbData.storyline)) {
+    gameDescription += (igdbData.summary || '') + ' ' + (igdbData.storyline || '');
+  }
+  if (steamData && steamData.steam_appid) {
+    const steamDesc = await fetchSteamDescription(steamData.steam_appid);
+    if (steamDesc) gameDescription += ' ' + steamDesc;
+  }
+  for (const url of homepageUrls) {
+    const about = await fetchWebsiteAboutSection(url);
+    if (about) { gameDescription += ' ' + about; break; }
+  }
+  // Studio background
+  let studioBackground = '';
+  if (igdbData && igdbData.studioAssessment && Array.isArray(igdbData.studioAssessment)) {
+    studioBackground = igdbData.studioAssessment.map((s: any) => `${s.companyName}: Developer: ${s.isDeveloper}, Publisher: ${s.isPublisher}, First project: ${s.firstProjectDate}`).join(' | ');
+  }
+
   // AI Summary (Anthropic Claude)
   try {
     if (process.env.ANTHROPIC_API_KEY) {
@@ -1065,36 +1146,7 @@ app.post('/api/research', async (req, res) => {
         deliveryStatus = `Released: ${steamData.release_date.date}`;
       }
       // Compose AI prompt
-      const aiPrompt = `You are an expert game project analyst. Given the following data about a game or Web3 project, write a concise, insightful summary for users.
-
-- Reference the hierarchy: Studio > Game Loop/Product > Community > Economy > Blockchain.
-- Explain the risk score and investment grade in this context.
-- Cross-reference project scale (team size: ${teamSize}, funding: ${funding}, fundingType: ${fundingType}) with delivery and community sentiment (sentiment: ${communitySentiment}, delivery: ${deliveryStatus}).
-- If the project is pre-launch (preLaunch: ${preLaunch}), do NOT red-flag missing tokens or NFTs; instead, note it as context.
-- Consider how long the project has been in development (devTimeYears: ${devTimeYears}).
-- If there are community comments about delays or lack of progress (see steamReviewSummary, redditSummary), mention them, but interpret them in the context of team size and funding.
-- Analyze tokenomics and holder distribution for sustainability and risk of VC/team dumps.
-- Note if the project is self-funded or VC-backed.
-- Analyze GitHub activity (see githubStats) for real dev progress and transparency.
-- Analyze SteamCharts player trends (see steamChartsSummary) for real user engagement.
-- Analyze Reddit sentiment (see redditSummary) for community mood.
-- Analyze NFT market activity (see openseaSummary, magicEdenSummary) for real engagement.
-- Analyze Crunchbase funding/team info (see crunchbaseSummary) for legitimacy.
-- Analyze Dune/Nansen/Arkham on-chain analytics (see duneSummary) for token flows and whale activity.
-- Analyze security audits and bug bounties (see securitySummary) for vulnerabilities and project safety.
-- Analyze professional/user reviews (see reviewSummary) for critical and user reception.
-- Analyze LinkedIn for team size and notable members (see linkedinSummary).
-- Analyze Glassdoor for employee sentiment (see glassdoorSummary).
-- Analyze Twitter/X for recent news, engagement, and sentiment (see twitterSummary).
-- Analyze Medium/Blog for recent updates (see blogSummary).
-- Analyze Telegram for group activity (see telegramSummary).
-- Highlight red flags and positive indicators.
-- Be honest, specific, and clear.
-- IMPORTANT: If data for a category is missing, say 'No data found' or 'Could not verify' rather than 'does not exist.' Only state that something does not exist if you are certain from the data. Missing data may be due to unavailable sources, not necessarily absence. Avoid red-flagging solely due to missing data unless there is strong evidence. Do NOT include a 'Key Findings' section.
-
-Data:
-${JSON.stringify({cgData, igdbData, steamData, discordData, etherscanData, solscanData, youtubeData, nftData, preLaunch, devTimeYears, fundingType, tokenomics, steamReviewSummary, githubRepo, githubStats, steamChartsSummary, redditSummary, openseaSummary, magicEdenSummary, crunchbaseSummary, duneSummary, securitySummary, reviewSummary, linkedinSummary, glassdoorSummary, twitterSummary, blogSummary, telegramSummary}, null, 2)}
-`;
+      const aiPrompt = `You are an expert game project analyst. Given the following data about a game or Web3 project, write a comprehensive, user-friendly summary for users.\n\n- Provide a detailed, readable description of the game, its genre, and current status (alpha, beta, live, etc.) using all available sources (IGDB, Steam, website, etc.).\n- Provide background on the studio/developer: experience, previous projects, reputation.\n- Summarize community presence (Discord, Twitter, Reddit, etc.).\n- Summarize tokenomics and blockchain integration.\n- Provide a risk score and investment grade.\n- Highlight red flags and positive indicators.\n- Be honest, specific, and clear.\n- IMPORTANT: If data for a category is missing, say 'No data found' or 'Could not verify' rather than 'does not exist.' Only state that something does not exist if you are certain from the data.\n- Do NOT include a 'Key Findings' section.\n\nGame Description:\n${gameDescription}\n\nStudio Background:\n${studioBackground}\n\nData:\n${JSON.stringify({cgData, igdbData, steamData, discordData, etherscanData, solscanData, youtubeData, nftData, preLaunch, devTimeYears, fundingType, tokenomics, steamReviewSummary, githubRepo, githubStats, steamChartsSummary, redditSummary, openseaSummary, magicEdenSummary, crunchbaseSummary, duneSummary, securitySummary, reviewSummary, linkedinSummary, glassdoorSummary, twitterSummary, blogSummary, telegramSummary}, null, 2)}\n`;
       const aiRes = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
