@@ -170,6 +170,19 @@ function extractDomain(url: string): string | null {
   }
 }
 
+function extractSocialLinksFromHtml(html: string): {discord?: string, twitter?: string} {
+  const $ = cheerio.load(html);
+  let discord: string | undefined = undefined, twitter: string | undefined = undefined;
+  $('a').each((_: any, el: any) => {
+    const href = $(el).attr('href');
+    if (href) {
+      if (!discord && /discord\.(gg|com)\//i.test(href)) discord = href;
+      if (!twitter && /twitter\.com\//i.test(href)) twitter = href;
+    }
+  });
+  return { discord, twitter };
+}
+
 app.post('/api/research', async (req, res) => {
   console.log('Received POST /api/research', req.body);
   const { projectName, tokenSymbol, contractAddress, roninContractAddress } = req.body;
@@ -397,21 +410,60 @@ app.post('/api/research', async (req, res) => {
     steamData = { error: 'Steam fetch failed' };
   }
 
-  // Discord fetch
-  try {
-    let discordInvite = null;
-    if (igdbData && igdbData.websites && Array.isArray(igdbData.websites)) {
-      for (const w of igdbData.websites) {
-        if (typeof w.url === 'string' && w.url.includes('discord.gg')) {
-          const match = w.url.match(/discord\.gg\/(\w+)/);
-          if (match) {
-            discordInvite = match[1];
-            break;
-          }
+  // Collect all possible homepages/website URLs from CoinGecko, IGDB, and aliases
+  let homepageUrls = [];
+  if (cgData && cgData.links && cgData.links.homepage && Array.isArray(cgData.links.homepage)) {
+    homepageUrls.push(...cgData.links.homepage.filter(Boolean));
+  }
+  if (igdbData && igdbData.websites && Array.isArray(igdbData.websites)) {
+    homepageUrls.push(...igdbData.websites.map((w: any) => w.url).filter(Boolean));
+  }
+  homepageUrls = Array.from(new Set(homepageUrls.filter(Boolean)));
+
+  // --- Discord extraction ---
+  let discordInvite = null;
+  // 1. Try CoinGecko chat_url
+  if (!discordInvite && cgData && cgData.links && cgData.links.chat_url && Array.isArray(cgData.links.chat_url)) {
+    const cgDiscord = cgData.links.chat_url.find((u: string) => u && /discord\.(gg|com)\//i.test(u));
+    if (cgDiscord) {
+      const match = cgDiscord.match(/discord\.(?:gg|com)\/(invite\/)?([\w-]+)/i);
+      if (match) discordInvite = match[2];
+    }
+  }
+  // 2. Try IGDB websites
+  if (!discordInvite && igdbData && igdbData.websites && Array.isArray(igdbData.websites)) {
+    for (const w of igdbData.websites) {
+      if (typeof w.url === 'string' && /discord\.(gg|com)\//i.test(w.url)) {
+        const match = w.url.match(/discord\.(?:gg|com)\/(invite\/)?([\w-]+)/i);
+        if (match) {
+          discordInvite = match[2];
+          break;
         }
       }
     }
-    if (discordInvite) {
+  }
+  // 3. Scrape all homepages for Discord links
+  if (!discordInvite) {
+    for (const url of homepageUrls) {
+      try {
+        const res = await fetch(url);
+        if (res.ok) {
+          const html = await res.text();
+          const { discord } = extractSocialLinksFromHtml(html);
+          if (discord) {
+            const match = discord.match(/discord\.(?:gg|com)\/(invite\/)?([\w-]+)/i);
+            if (match) {
+              discordInvite = match[2];
+              break;
+            }
+          }
+        }
+      } catch (e) { /* ignore */ }
+    }
+  }
+  // Fetch Discord data if found
+  if (discordInvite) {
+    try {
       const discordRes = await fetch(`https://discord.com/api/v10/invites/${discordInvite}?with_counts=true&with_expiration=true`);
       if (discordRes.ok) {
         const discordJson = await discordRes.json();
@@ -434,9 +486,65 @@ app.post('/api/research', async (req, res) => {
           }
         } catch (e) { /* ignore */ }
       }
+    } catch (e) { discordData = { ...(discordData as any), error: 'Discord fetch failed' }; }
+  }
+
+  // --- Twitter extraction ---
+  let twitterHandle = null;
+  // 1. Try CoinGecko
+  if (cgData && cgData.links && cgData.links.twitter_screen_name) {
+    twitterHandle = cgData.links.twitter_screen_name;
+  }
+  // 2. Try IGDB websites
+  if (!twitterHandle && igdbData && igdbData.websites && Array.isArray(igdbData.websites)) {
+    const tw = igdbData.websites.find((w: any) => typeof w.url === 'string' && w.url.includes('twitter.com'));
+    if (tw) {
+      const match = tw.url.match(/twitter.com\/([\w_]+)/);
+      if (match) twitterHandle = match[1];
     }
-  } catch (e) {
-    discordData = { ...(discordData as any), error: 'Discord fetch failed' };
+  }
+  // 3. Scrape all homepages for Twitter links
+  if (!twitterHandle) {
+    for (const url of homepageUrls) {
+      try {
+        const res = await fetch(url);
+        if (res.ok) {
+          const html = await res.text();
+          const { twitter } = extractSocialLinksFromHtml(html);
+          if (twitter) {
+            const match = twitter.match(/twitter.com\/([\w_]+)/);
+            if (match) {
+              twitterHandle = match[1];
+              break;
+            }
+          }
+        }
+      } catch (e) { /* ignore */ }
+    }
+  }
+  // Fetch Twitter data if found
+  if (twitterHandle) {
+    try {
+      const twRes = await fetch(`https://nitter.net/${twitterHandle}`); // Use Nitter as a public proxy
+      if (twRes.ok) {
+        const html = await twRes.text();
+        // Extract last 5 tweets (very basic)
+        const tweetMatches = [...html.matchAll(/<div class="tweet-content media-body">([\s\S]*?)<\/div>/g)];
+        let tweets = tweetMatches.slice(0, 5).map(m => m[1].replace(/<[^>]+>/g, '').trim());
+        // Extract likes/retweets (very basic)
+        const likeMatches = [...html.matchAll(/<span class="icon-heart"><\/span>\s*(\d+)/g)];
+        const rtMatches = [...html.matchAll(/<span class="icon-retweet"><\/span>\s*(\d+)/g)];
+        let likes = likeMatches.slice(0, 5).map(m => m[1]);
+        let rts = rtMatches.slice(0, 5).map(m => m[1]);
+        // Basic sentiment: count positive/negative words
+        let pos = 0, neg = 0;
+        for (const t of tweets) {
+          if (/(great|excite|love|win|success|launch|update|active|good|moon|hype)/i.test(t)) pos++;
+          if (/(delay|scam|rug|problem|concern|down|bad|fail|fud|abandon|inactive)/i.test(t)) neg++;
+        }
+        twitterSummary = `Twitter (@${twitterHandle}): Last 5 tweets: ${tweets.map((t, i) => `"${t}" (${likes[i] || 0} likes, ${rts[i] || 0} RTs)`).join(' | ')}. Sentiment: ${pos} positive, ${neg} negative.`;
+      }
+    } catch (e) { /* ignore */ }
   }
 
   // Etherscan fetch
@@ -832,45 +940,6 @@ app.post('/api/research', async (req, res) => {
       }
     }
   } catch (e) { /* ignore */ }
-
-  // Twitter/X integration: auto-detect handle, fetch recent tweets, summarize
-  let twitterHandle = null;
-  // Try CoinGecko
-  if (cgData && cgData.links && cgData.links.twitter_screen_name) {
-    twitterHandle = cgData.links.twitter_screen_name;
-  }
-  // Try IGDB websites
-  if (!twitterHandle && igdbData && igdbData.websites && Array.isArray(igdbData.websites)) {
-    const tw = igdbData.websites.find((w: any) => typeof w.url === 'string' && w.url.includes('twitter.com'));
-    if (tw) {
-      const match = tw.url.match(/twitter.com\/(\w+)/);
-      if (match) twitterHandle = match[1];
-    }
-  }
-  // Fetch recent tweets (scrape public if no API key)
-  if (twitterHandle) {
-    try {
-      const twRes = await fetch(`https://nitter.net/${twitterHandle}`); // Use Nitter as a public proxy
-      if (twRes.ok) {
-        const html = await twRes.text();
-        // Extract last 5 tweets (very basic)
-        const tweetMatches = [...html.matchAll(/<div class="tweet-content media-body">([\s\S]*?)<\/div>/g)];
-        let tweets = tweetMatches.slice(0, 5).map(m => m[1].replace(/<[^>]+>/g, '').trim());
-        // Extract likes/retweets (very basic)
-        const likeMatches = [...html.matchAll(/<span class="icon-heart"><\/span>\s*(\d+)/g)];
-        const rtMatches = [...html.matchAll(/<span class="icon-retweet"><\/span>\s*(\d+)/g)];
-        let likes = likeMatches.slice(0, 5).map(m => m[1]);
-        let rts = rtMatches.slice(0, 5).map(m => m[1]);
-        // Basic sentiment: count positive/negative words
-        let pos = 0, neg = 0;
-        for (const t of tweets) {
-          if (/(great|excite|love|win|success|launch|update|active|good|moon|hype)/i.test(t)) pos++;
-          if (/(delay|scam|rug|problem|concern|down|bad|fail|fud|abandon|inactive)/i.test(t)) neg++;
-        }
-        twitterSummary = `Twitter (@${twitterHandle}): Last 5 tweets: ${tweets.map((t, i) => `"${t}" (${likes[i] || 0} likes, ${rts[i] || 0} RTs)`).join(' | ')}. Sentiment: ${pos} positive, ${neg} negative.`;
-      }
-    } catch (e) { /* ignore */ }
-  }
 
   // Medium/Blog integration: auto-detect link, fetch recent posts, summarize
   let blogUrl = null;
