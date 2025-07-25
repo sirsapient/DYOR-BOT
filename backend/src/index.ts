@@ -1172,7 +1172,14 @@ app.post('/api/research', async (req, res) => {
         }
         sourcesUsed.push('Anthropic');
       } else {
-        aiSummary = `Anthropic: ${aiRes.status} ${aiRes.statusText}`;
+        let errorMsg = aiRes.statusText || '';
+        if (aiRes.status === 529) {
+          errorMsg = 'Anthropic API is overloaded or rate-limited. Please try again later.';
+        }
+        if (!errorMsg) {
+          errorMsg = 'Error from Anthropic API. Please try again later.';
+        }
+        aiSummary = `Anthropic: ${aiRes.status} ${errorMsg}`;
       }
     }
   } catch (e) {
