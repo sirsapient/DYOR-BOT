@@ -1,7 +1,43 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ProjectResearch } from './types';
 import './App.css';
 import ReactMarkdown from 'react-markdown';
+
+function LoadingModal({ show }: { show: boolean }) {
+  const images = [
+    '/conspiracy.jpg',
+    '/thinking-kid.jpg',
+    '/math-guy.jpg',
+    '/math-woman.jpg',
+  ];
+  const [index, setIndex] = useState(0);
+  useEffect(() => {
+    if (!show) return;
+    const interval = setInterval(() => {
+      setIndex(i => (i + 1) % images.length);
+    }, 1500);
+    return () => clearInterval(interval);
+  }, [show]);
+  if (!show) return null;
+  return (
+    <div style={{
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      width: '100vw',
+      height: '100vh',
+      background: 'rgba(0,0,0,0.7)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 9999,
+      flexDirection: 'column',
+    }}>
+      <img src={images[index]} alt="Researching..." style={{ maxWidth: 350, maxHeight: 350, borderRadius: 12, boxShadow: '0 4px 24px #0008' }} />
+      <div style={{ color: '#fff', marginTop: 24, fontSize: 22, fontWeight: 600 }}>Researching project...</div>
+    </div>
+  );
+}
 
 function App() {
   const [projectName, setProjectName] = useState('');
@@ -33,20 +69,8 @@ function App() {
 
   return (
     <div className="App">
+      <LoadingModal show={researchLoading} />
       <h1>DYOR BOT</h1>
-      <div style={{
-        background: '#f5f5f5',
-        border: '1px solid #ddd',
-        borderRadius: 8,
-        padding: 16,
-        margin: '16px auto',
-        maxWidth: 600,
-        fontSize: '1.1em',
-        color: '#333',
-      }}>
-        <strong>About:</strong> DYOR BOT is a research tool for analyzing Web3 and gaming projects. Enter a project or token name above and click Search to get a risk score, investment grade, and key findings. Data is sourced from IGDB, CoinGecko, Steam, Etherscan, and more. <br/><br/>
-        <strong>How to use:</strong> Type a project or token name (e.g., "Axie Infinity", "Wildcard") and press Search. Review the summary and details to make informed decisions.
-      </div>
       <hr />
       <h2>Project Research</h2>
       <form onSubmit={handleSearch} style={{ marginBottom: 16 }}>
@@ -61,6 +85,19 @@ function App() {
           {researchLoading ? 'Searching...' : 'Search'}
         </button>
       </form>
+      <div style={{
+        background: '#f5f5f5',
+        border: '1px solid #ddd',
+        borderRadius: 8,
+        padding: 16,
+        margin: '16px auto',
+        maxWidth: 600,
+        fontSize: '1.1em',
+        color: '#333',
+      }}>
+        <strong>About:</strong> DYOR BOT is a research tool for analyzing Web3 and gaming projects. Enter a project or token name above and click Search to get a risk score, investment grade, and key findings. Data is sourced from IGDB, CoinGecko, Steam, Etherscan, and more. <br/><br/>
+        <strong>How to use:</strong> Type a project or token name (e.g., "Axie Infinity", "Wildcard") and press Search. Review the summary and details to make informed decisions.
+      </div>
       {error && <p style={{ color: 'red' }}>{error}</p>}
       {research && (
         <div className="research-container">
