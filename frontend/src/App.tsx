@@ -95,8 +95,8 @@ function App() {
         fontSize: '1.1em',
         color: '#333',
       }}>
-        <strong>About:</strong> DYOR BOT is a research tool for analyzing Web3 and gaming projects. Enter a project or token name above and click Search to get a risk score, investment grade, and key findings. Data is sourced from IGDB, CoinGecko, Steam, Etherscan, and more. <br/><br/>
-        <strong>How to use:</strong> Type a project or token name (e.g., "Axie Infinity", "Wildcard") and press Search. Review the summary and details to make informed decisions.
+        <strong>About:</strong> DYOR BOT is a research tool for analyzing Web3 and gaming projects. It uses over 10 data sources to provide risk scores, investment grades, and key findings.<br/><br/>
+        <strong>How to use:</strong> Type a project or token name and press Search. Review the summary and details to make informed decisions.
       </div>
       {error && <p style={{ color: 'red' }}>{error}</p>}
       {research && (
