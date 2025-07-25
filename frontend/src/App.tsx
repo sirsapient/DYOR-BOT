@@ -101,11 +101,9 @@ function App() {
       {error && <p style={{ color: 'red' }}>{error}</p>}
       {research && (
         <div className="research-container">
-          <h3>{research.projectName}</h3>
           <p>Type: {research.projectType}</p>
           <p>Risk Score: {research.riskScore}</p>
           <p>Investment Grade: {research.investmentGrade}</p>
-          <h4>Key Findings</h4>
           {research.aiSummary && research.aiSummary.startsWith('Anthropic:') ? (
             <div className="markdown-content" style={{ marginBottom: 12, color: 'red' }}>
               There was an issue retrieving the AI summary. Please try again later.
