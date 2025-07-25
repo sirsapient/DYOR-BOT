@@ -14,7 +14,9 @@
   "description": "",
   "dependencies": {
     "cors": "^2.8.5",
-    "express": "^5.1.0"
+    "ethers": "^6.15.0",
+    "express": "^5.1.0",
+    "steam-search": "^1.0.0"
   },
   "devDependencies": {
     "@types/express": "^5.0.3",
