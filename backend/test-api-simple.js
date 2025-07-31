@@ -2,43 +2,27 @@ const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch
 
 async function testAPI() {
   try {
-    console.log('Testing API confidence data...');
+    // Test health endpoint
+    console.log('Testing health endpoint...');
+    const healthRes = await fetch('http://localhost:4000/api/health');
+    console.log('Health status:', healthRes.status);
     
-    const response = await fetch('http://localhost:4000/api/research', {
+    // Test research endpoint
+    console.log('\nTesting research endpoint...');
+    const researchRes = await fetch('http://localhost:4000/api/research', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        projectName: 'ethereum'
-      })
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ projectName: 'test' })
     });
-
-    if (!response.ok) {
-      console.error('API Error:', response.status, response.statusText);
-      return;
-    }
-
-    const data = await response.json();
+    console.log('Research status:', researchRes.status);
     
-    console.log('API Response received!');
-    console.log('Response keys:', Object.keys(data));
-    console.log('Has confidence field:', 'confidence' in data);
-    
-    if (data.confidence) {
-      console.log('✅ Confidence data found!');
-      console.log('Confidence structure:');
-      console.log('- overall:', data.confidence.overall);
-      console.log('- breakdown:', data.confidence.breakdown);
-      console.log('- sourceDetails length:', data.confidence.sourceDetails?.length);
-      console.log('- limitations:', data.confidence.limitations);
-      console.log('- strengths:', data.confidence.strengths);
-      console.log('- userGuidance:', data.confidence.userGuidance);
+    if (researchRes.ok) {
+      const data = await researchRes.json();
+      console.log('Response received:', Object.keys(data));
     } else {
-      console.log('❌ No confidence data found in response');
-      console.log('Available fields:', Object.keys(data));
+      const errorText = await researchRes.text();
+      console.log('Error response:', errorText);
     }
-    
   } catch (error) {
     console.error('Test failed:', error.message);
   }

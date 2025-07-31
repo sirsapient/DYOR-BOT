@@ -306,6 +306,15 @@ export function mapDataToFindings(data: any): ResearchFindings {
       timestamp: new Date(),
       dataPoints: countDataPoints(data.cgData)
     };
+  } else if (data.cgData && data.cgData.error) {
+    // Even if there's an error, we found some data
+    findings.financial_data = {
+      found: true,
+      data: data.cgData,
+      quality: 'low',
+      timestamp: new Date(),
+      dataPoints: 1
+    };
   }
   
   // Map IGDB data to product_data
@@ -316,6 +325,15 @@ export function mapDataToFindings(data: any): ResearchFindings {
       quality: 'high',
       timestamp: new Date(),
       dataPoints: countDataPoints(data.igdbData)
+    };
+  } else if (data.igdbData && data.igdbData.error) {
+    // Even if there's an error, we found some data
+    findings.product_data = {
+      found: true,
+      data: data.igdbData,
+      quality: 'low',
+      timestamp: new Date(),
+      dataPoints: 1
     };
   }
   
@@ -332,6 +350,21 @@ export function mapDataToFindings(data: any): ResearchFindings {
         quality: 'high',
         timestamp: new Date(),
         dataPoints: countDataPoints(data.steamData)
+      };
+    }
+  } else if (data.steamData && data.steamData.error) {
+    // Even if there's an error, we found some data
+    if (findings.product_data) {
+      // Merge with existing product_data
+      findings.product_data.data = { ...findings.product_data.data, steam: data.steamData };
+      findings.product_data.dataPoints += 1;
+    } else {
+      findings.product_data = {
+        found: true,
+        data: data.steamData,
+        quality: 'low',
+        timestamp: new Date(),
+        dataPoints: 1
       };
     }
   }

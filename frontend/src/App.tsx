@@ -85,8 +85,6 @@ function App() {
     }
   };
 
-
-
   return (
     <div className="App">
       <LoadingModal show={researchLoading} />
