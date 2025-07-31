@@ -68,7 +68,7 @@ export class ConfidenceCalculator {
     const overall = this.calculateOverallConfidence(researchScore, breakdown);
     const limitations = this.identifyLimitations(findings, researchPlan);
     const strengths = this.identifyStrengths(findings, sourceDetails);
-    const userGuidance = this.generateUserGuidance(overall, breakdown, limitations);
+    const userGuidance = this.generateUserGuidance(overall, breakdown, limitations, findings);
 
     return {
       overall,
@@ -149,7 +149,7 @@ export class ConfidenceCalculator {
     };
   }
 
-  private generateUserGuidance(overall: any, breakdown: any, limitations: string[]) {
+  private generateUserGuidance(overall: any, breakdown: any, limitations: string[], findings: ResearchFindings) {
     let trustLevel: 'high' | 'medium' | 'low' = 'medium';
     let useCase = 'General research and due diligence';
     const warnings: string[] = [];
@@ -165,8 +165,16 @@ export class ConfidenceCalculator {
     }
 
     if (breakdown.sourceReliability.official === 0) {
-      warnings.push('No official sources found - rely on external verification');
-      additionalResearch.push('Search for official project documentation');
+      // Check if this is an established project that should have official sources
+      const isEstablishedProject = this.isEstablishedProject(findings);
+      if (isEstablishedProject) {
+        warnings.push('Established project missing official sources - this may indicate data collection issues');
+        additionalResearch.push('Search for official project documentation and whitepaper');
+        additionalResearch.push('Check for security audit reports and institutional backing');
+      } else {
+        warnings.push('No official sources found - rely on external verification');
+        additionalResearch.push('Search for official project documentation');
+      }
     }
 
     if (breakdown.dataFreshness.averageAge > 30) {
@@ -274,6 +282,17 @@ export class ConfidenceCalculator {
     );
     
     return oldest.displayName;
+  }
+
+  // Helper method to detect established projects
+  private isEstablishedProject(findings: ResearchFindings): boolean {
+    const hasOfficialWhitepaper = findings.whitepaper?.found && findings.whitepaper?.quality === 'high';
+    const hasSecurityAudit = findings.security_audits?.found && findings.security_audits?.quality === 'high';
+    const hasInstitutionalBacking = findings.financial_data?.data?.funding_rounds || 
+                                   findings.financial_data?.data?.institutional_investors;
+    const hasExtensiveDocumentation = findings.whitepaper?.dataPoints > 20;
+    
+    return hasOfficialWhitepaper && (hasSecurityAudit || hasInstitutionalBacking || hasExtensiveDocumentation);
   }
 
 

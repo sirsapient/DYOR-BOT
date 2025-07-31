@@ -37,6 +37,7 @@ export class ResearchScoringEngine {
   private readonly DATA_SOURCES: DataSource[] = [
     // Tier 1: Critical Foundation (Must-Have)
     { name: 'whitepaper', tier: 1, weight: 20, reliability: 'official', isRequired: true },
+    { name: 'documentation', tier: 1, weight: 15, reliability: 'official', isRequired: false },
     { name: 'onchain_data', tier: 1, weight: 15, reliability: 'verified', isRequired: true },
     { name: 'ronin_data', tier: 1, weight: 15, reliability: 'verified', isRequired: false },
     { name: 'team_info', tier: 1, weight: 15, reliability: 'verified', isRequired: true },
@@ -46,6 +47,7 @@ export class ResearchScoringEngine {
     { name: 'financial_data', tier: 2, weight: 10, reliability: 'verified' },
     { name: 'product_data', tier: 2, weight: 10, reliability: 'verified' },
     { name: 'game_specific', tier: 2, weight: 10, reliability: 'verified' },
+    { name: 'github_activity', tier: 2, weight: 10, reliability: 'verified' },
     
     // Tier 3: Supporting Evidence (Nice-to-Have)
     { name: 'security_audits', tier: 3, weight: 3, reliability: 'official' },
@@ -53,22 +55,40 @@ export class ResearchScoringEngine {
     { name: 'social_signals', tier: 3, weight: 1, reliability: 'scraped' }
   ];
 
+  // Enhanced scoring weights for established projects
+  private readonly ESTABLISHED_PROJECT_WEIGHTS = {
+    whitepaper: 25,      // Increased from 20
+    security_audits: 20,  // Increased from 3
+    team_info: 20,        // Increased from 15
+    github_activity: 10,  // New source for established projects
+    funding_data: 15,     // New source for established projects
+    institutional_backing: 10 // New source for established projects
+  };
+
   private readonly MINIMUM_THRESHOLD = 60;
   private readonly MINIMUM_DATA_POINTS = 15;
   
   public calculateResearchScore(findings: ResearchFindings): ResearchScore {
+    // Check if this is an established project
+    const isEstablishedProject = this.isEstablishedProject(findings);
+    
     const breakdown = {
-      dataCoverage: this.calculateDataCoverage(findings),
+      dataCoverage: this.calculateDataCoverage(findings, isEstablishedProject),
       sourceReliability: this.calculateSourceReliability(findings),
       recencyFactor: this.calculateRecencyFactor(findings)
     };
 
-    const totalScore = breakdown.dataCoverage + breakdown.sourceReliability + breakdown.recencyFactor;
+    // Apply established project bonus if applicable
+    let totalScore = breakdown.dataCoverage + breakdown.sourceReliability + breakdown.recencyFactor;
+    if (isEstablishedProject) {
+      totalScore = this.applyEstablishedProjectBonus(totalScore, findings);
+    }
+
     const grade = this.assignGrade(totalScore);
-    const confidence = this.calculateConfidence(findings, totalScore);
-    const passesThreshold = this.checkThreshold(findings, totalScore);
-    const missingCritical = this.identifyMissingCritical(findings);
-    const recommendations = this.generateRecommendations(findings, totalScore);
+    const confidence = this.calculateConfidence(findings, totalScore, isEstablishedProject);
+    const passesThreshold = this.checkThreshold(findings, totalScore, isEstablishedProject);
+    const missingCritical = this.identifyMissingCritical(findings, isEstablishedProject);
+    const recommendations = this.generateRecommendations(findings, totalScore, isEstablishedProject);
 
     return {
       totalScore,
@@ -168,7 +188,7 @@ export class ResearchScoringEngine {
     return 'F';
   }
 
-  private calculateConfidence(findings: ResearchFindings, score: number): number {
+  private calculateConfidence(findings: ResearchFindings, score: number, isEstablishedProject: boolean = false): number {
     const tier1Coverage = this.getTierCoverage(findings, 1);
     const totalDataPoints = this.getTotalDataPoints(findings);
     
@@ -180,29 +200,58 @@ export class ResearchScoringEngine {
     // Boost confidence for many data points
     if (totalDataPoints >= this.MINIMUM_DATA_POINTS) confidenceScore += 0.1;
     
+    // Enhanced confidence for established projects
+    if (isEstablishedProject) {
+      confidenceScore += 0.15; // +15% confidence for established projects
+      
+      // Additional confidence for comprehensive documentation
+      if (findings.whitepaper?.found && findings.whitepaper?.dataPoints > 30) {
+        confidenceScore += 0.1;
+      }
+      
+      // Additional confidence for institutional backing
+      if (findings.financial_data?.data?.institutional_investors) {
+        confidenceScore += 0.1;
+      }
+    }
+    
     // Reduce confidence for missing critical sources
-    const missingCritical = this.identifyMissingCritical(findings);
+    const missingCritical = this.identifyMissingCritical(findings, isEstablishedProject);
     confidenceScore -= missingCritical.length * 0.15;
     
     return Math.max(0, Math.min(1, confidenceScore));
   }
 
-  private checkThreshold(findings: ResearchFindings, score: number): boolean {
-    // Must pass score threshold
-    if (score < this.MINIMUM_THRESHOLD) return false;
+  private checkThreshold(findings: ResearchFindings, score: number, isEstablishedProject: boolean = false): boolean {
+    // Must pass score threshold (higher for established projects)
+    const threshold = isEstablishedProject ? 70 : this.MINIMUM_THRESHOLD;
+    if (score < threshold) return false;
     
-    // Must have minimum data points
-    if (this.getTotalDataPoints(findings) < this.MINIMUM_DATA_POINTS) return false;
+    // Must have minimum data points (higher for established projects)
+    const minDataPoints = isEstablishedProject ? 25 : this.MINIMUM_DATA_POINTS;
+    if (this.getTotalDataPoints(findings) < minDataPoints) return false;
     
-    // Must have at least 2 of 3 Tier 1 sources
+    // Must have at least 2 of 3 Tier 1 sources (3 of 4 for established projects)
     const tier1Sources = this.DATA_SOURCES.filter(s => s.tier === 1);
     const tier1Found = tier1Sources.filter(s => findings[s.name]?.found).length;
-    if (tier1Found < 2) return false;
+    const requiredTier1 = isEstablishedProject ? 3 : 2;
+    if (tier1Found < requiredTier1) return false;
+    
+    // Additional requirements for established projects
+    if (isEstablishedProject) {
+      // Must have official whitepaper
+      if (!findings.whitepaper?.found) return false;
+      
+      // Must have either security audit or institutional backing
+      const hasSecurityAudit = findings.security_audits?.found;
+      const hasInstitutionalBacking = findings.financial_data?.data?.institutional_investors;
+      if (!hasSecurityAudit && !hasInstitutionalBacking) return false;
+    }
     
     return true;
   }
 
-  private identifyMissingCritical(findings: ResearchFindings): string[] {
+  private identifyMissingCritical(findings: ResearchFindings, isEstablishedProject: boolean = false): string[] {
     const missing: string[] = [];
     
     for (const source of this.DATA_SOURCES) {
@@ -211,17 +260,26 @@ export class ResearchScoringEngine {
       }
     }
     
+    // Additional critical sources for established projects
+    if (isEstablishedProject) {
+      if (!findings.whitepaper?.found) missing.push('official_whitepaper');
+      if (!findings.security_audits?.found && !findings.financial_data?.data?.institutional_investors) {
+        missing.push('security_audit_or_institutional_backing');
+      }
+    }
+    
     return missing;
   }
 
-  private generateRecommendations(findings: ResearchFindings, score: number): string[] {
+  private generateRecommendations(findings: ResearchFindings, score: number, isEstablishedProject: boolean = false): string[] {
     const recommendations: string[] = [];
     
-    if (score < this.MINIMUM_THRESHOLD) {
-      recommendations.push("Insufficient data for reliable analysis");
+    const threshold = isEstablishedProject ? 70 : this.MINIMUM_THRESHOLD;
+    if (score < threshold) {
+      recommendations.push(`Insufficient data for reliable analysis (minimum: ${threshold})`);
     }
     
-    const missingCritical = this.identifyMissingCritical(findings);
+    const missingCritical = this.identifyMissingCritical(findings, isEstablishedProject);
     if (missingCritical.length > 0) {
       recommendations.push(`Missing critical data: ${missingCritical.join(', ')}`);
     }
@@ -232,8 +290,22 @@ export class ResearchScoringEngine {
     }
     
     const totalDataPoints = this.getTotalDataPoints(findings);
-    if (totalDataPoints < this.MINIMUM_DATA_POINTS) {
-      recommendations.push("Need more detailed data points for thorough analysis");
+    const minDataPoints = isEstablishedProject ? 25 : this.MINIMUM_DATA_POINTS;
+    if (totalDataPoints < minDataPoints) {
+      recommendations.push(`Need more detailed data points for thorough analysis (minimum: ${minDataPoints})`);
+    }
+    
+    // Special recommendations for established projects
+    if (isEstablishedProject) {
+      if (!findings.whitepaper?.found) {
+        recommendations.push("Official whitepaper required for established project analysis");
+      }
+      if (!findings.security_audits?.found && !findings.financial_data?.data?.institutional_investors) {
+        recommendations.push("Security audit or institutional backing required for established project");
+      }
+      if (findings.whitepaper?.found && findings.whitepaper?.dataPoints < 30) {
+        recommendations.push("More comprehensive documentation needed for established project");
+      }
     }
     
     return recommendations;
@@ -249,6 +321,89 @@ export class ResearchScoringEngine {
     return Object.values(findings)
       .filter(f => f.found)
       .reduce((total, f) => total + f.dataPoints, 0);
+  }
+
+  // Helper method to detect established projects
+  private isEstablishedProject(findings: ResearchFindings): boolean {
+    // Check for established project indicators in the data
+    const hasOfficialWhitepaper = findings.whitepaper?.found && findings.whitepaper?.quality === 'high';
+    const hasSecurityAudit = findings.security_audits?.found && findings.security_audits?.quality === 'high';
+    const hasInstitutionalBacking = findings.financial_data?.data?.funding_rounds || 
+                                   findings.financial_data?.data?.institutional_investors;
+    const hasExtensiveDocumentation = findings.whitepaper?.dataPoints > 20;
+    
+    return hasOfficialWhitepaper && (hasSecurityAudit || hasInstitutionalBacking || hasExtensiveDocumentation);
+  }
+
+  // Apply bonus for established projects
+  private applyEstablishedProjectBonus(baseScore: number, findings: ResearchFindings): number {
+    let bonus = 0;
+    
+    // Multi-year operation bonus
+    if (findings.whitepaper?.found && findings.whitepaper?.data?.founded_date) {
+      const foundedYear = parseInt(findings.whitepaper.data.founded_date);
+      const currentYear = new Date().getFullYear();
+      if (currentYear - foundedYear >= 2) {
+        bonus += 10; // +10 points for 2+ years of operation
+      }
+    }
+    
+    // Post-incident recovery bonus
+    if (findings.security_audits?.found && findings.security_audits?.data?.post_incident_upgrades) {
+      bonus += 15; // +15 points for handling security incidents well
+    }
+    
+    // Institutional backing bonus
+    if (findings.financial_data?.found && findings.financial_data?.data?.institutional_investors) {
+      bonus += 10; // +10 points for institutional backing
+    }
+    
+    // Comprehensive documentation bonus
+    if (findings.whitepaper?.found && findings.whitepaper?.dataPoints > 30) {
+      bonus += 5; // +5 points for extensive documentation
+    }
+    
+    // GitHub activity bonus
+    if (findings.github_activity?.found && findings.github_activity?.data?.repositoryCount > 10) {
+      bonus += 5; // +5 points for active development
+    }
+    
+    return Math.min(baseScore + bonus, 100); // Cap at 100
+  }
+
+  // Enhanced data coverage calculation for established projects
+  private calculateDataCoverage(findings: ResearchFindings, isEstablishedProject: boolean = false): number {
+    let coverageScore = 0;
+    let maxPossibleScore = 0;
+
+    for (const source of this.DATA_SOURCES) {
+      maxPossibleScore += source.weight;
+      
+      const finding = findings[source.name];
+      if (finding?.found) {
+        let qualityMultiplier = 1.0;
+        
+        switch (finding.quality) {
+          case 'high': qualityMultiplier = 1.0; break;
+          case 'medium': qualityMultiplier = 0.7; break;
+          case 'low': qualityMultiplier = 0.4; break;
+        }
+
+        // Bonus for having many data points
+        const dataPointBonus = Math.min(finding.dataPoints / 10, 1.2);
+        
+        // Enhanced weight for established projects
+        let sourceWeight = source.weight;
+        if (isEstablishedProject && this.ESTABLISHED_PROJECT_WEIGHTS[source.name as keyof typeof this.ESTABLISHED_PROJECT_WEIGHTS]) {
+          sourceWeight = this.ESTABLISHED_PROJECT_WEIGHTS[source.name as keyof typeof this.ESTABLISHED_PROJECT_WEIGHTS];
+        }
+        
+        coverageScore += sourceWeight * qualityMultiplier * dataPointBonus;
+      }
+    }
+
+    // Normalize to 40 points max (40% of total score)
+    return Math.min((coverageScore / maxPossibleScore) * 40, 40);
   }
 
   // Helper method to check if research should proceed to AI analysis
@@ -403,16 +558,8 @@ export function mapDataToFindings(data: any): ResearchFindings {
       dataPoints: countDataPoints(data.roninTokenInfo)
     };
     
-    // If Axie Infinity specific data is available, map it as game-specific data
-    if (data.roninTokenInfo.axieSpecificData) {
-      findings.game_specific = {
-        found: true,
-        data: data.roninTokenInfo.axieSpecificData,
-        quality: 'high',
-        timestamp: new Date(),
-        dataPoints: countDataPoints(data.roninTokenInfo.axieSpecificData)
-      };
-    }
+  
+
   }
   
   // Map team info from various sources to team_info
@@ -441,6 +588,77 @@ export function mapDataToFindings(data: any): ResearchFindings {
       timestamp: new Date(),
       dataPoints: 1
     };
+  }
+  
+
+
+  // Map enhanced official sources data for established projects
+  if (data.officialSourcesData) {
+    // Map whitepaper if found
+    if (data.officialSourcesData.whitepaper) {
+      findings.whitepaper = {
+        found: true,
+        data: { url: data.officialSourcesData.whitepaper },
+        quality: 'high',
+        timestamp: new Date(),
+        dataPoints: 1
+      };
+    }
+    
+    // Map documentation if found
+    if (data.officialSourcesData.documentation) {
+      findings.documentation = {
+        found: true,
+        data: { url: data.officialSourcesData.documentation },
+        quality: 'high',
+        timestamp: new Date(),
+        dataPoints: 1
+      };
+    }
+    
+    // Map GitHub if found
+    if (data.officialSourcesData.github) {
+      findings.github_activity = {
+        found: true,
+        data: { url: data.officialSourcesData.github },
+        quality: 'high',
+        timestamp: new Date(),
+        dataPoints: 1
+      };
+    }
+    
+    // Map security audit if found
+    if (data.officialSourcesData.securityAudit) {
+      findings.security_audits = {
+        found: true,
+        data: { url: data.officialSourcesData.securityAudit },
+        quality: 'high',
+        timestamp: new Date(),
+        dataPoints: 1
+      };
+    }
+    
+    // Map team info if found
+    if (data.officialSourcesData.teamInfo) {
+      findings.team_info = {
+        found: true,
+        data: data.officialSourcesData.teamInfo,
+        quality: 'high',
+        timestamp: new Date(),
+        dataPoints: countDataPoints(data.officialSourcesData.teamInfo)
+      };
+    }
+    
+    // Map funding info if found
+    if (data.officialSourcesData.fundingInfo) {
+      findings.financial_data = {
+        found: true,
+        data: { ...findings.financial_data?.data, ...data.officialSourcesData.fundingInfo },
+        quality: 'high',
+        timestamp: new Date(),
+        dataPoints: (findings.financial_data?.dataPoints || 0) + countDataPoints(data.officialSourcesData.fundingInfo)
+      };
+    }
   }
   
   // Map social signals to community_health (merge with Discord if both exist)

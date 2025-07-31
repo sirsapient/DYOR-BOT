@@ -126,10 +126,5 @@ export interface RoninTokenInfo {
     recentTransactions?: any[];
     network?: string;
   };
-  axieSpecificData?: {
-    gameStats?: any;
-    marketplaceData?: any;
-    breedingData?: any;
-  };
   error?: string;
 } 

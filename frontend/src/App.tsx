@@ -175,28 +175,7 @@ function App() {
           </div>
         </div>
 
-        {/* Quick Axie Infinity Button */}
-        <div style={{ marginBottom: '12px' }}>
-          <button
-            type="button"
-            onClick={() => {
-              setProjectName('Axie Infinity');
-              setSelectedNetwork('ronin');
-              setRoninContractAddress('0x97a9107c1793bc407d6f527b77e7fff4d812bece'); // AXS token contract
-            }}
-            style={{
-              padding: '8px 16px',
-              backgroundColor: '#4CAF50',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              fontSize: '14px'
-            }}
-          >
-            🎮 Quick Search: Axie Infinity
-          </button>
-        </div>
+
       </form>
       <div style={{
         background: '#f5f5f5',
@@ -296,22 +275,7 @@ function App() {
                     <p><strong>Transactions:</strong> {research.financialData.roninTokenInfo.transactionHistory.transactionCount?.toLocaleString() || 'N/A'}</p>
                   )}
                   
-                  {/* Axie Infinity Specific Data */}
-                  {research.financialData.roninTokenInfo.axieSpecificData && (
-                    <div style={{ marginTop: 8, padding: 8, backgroundColor: '#e8f5e8', borderRadius: 4 }}>
-                      <h6 style={{ color: '#2e7d32', margin: '0 0 4px 0' }}>🎮 Axie Infinity Game Data</h6>
-                      {research.financialData.roninTokenInfo.axieSpecificData.gameStats && (
-                        <p style={{ fontSize: '14px', margin: '2px 0' }}>
-                          <strong>Game Stats:</strong> Available
-                        </p>
-                      )}
-                      {research.financialData.roninTokenInfo.axieSpecificData.marketplaceData && (
-                        <p style={{ fontSize: '14px', margin: '2px 0' }}>
-                          <strong>Marketplace Data:</strong> Available
-                        </p>
-                      )}
-                    </div>
-                  )}
+
                 </div>
               )}
             </div>

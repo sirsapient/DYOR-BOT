@@ -106,7 +106,16 @@ export class QualityGatesEngine {
 
   // Gate 1: Minimum Score Check
   private checkMinimumScore(score: ResearchScore): boolean {
-    return score.totalScore >= 60 && score.passesThreshold;
+    // Higher threshold for established projects
+    const isEstablishedProject = this.isEstablishedProject(score);
+    const minimumScore = isEstablishedProject ? 70 : 60;
+    return score.totalScore >= minimumScore && score.passesThreshold;
+  }
+
+  // Helper method to detect established projects
+  private isEstablishedProject(score: ResearchScore): boolean {
+    // Check if this is an established project based on score characteristics
+    return score.totalScore >= 75 && score.confidence >= 0.8;
   }
 
   // Gate 2: Critical Data Sources Must Be Present
@@ -118,12 +127,16 @@ export class QualityGatesEngine {
     const reasons: string[] = [];
     const suggestions: string[] = [];
 
-    // Must have at least 2 of 3 Tier 1 sources
+    // Check if this is an established project
+    const isEstablishedProject = this.isEstablishedProjectFromFindings(findings);
+
+    // Must have at least 2 of 3 Tier 1 sources (3 of 4 for established projects)
     const tier1Sources = ['whitepaper', 'onchain_data', 'team_info'];
     const foundTier1 = tier1Sources.filter(source => findings[source]?.found);
+    const requiredTier1 = isEstablishedProject ? 3 : 2;
 
-    if (foundTier1.length < 2) {
-      reasons.push(`Only found ${foundTier1.length}/3 critical data sources`);
+    if (foundTier1.length < requiredTier1) {
+      reasons.push(`Only found ${foundTier1.length}/${requiredTier1} critical data sources`);
       
       const missing = tier1Sources.filter(source => !findings[source]?.found);
       missing.forEach(source => {
@@ -131,6 +144,9 @@ export class QualityGatesEngine {
           case 'whitepaper':
             suggestions.push('Search for project whitepaper, documentation, or technical specs');
             suggestions.push('Check project website for detailed information');
+            if (isEstablishedProject) {
+              suggestions.push('Official whitepaper is required for established projects');
+            }
             break;
           case 'onchain_data':
             suggestions.push('Verify token contract on blockchain explorer');
@@ -144,21 +160,46 @@ export class QualityGatesEngine {
       });
     }
 
-    // Must have minimum data points
+    // Must have minimum data points (higher for established projects)
     const totalDataPoints = Object.values(findings)
       .filter(f => f.found)
       .reduce((total, f) => total + f.dataPoints, 0);
+    const minDataPoints = isEstablishedProject ? 25 : 15;
 
-    if (totalDataPoints < 15) {
-      reasons.push(`Insufficient data points (${totalDataPoints}/15 minimum)`);
+    if (totalDataPoints < minDataPoints) {
+      reasons.push(`Insufficient data points (${totalDataPoints}/${minDataPoints} minimum)`);
       suggestions.push('Gather more detailed information from available sources');
     }
 
+    // Additional requirements for established projects
+    if (isEstablishedProject) {
+      if (!findings.whitepaper?.found) {
+        reasons.push('Official whitepaper required for established project');
+        suggestions.push('Search for official project documentation and whitepaper');
+      }
+      
+      if (!findings.security_audits?.found && !findings.financial_data?.data?.institutional_investors) {
+        reasons.push('Security audit or institutional backing required for established project');
+        suggestions.push('Look for security audit reports or institutional investor information');
+      }
+    }
+
     return {
-      passed: foundTier1.length >= 2 && totalDataPoints >= 15,
+      passed: foundTier1.length >= requiredTier1 && totalDataPoints >= minDataPoints,
       reasons,
       suggestions
     };
+  }
+
+  // Helper method to detect established projects from findings
+  private isEstablishedProjectFromFindings(findings: ResearchFindings): boolean {
+    const hasOfficialWhitepaper = findings.whitepaper?.found && findings.whitepaper?.quality === 'high';
+    const hasSecurityAudit = findings.security_audits?.found && findings.security_audits?.quality === 'high';
+    const hasInstitutionalBacking = findings.financial_data?.data?.funding_rounds || 
+                                   findings.financial_data?.data?.institutional_investors;
+    const hasExtensiveDocumentation = findings.whitepaper?.dataPoints > 20;
+    
+    return hasOfficialWhitepaper && (hasSecurityAudit || hasInstitutionalBacking || hasExtensiveDocumentation);
   }
 
   // Gate 3: Team Identity Verification

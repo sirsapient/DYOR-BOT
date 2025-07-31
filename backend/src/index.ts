@@ -291,7 +291,7 @@ async function searchContractAddressWithLLM(projectName: string): Promise<string
 }
 
 async function fetchWhitepaperUrl(websiteUrl: string): Promise<string | null> {
-  // Fetch the homepage and look for links containing 'whitepaper' or 'tokenomics'
+  // Enhanced whitepaper discovery for established projects
   try {
     const res = await fetch(websiteUrl);
     if (!res.ok) return null;
@@ -299,43 +299,192 @@ async function fetchWhitepaperUrl(websiteUrl: string): Promise<string | null> {
     const $ = cheerio.load(html);
     let found = null;
     
-    // Look for various tokenomics-related links
-    $('a').each((_: any, el: any) => {
-      const href = $(el).attr('href');
-      const text = $(el).text().toLowerCase();
-      
-      if (href) {
-        // Check href for tokenomics-related terms
-        if (/whitepaper|tokenomics|token[-_]economics|token[-_]distribution|economics|docs?|documentation/i.test(href)) {
-          found = href.startsWith('http') ? href : new URL(href, websiteUrl).toString();
-          return false;
-        }
-        
-        // Check link text for tokenomics-related terms
-        if (/whitepaper|tokenomics|token economics|token distribution|economics|documentation/i.test(text)) {
-          found = href.startsWith('http') ? href : new URL(href, websiteUrl).toString();
-          return false;
+    // Strategy 1: Direct whitepaper links
+    const whitepaperSelectors = [
+      'a[href*="whitepaper"]',
+      'a[href*="tokenomics"]',
+      'a[href*="docs"]',
+      'a[href*="documentation"]',
+      'a[href*="litepaper"]',
+      'a[href*="technical-paper"]',
+      'a[href*="economics"]',
+      'a[href*="governance"]'
+    ];
+    
+    for (const selector of whitepaperSelectors) {
+      const link = $(selector).first();
+      if (link.length) {
+        const href = link.attr('href');
+        if (href) {
+          const fullUrl = href.startsWith('http') ? href : new URL(href, websiteUrl).href;
+          found = fullUrl;
+          break;
         }
       }
-    });
+    }
     
-    // If no specific tokenomics link found, look for general documentation
+    // Strategy 2: Look for common whitepaper URL patterns
     if (!found) {
-      $('a').each((_: any, el: any) => {
-        const href = $(el).attr('href');
-        const text = $(el).text().toLowerCase();
-        
-        if (href && /docs?|documentation|learn|about/i.test(href) && /docs?|documentation|learn|about/i.test(text)) {
-          found = href.startsWith('http') ? href : new URL(href, websiteUrl).toString();
-          return false;
+      const commonPaths = [
+        '/whitepaper',
+        '/docs',
+        '/documentation',
+        '/tokenomics',
+        '/economics',
+        '/governance',
+        '/technical'
+      ];
+      
+      for (const path of commonPaths) {
+        try {
+          const testUrl = new URL(path, websiteUrl).href;
+          const testRes = await fetch(testUrl);
+          if (testRes.ok) {
+            found = testUrl;
+            break;
+          }
+        } catch (e) {
+          // Continue to next path
         }
-      });
+      }
+    }
+    
+    // Strategy 3: Search for PDF links
+    if (!found) {
+      const pdfLinks = $('a[href*=".pdf"]');
+      for (let i = 0; i < pdfLinks.length; i++) {
+        const href = $(pdfLinks[i]).attr('href');
+        if (href && (href.includes('whitepaper') || href.includes('tokenomics') || href.includes('audit'))) {
+          const fullUrl = href.startsWith('http') ? href : new URL(href, websiteUrl).href;
+          found = fullUrl;
+          break;
+        }
+      }
     }
     
     return found;
   } catch (e) {
     return null;
   }
+}
+
+// Enhanced function to detect if a project is established
+function isEstablishedProject(projectName: string, aliases: string[]): boolean {
+  const establishedKeywords = [
+    'sandbox', 'decentraland', 'mana',
+    'illuvium', 'gods', 'unchained',
+    'stepn', 'move', 'earn',
+    'gala', 'games', 'foundation',
+    'enjin', 'coin', 'platform',
+    'immutable', 'x', 'gods',
+    'ultra', 'u', 'token',
+    'wax', 'blockchain', 'platform',
+    'flow', 'dapper', 'labs',
+    'polygon', 'studios', 'gaming'
+  ];
+  
+  const allNames = [projectName.toLowerCase(), ...aliases.map(a => a.toLowerCase())];
+  
+  return establishedKeywords.some(keyword => 
+    allNames.some(name => name.includes(keyword))
+  );
+}
+
+// Enhanced function to find official sources for established projects
+async function findOfficialSourcesForEstablishedProject(projectName: string, aliases: string[]): Promise<any> {
+  const officialSources: any = {
+    whitepaper: null,
+    documentation: null,
+    github: null,
+    securityAudit: null,
+    teamInfo: null,
+    fundingInfo: null
+  };
+  
+  // Strategy 1: Try common domain patterns
+  const domainPatterns = [
+    `${projectName.toLowerCase().replace(/\s+/g, '')}.com`,
+    `${projectName.toLowerCase().replace(/\s+/g, '')}.io`,
+    `${projectName.toLowerCase().replace(/\s+/g, '')}.org`,
+    `${aliases[0]?.toLowerCase().replace(/\s+/g, '')}.com`,
+    `${aliases[0]?.toLowerCase().replace(/\s+/g, '')}.io`
+  ];
+  
+  for (const domain of domainPatterns) {
+    try {
+      const websiteUrl = `https://${domain}`;
+      const res = await fetch(websiteUrl);
+      if (res.ok) {
+        // Found official website, now look for whitepaper
+        const whitepaperUrl = await fetchWhitepaperUrl(websiteUrl);
+        if (whitepaperUrl) {
+          officialSources.whitepaper = whitepaperUrl;
+        }
+        
+        // Look for GitHub link
+        const html = await res.text();
+        const $ = cheerio.load(html);
+        const githubLink = $('a[href*="github.com"]').first();
+        if (githubLink.length) {
+          officialSources.github = githubLink.attr('href');
+        }
+        
+        // Look for documentation
+        const docsLink = $('a[href*="docs"], a[href*="documentation"]').first();
+        if (docsLink.length) {
+          officialSources.documentation = docsLink.attr('href');
+        }
+        
+        break;
+      }
+    } catch (e) {
+      // Continue to next domain
+    }
+  }
+  
+  // Strategy 2: Search for GitHub repositories
+  if (!officialSources.github) {
+    for (const alias of aliases) {
+      try {
+        const githubRes = await fetch(`https://api.github.com/search/repositories?q=${encodeURIComponent(alias)}`);
+        if (githubRes.ok) {
+          const githubData = await githubRes.json();
+          if (githubData.items && githubData.items.length > 0) {
+            const topRepo = githubData.items[0];
+            if (topRepo.stargazers_count > 100) { // Only consider popular repos
+              officialSources.github = topRepo.html_url;
+            }
+          }
+        }
+      } catch (e) {
+        // Continue to next alias
+      }
+    }
+  }
+  
+  // Strategy 3: Search for security audit reports
+  if (!officialSources.securityAudit) {
+    for (const alias of aliases) {
+      try {
+        const auditSearchTerms = [
+          `${alias} security audit`,
+          `${alias} certik audit`,
+          `${alias} audit report`,
+          `${alias} security verification`
+        ];
+        
+        for (const searchTerm of auditSearchTerms) {
+          // This would integrate with a search API like SerpAPI
+          // For now, we'll return a placeholder
+          // TODO: Implement actual audit search functionality
+        }
+      } catch (e) {
+        // Continue to next alias
+      }
+    }
+  }
+  
+  return officialSources;
 }
 
 async function fetchPdfBuffer(url: string): Promise<Buffer | null> {
@@ -379,7 +528,7 @@ async function extractTokenomicsFromWhitepaper(websiteUrl: string): Promise<any 
   // Use Anthropic Claude to extract tokenomics
   const prompt = `Given the following text from a crypto project whitepaper or tokenomics page, extract the tokenomics details. Focus on:
 
-1. Token names and symbols (e.g., AXS, SLP for Axie Infinity)
+    1. Token names and symbols (e.g., AXS, SLP)
 2. Total supply and circulating supply
 3. Token distribution breakdown (team, community, treasury, etc.)
 4. Vesting schedules and unlock periods
@@ -888,6 +1037,17 @@ async function performTraditionalResearch(req: any, res: any) {
   // Deduplicate and prioritize aliases
   aliases = Array.from(new Set(aliases.map(a => a.trim().toLowerCase()).filter(Boolean)));
 
+  // Enhanced search for established projects
+  let officialSourcesData: any = null;
+  if (isEstablishedProject(projectName, aliases)) {
+    console.log(`Detected established project: ${projectName}, searching for official sources...`);
+    officialSourcesData = await findOfficialSourcesForEstablishedProject(projectName, aliases);
+    if (officialSourcesData) {
+      sourcesUsed.push('OfficialSources');
+      console.log('Found official sources:', Object.keys(officialSourcesData).filter(key => officialSourcesData[key]));
+    }
+  }
+
   // Steam fetch
   try {
     const steamRes = await fetch(`https://store.steampowered.com/api/storesearch/?term=${encodeURIComponent(projectName)}&cc=us&l=en`);
@@ -1055,19 +1215,7 @@ async function performTraditionalResearch(req: any, res: any) {
         
       }
 
-      // Special handling for Axie Infinity
-      if (projectName.toLowerCase().includes('axie') || 
-          (tokenSymbol && tokenSymbol.toLowerCase() === 'axs') ||
-          (roninTokenInfo && roninTokenInfo.symbol && roninTokenInfo.symbol.toLowerCase() === 'axs')) {
 
-        const axieData = await fetchAxieInfinitySpecificData();
-        if (axieData) {
-          if (!roninTokenInfo) roninTokenInfo = {};
-          roninTokenInfo.axieSpecificData = axieData;
-          sourcesUsed.push('AxieInfinity');
-
-        }
-      }
     } catch (e) {
 
       roninTokenInfo = { error: 'Ronin fetch failed' };
@@ -1169,11 +1317,13 @@ Format the response as a clear, structured analysis suitable for investors and r
     steamData,
     discordData,
     etherscanData,
+    roninTokenInfo,
     studioAssessment: igdbData?.studioAssessment,
     securitySummary,
     twitterSummary,
     redditSummary,
     telegramSummary,
+    officialSourcesData,
   });
 
 
@@ -1388,40 +1538,11 @@ async function fetchRoninTransactionHistory(contractAddress: string): Promise<an
   return null;
 }
 
-async function fetchAxieInfinitySpecificData(): Promise<any> {
-  try {
-    // Axie Infinity specific data sources
-    const axieData = {
-      gameStats: null,
-      marketplaceData: null,
-      breedingData: null
-    };
 
-    // Fetch Axie Infinity game stats
-    try {
-      const gameStatsRes = await fetch('https://api.axieinfinity.com/v1/stats/axies/count');
-      if (gameStatsRes.ok) {
-        const gameStats = await gameStatsRes.json();
-        axieData.gameStats = gameStats;
-      }
-    } catch (e) {
-  
-    }
 
-    // Fetch marketplace data
-    try {
-      const marketplaceRes = await fetch('https://api.axieinfinity.com/v1/marketplace/stats');
-      if (marketplaceRes.ok) {
-        const marketplace = await marketplaceRes.json();
-        axieData.marketplaceData = marketplace;
-      }
-    } catch (e) {
-  
-    }
 
-    return axieData;
-  } catch (e) {
 
-  }
-  return null;
+function countDataPoints(text: string): number {
+  const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 10);
+  return Math.min(sentences.length, 50);
 }
