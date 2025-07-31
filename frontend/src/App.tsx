@@ -55,7 +55,7 @@ function App() {
       const endpoint = '/api/research';
       const fullUrl = `${apiUrl}${endpoint}`;
       
-      console.log('Making request to:', fullUrl);
+      console.log('Making request to:', fullUrl, '(Updated with port 10000)');
       
       const res = await fetch(fullUrl, {
         method: 'POST',
