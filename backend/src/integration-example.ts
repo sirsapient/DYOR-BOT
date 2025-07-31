@@ -41,9 +41,9 @@ export async function enhancedResearchWithAI(
     console.log('✅ AI research planning completed successfully');
     console.log(`📊 AI Research Summary:`);
     console.log(`   - Project Type: ${aiResult.researchPlan.projectClassification.type}`);
-    console.log(`   - AI Confidence: ${aiResult.completeness.confidence}`);
-    console.log(`   - Sources Collected: ${aiResult.meta.sourcesCollected}`);
-    console.log(`   - Time Spent: ${aiResult.meta.timeSpent} minutes`);
+    console.log(`   - AI Confidence: ${aiResult.completeness?.confidence || 'N/A'}`);
+    console.log(`   - Sources Collected: ${aiResult.meta?.sourcesCollected || 'N/A'}`);
+    console.log(`   - Time Spent: ${aiResult.meta?.timeSpent || 'N/A'} minutes`);
 
     // Step 2: Use the AI-generated findings with quality gates
     const qualityGateResult = await handleResearchWithQualityGates(
@@ -56,16 +56,16 @@ export async function enhancedResearchWithAI(
 
     // Step 3: Combine AI insights with quality gate results
     return {
-      success: qualityGateResult.passed,
+      success: qualityGateResult.success,
       aiResearch: aiResult,
       qualityGates: qualityGateResult,
       combinedInsights: {
         projectType: aiResult.researchPlan.projectClassification.type,
-        aiConfidence: aiResult.completeness.confidence,
-        qualityScore: qualityGateResult.passed ? 'High' : 'Low',
+        aiConfidence: aiResult.completeness?.confidence || 0,
+        qualityScore: qualityGateResult.success ? 'High' : 'Low',
         recommendations: [
-          ...aiResult.completeness.recommendations,
-          ...qualityGateResult.recommendations
+          ...(aiResult.completeness?.recommendations || []),
+          ...(qualityGateResult.recommendations || [])
         ],
         riskAreas: aiResult.researchPlan.riskAreas.map(risk => ({
           area: risk.area,
@@ -206,7 +206,7 @@ export async function batchResearchWithAI(
         aiConfidence: 0,
         timeSpent: 0,
         sourcesCollected: 0,
-        error: error.message
+        error: error instanceof Error ? error.message : String(error)
       });
     }
   }

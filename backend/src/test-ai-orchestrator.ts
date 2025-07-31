@@ -43,9 +43,9 @@ export async function testAIOrchestratedResearch() {
       console.log(`📊 Research Summary:`);
       console.log(`   - Project Type: ${result.researchPlan.projectClassification.type}`);
       console.log(`   - Confidence: ${result.researchPlan.projectClassification.confidence}`);
-      console.log(`   - Sources Collected: ${result.meta.sourcesCollected}`);
-      console.log(`   - Time Spent: ${result.meta.timeSpent} minutes`);
-      console.log(`   - AI Confidence: ${result.completeness.confidence}`);
+      console.log(`   - Sources Collected: ${result.meta?.sourcesCollected || 'N/A'}`);
+      console.log(`   - Time Spent: ${result.meta?.timeSpent || 'N/A'} minutes`);
+      console.log(`   - AI Confidence: ${result.completeness?.confidence || 'N/A'}`);
       
       console.log(`\n🔍 Priority Sources:`);
       result.researchPlan.prioritySources.forEach((source, index) => {
@@ -67,16 +67,16 @@ export async function testAIOrchestratedResearch() {
       }
 
       console.log(`\n📈 Completeness Assessment:`);
-      console.log(`   - Is Complete: ${result.completeness.isComplete}`);
-      console.log(`   - Confidence: ${result.completeness.confidence}`);
-      console.log(`   - Gaps: ${result.completeness.gaps.join(', ') || 'None'}`);
-      console.log(`   - Recommendations: ${result.completeness.recommendations.join(', ')}`);
+      console.log(`   - Is Complete: ${result.completeness?.isComplete || 'N/A'}`);
+      console.log(`   - Confidence: ${result.completeness?.confidence || 'N/A'}`);
+      console.log(`   - Gaps: ${result.completeness?.gaps?.join(', ') || 'None'}`);
+      console.log(`   - Recommendations: ${result.completeness?.recommendations?.join(', ') || 'None'}`);
 
     } else {
       console.log('\n❌ Research failed to meet quality standards');
       console.log(`Reason: ${result.reason}`);
-      console.log(`Gaps: ${result.gaps.join(', ')}`);
-      console.log(`Recommendations: ${result.recommendations.join(', ')}`);
+      console.log(`Gaps: ${result.gaps?.join(', ') || 'None'}`);
+      console.log(`Recommendations: ${result.recommendations?.join(', ') || 'None'}`);
     }
 
   } catch (error) {
@@ -168,7 +168,7 @@ export async function testIndividualOrchestratorMethods() {
     console.log(`✅ Completeness assessment completed`);
     console.log(`   Is Complete: ${completeness.isComplete}`);
     console.log(`   Confidence: ${completeness.confidence}`);
-    console.log(`   Gaps: ${completeness.gaps.join(', ') || 'None'}`);
+    console.log(`   Gaps: ${completeness.gaps?.join(', ') || 'None'}`);
 
   } catch (error) {
     console.error('❌ Error testing individual methods:', error);
