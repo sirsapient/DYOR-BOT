@@ -45,7 +45,7 @@ function App() {
   const [research, setResearch] = useState<ProjectResearch | null>(null);
   const [researchLoading, setResearchLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [useMockApi, setUseMockApi] = useState(false);
+  const [useMockApi, setUseMockApi] = useState(true); // Default to mock API for now
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -114,12 +114,12 @@ function App() {
               onChange={e => setUseMockApi(e.target.checked)}
               style={{ marginRight: '4px' }}
             />
-            Use Mock API (for testing confidence indicators locally)
+            Use Mock API (recommended for testing)
           </label>
         </div>
         {!useMockApi && (
           <div style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>
-            Note: Using production API. If you get errors, try checking "Use Mock API" for local testing.
+            Note: Production API is currently having issues. Use Mock API for reliable testing.
           </div>
         )}
       </form>
