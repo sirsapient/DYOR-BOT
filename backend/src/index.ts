@@ -401,17 +401,14 @@ app.post('/api/research', async (req: any, res: any) => {
   // Enhanced CoinGecko fetch
   try {
     let coinId = null;
-    console.log('🔍 Starting CoinGecko search for:', projectName);
-    console.log('🔍 Initial aliases:', aliases);
-    
+
     // 1. If contract address is provided, try contract endpoint (Ethereum only for now)
     if (contractAddress) {
-      console.log('🔍 Using contract address:', contractAddress);
       const contractRes = await fetch(`https://api.coingecko.com/api/v3/coins/ethereum/contract/${contractAddress}`);
       if (contractRes.ok) {
         cgData = await contractRes.json();
         sourcesUsed.push('CoinGecko');
-        console.log('✅ CoinGecko contract search successful');
+    
         if (cgData.name) aliases.push(cgData.name);
         if (cgData.symbol) aliases.push(cgData.symbol);
         if (cgData.links && cgData.links.homepage && cgData.links.homepage[0]) {
@@ -420,48 +417,40 @@ app.post('/api/research', async (req: any, res: any) => {
         }
       } else {
         cgData = { error: `CoinGecko contract: ${contractRes.status} ${contractRes.statusText}` };
-        console.log('❌ CoinGecko contract search failed:', contractRes.status, contractRes.statusText);
+    
       }
     } else {
       // 2. Otherwise, fetch all coins and try to match using all aliases
-      console.log('🔍 Fetching CoinGecko coins list...');
       const listRes = await fetch('https://api.coingecko.com/api/v3/coins/list');
       if (listRes.ok) {
         const coins: any[] = await listRes.json();
-        console.log('📊 CoinGecko coins list loaded, total coins:', coins.length);
         
         // Try all aliases for id, name, symbol, partial/fuzzy
         let candidates: any[] = [];
         for (const alias of aliases) {
           const lowerAlias = alias.toLowerCase();
           candidates = coins.filter((c: any) => c.id.toLowerCase() === lowerAlias || c.name.toLowerCase() === lowerAlias);
-          console.log(`🔍 Searching for exact match "${lowerAlias}":`, candidates.length, 'candidates found');
           if (candidates.length) break;
         }
         if (!candidates.length && tokenSymbol) {
           candidates = coins.filter((c: any) => c.symbol.toLowerCase() === tokenSymbol.toLowerCase());
-          console.log(`🔍 Searching for token symbol "${tokenSymbol}":`, candidates.length, 'candidates found');
         }
         if (!candidates.length) {
           for (const alias of aliases) {
             const lowerAlias = alias.toLowerCase();
             candidates = coins.filter((c: any) => c.id.toLowerCase().includes(lowerAlias) || c.name.toLowerCase().includes(lowerAlias));
-            console.log(`🔍 Searching for partial match "${lowerAlias}":`, candidates.length, 'candidates found');
             if (candidates.length) break;
           }
         }
         if (!candidates.length && tokenSymbol) {
           candidates = coins.filter((c: any) => c.symbol.toLowerCase().includes(tokenSymbol.toLowerCase()));
-          console.log(`🔍 Searching for partial token symbol "${tokenSymbol}":`, candidates.length, 'candidates found');
         }
         if (candidates.length) {
           coinId = candidates[0].id;
-          console.log('✅ Found CoinGecko candidate:', coinId);
           const cgRes = await fetch(`https://api.coingecko.com/api/v3/coins/${coinId}`);
           if (cgRes.ok) {
             cgData = await cgRes.json();
             sourcesUsed.push('CoinGecko');
-            console.log('✅ CoinGecko data fetched successfully');
             if (cgData.name) aliases.push(cgData.name);
             if (cgData.symbol) aliases.push(cgData.symbol);
             if (cgData.links && cgData.links.homepage && cgData.links.homepage[0]) {
@@ -470,10 +459,8 @@ app.post('/api/research', async (req: any, res: any) => {
             }
           } else {
             cgData = { error: `CoinGecko: ${cgRes.status} ${cgRes.statusText}` };
-            console.log('❌ CoinGecko data fetch failed:', cgRes.status, cgRes.statusText);
           }
         } else {
-          console.log('❌ No CoinGecko candidates found for any alias');
           // Fallback: LLM-powered web search for contract address using all aliases
           let llmAddress = null;
           for (const alias of aliases) {
@@ -482,20 +469,16 @@ app.post('/api/research', async (req: any, res: any) => {
           }
           if (llmAddress) {
             cgData = { fallback_contract_address: llmAddress };
-            console.log('🔍 LLM found contract address:', llmAddress);
           } else {
             cgData = { error: 'No matching token found on CoinGecko (checked id, name, symbol, partial matches, all aliases), and LLM web search did not find a contract address.' };
-            console.log('❌ No contract address found via LLM');
           }
         }
       } else {
         cgData = { error: `CoinGecko list: ${listRes.status} ${listRes.statusText}` };
-        console.log('❌ CoinGecko list fetch failed:', listRes.status, listRes.statusText);
       }
     }
   } catch (e) {
     cgData = { error: 'CoinGecko fetch failed' };
-    console.log('❌ CoinGecko fetch exception:', e);
   }
 
   // IGDB fetch
@@ -520,9 +503,6 @@ app.post('/api/research', async (req: any, res: any) => {
       igdbData = igdbJson[0] || null;
       if (igdbData) {
         sourcesUsed.push('IGDB');
-        console.log('✅ IGDB data found:', igdbData.name);
-      } else {
-        console.log('❌ No IGDB data found');
       }
       if (igdbData && igdbData.name) aliases.push(igdbData.name);
       if (igdbData && igdbData.websites && Array.isArray(igdbData.websites)) {
@@ -575,24 +555,18 @@ app.post('/api/research', async (req: any, res: any) => {
 
   // Steam fetch
   try {
-    console.log('🔍 Starting Steam search for:', projectName);
     const steamRes = await fetch(`https://store.steampowered.com/api/storesearch/?term=${encodeURIComponent(projectName)}&cc=us&l=en`);
     if (steamRes.ok) {
       const steamJson = await steamRes.json();
       steamData = steamJson.items && steamJson.items.length > 0 ? steamJson.items[0] : null;
       if (steamData) {
         sourcesUsed.push('Steam');
-        console.log('✅ Steam data found:', steamData.name);
-      } else {
-        console.log('❌ No Steam data found');
       }
     } else {
       steamData = { error: `Steam: ${steamRes.status} ${steamRes.statusText}` };
-      console.log('❌ Steam search failed:', steamRes.status, steamRes.statusText);
     }
   } catch (e) {
     steamData = { error: 'Steam fetch failed' };
-    console.log('❌ Steam fetch exception:', e);
   }
 
   // Collect all possible homepages/website URLs from CoinGecko, IGDB, and aliases
@@ -1448,7 +1422,6 @@ ${JSON.stringify({cgData, igdbData, steamData, discordData, etherscanData, solsc
   
   // If all sources failed, return 404
   if (sourcesUsed.length === 0) {
-    console.log('❌ No sources found, returning 404');
     return res.status(404).json({ error: 'No data found for this project from any source.' });
   }
 
