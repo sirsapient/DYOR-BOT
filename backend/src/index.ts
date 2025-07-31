@@ -1,7 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 // @ts-ignore
-const fetch = require('node-fetch');
+const fetch = require('node-fetch').default || require('node-fetch');
 require('dotenv').config();
 import { ethers } from 'ethers';
 const pdfParse = require('pdf-parse');

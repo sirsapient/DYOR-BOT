@@ -52,10 +52,10 @@ function App() {
     setError(null);
     try {
       const apiUrl = process.env.REACT_APP_API_URL || 'https://dyor-bot.onrender.com';
-      const endpoint = '/api/research-mock';
+      const endpoint = '/api/research';
       const fullUrl = `${apiUrl}${endpoint}`;
       
-      console.log('Making request to:', fullUrl, '(Using mock endpoint for now)');
+      console.log('Making request to:', fullUrl, '(Fixed fetch compatibility)');
       
       const res = await fetch(fullUrl, {
         method: 'POST',
