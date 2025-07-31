@@ -58,7 +58,7 @@ function App() {
       const endpoint = useMockApi ? '/api/research-mock' : '/api/research';
       const fullUrl = `${apiUrl}${endpoint}`;
       
-      console.log('Making request to:', fullUrl); // Debug log
+      console.log('Making request to:', fullUrl); // Debug log - Updated with port 10000
       console.log('useMockApi:', useMockApi); // Debug log
       
       const res = await fetch(fullUrl, {
