@@ -1,5 +1,0 @@
-[33m6381129[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m Fix TypeScript errors: Initialize positives, negatives, and redFlags as empty arrays in keyFindings
-[33md64eb92[m Integrate AI orchestrator into main research endpoint
-[33m02734e0[m Temporarily default to mock API due to production backend issues
-[33m8b99f44[m Add debugging logs to CoinGecko search to diagnose data collection issues
-[33m6c2735e[m Fix frontend API URL logic and add better error handling

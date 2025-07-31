@@ -84,10 +84,12 @@ export class ConfidenceCalculator {
     const sourceConfigs = [
       { key: 'whitepaper', name: 'Documentation', icon: '📄', desc: 'Official project documentation' },
       { key: 'onchain_data', name: 'Blockchain Data', icon: '⛓️', desc: 'On-chain metrics and contracts' },
+      { key: 'ronin_data', name: 'Ronin Network', icon: '🌐', desc: 'Ronin blockchain data and transactions' },
       { key: 'team_info', name: 'Team Information', icon: '👥', desc: 'Founder and team backgrounds' },
       { key: 'community_health', name: 'Community', icon: '💬', desc: 'Discord, Twitter, Telegram activity' },
       { key: 'financial_data', name: 'Financial Data', icon: '💰', desc: 'Market cap, funding, trading data' },
       { key: 'product_data', name: 'Product Metrics', icon: '🎮', desc: 'Game stats, user reviews, usage' },
+      { key: 'game_specific', name: 'Game Data', icon: '🎯', desc: 'Game-specific metrics and analytics' },
       { key: 'security_audits', name: 'Security Audits', icon: '🛡️', desc: 'Smart contract audit reports' },
       { key: 'media_coverage', name: 'Media Coverage', icon: '📰', desc: 'News articles and press coverage' }
     ];
@@ -339,15 +341,12 @@ export function generateConfidenceMetrics(
   researchScore: ResearchScore,
   researchPlan: ResearchPlan
 ): ConfidenceMetrics {
-  console.log('generateConfidenceMetrics called with:');
-  console.log('- findings keys:', Object.keys(findings));
-  console.log('- researchScore:', researchScore);
-  console.log('- researchPlan:', researchPlan);
+
   
   const calculator = new ConfidenceCalculator();
   const result = calculator.calculateConfidenceMetrics(findings, researchScore, researchPlan);
   
-  console.log('generateConfidenceMetrics result:', result);
+
   return result;
 }
 

@@ -36,14 +36,16 @@ export interface ResearchScore {
 export class ResearchScoringEngine {
   private readonly DATA_SOURCES: DataSource[] = [
     // Tier 1: Critical Foundation (Must-Have)
-    { name: 'whitepaper', tier: 1, weight: 25, reliability: 'official', isRequired: true },
-    { name: 'onchain_data', tier: 1, weight: 20, reliability: 'verified', isRequired: true },
+    { name: 'whitepaper', tier: 1, weight: 20, reliability: 'official', isRequired: true },
+    { name: 'onchain_data', tier: 1, weight: 15, reliability: 'verified', isRequired: true },
+    { name: 'ronin_data', tier: 1, weight: 15, reliability: 'verified', isRequired: false },
     { name: 'team_info', tier: 1, weight: 15, reliability: 'verified', isRequired: true },
     
     // Tier 2: Market Intelligence (Important)
     { name: 'community_health', tier: 2, weight: 15, reliability: 'verified' },
     { name: 'financial_data', tier: 2, weight: 10, reliability: 'verified' },
     { name: 'product_data', tier: 2, weight: 10, reliability: 'verified' },
+    { name: 'game_specific', tier: 2, weight: 10, reliability: 'verified' },
     
     // Tier 3: Supporting Evidence (Nice-to-Have)
     { name: 'security_audits', tier: 3, weight: 3, reliability: 'official' },
@@ -389,6 +391,28 @@ export function mapDataToFindings(data: any): ResearchFindings {
       timestamp: new Date(),
       dataPoints: countDataPoints(data.etherscanData)
     };
+  }
+  
+  // Map Ronin Network data
+  if (data.roninTokenInfo && !data.roninTokenInfo.error) {
+    findings.ronin_data = {
+      found: true,
+      data: data.roninTokenInfo,
+      quality: 'high',
+      timestamp: new Date(),
+      dataPoints: countDataPoints(data.roninTokenInfo)
+    };
+    
+    // If Axie Infinity specific data is available, map it as game-specific data
+    if (data.roninTokenInfo.axieSpecificData) {
+      findings.game_specific = {
+        found: true,
+        data: data.roninTokenInfo.axieSpecificData,
+        quality: 'high',
+        timestamp: new Date(),
+        dataPoints: countDataPoints(data.roninTokenInfo.axieSpecificData)
+      };
+    }
   }
   
   // Map team info from various sources to team_info

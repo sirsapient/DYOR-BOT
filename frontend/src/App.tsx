@@ -45,6 +45,10 @@ function App() {
   const [research, setResearch] = useState<ProjectResearch | null>(null);
   const [researchLoading, setResearchLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedNetwork, setSelectedNetwork] = useState<'auto' | 'ethereum' | 'ronin'>('auto');
+  const [contractAddress, setContractAddress] = useState('');
+  const [roninContractAddress, setRoninContractAddress] = useState('');
+
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     setResearchLoading(true);
@@ -55,26 +59,39 @@ function App() {
       const endpoint = '/api/research';
       const fullUrl = `${apiUrl}${endpoint}`;
       
-      console.log('Making request to:', fullUrl, '(Fixed fetch compatibility)');
+
+      
+      const requestBody: any = { projectName };
+      
+      // Add network-specific contract addresses
+      if (selectedNetwork === 'ethereum' && contractAddress) {
+        requestBody.contractAddress = contractAddress;
+      } else if (selectedNetwork === 'ronin' && roninContractAddress) {
+        requestBody.roninContractAddress = roninContractAddress;
+      } else if (selectedNetwork === 'auto') {
+        // Try both if available
+        if (contractAddress) requestBody.contractAddress = contractAddress;
+        if (roninContractAddress) requestBody.roninContractAddress = roninContractAddress;
+      }
       
       const res = await fetch(fullUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectName }),
+        body: JSON.stringify(requestBody),
       });
       
       if (!res.ok) {
         const errorText = await res.text();
-        console.error('API Error Response:', errorText);
+  
         throw new Error(`API error: ${res.status} ${res.statusText}`);
       }
       
       const data = await res.json();
-      console.log('API Response received:', data); // Debug log
+
       
       setResearch(data);
     } catch (err) {
-      console.error('Fetch error:', err);
+
       setError(`Failed to fetch research: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
       setResearchLoading(false);
@@ -94,13 +111,92 @@ function App() {
             value={projectName}
             onChange={e => setProjectName(e.target.value)}
             placeholder="Enter project or token name"
-            style={{ marginRight: 8 }}
+            style={{ marginRight: 8, flex: 1 }}
           />
           <button type="submit" disabled={researchLoading || !projectName}>
             {researchLoading ? 'Searching...' : 'Search'}
           </button>
         </div>
 
+        {/* Network Selection */}
+        <div style={{ marginBottom: '12px' }}>
+          <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px', fontWeight: 500 }}>
+            Network (Optional):
+          </label>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <select
+              value={selectedNetwork}
+              onChange={e => setSelectedNetwork(e.target.value as 'auto' | 'ethereum' | 'ronin')}
+              style={{ padding: '4px 8px', borderRadius: '4px', border: '1px solid #ddd' }}
+            >
+              <option value="auto">Auto-detect</option>
+              <option value="ethereum">Ethereum</option>
+              <option value="ronin">Ronin Network</option>
+            </select>
+            
+            {selectedNetwork === 'ethereum' && (
+              <input
+                type="text"
+                value={contractAddress}
+                onChange={e => setContractAddress(e.target.value)}
+                placeholder="Ethereum contract address (0x...)"
+                style={{ flex: 1, padding: '4px 8px', borderRadius: '4px', border: '1px solid #ddd' }}
+              />
+            )}
+            
+            {selectedNetwork === 'ronin' && (
+              <input
+                type="text"
+                value={roninContractAddress}
+                onChange={e => setRoninContractAddress(e.target.value)}
+                placeholder="Ronin contract address (0x...)"
+                style={{ flex: 1, padding: '4px 8px', borderRadius: '4px', border: '1px solid #ddd' }}
+              />
+            )}
+            
+            {selectedNetwork === 'auto' && (
+              <div style={{ display: 'flex', gap: '8px', flex: 1 }}>
+                <input
+                  type="text"
+                  value={contractAddress}
+                  onChange={e => setContractAddress(e.target.value)}
+                  placeholder="Ethereum contract (optional)"
+                  style={{ flex: 1, padding: '4px 8px', borderRadius: '4px', border: '1px solid #ddd' }}
+                />
+                <input
+                  type="text"
+                  value={roninContractAddress}
+                  onChange={e => setRoninContractAddress(e.target.value)}
+                  placeholder="Ronin contract (optional)"
+                  style={{ flex: 1, padding: '4px 8px', borderRadius: '4px', border: '1px solid #ddd' }}
+                />
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Quick Axie Infinity Button */}
+        <div style={{ marginBottom: '12px' }}>
+          <button
+            type="button"
+            onClick={() => {
+              setProjectName('Axie Infinity');
+              setSelectedNetwork('ronin');
+              setRoninContractAddress('0x97a9107c1793bc407d6f527b77e7fff4d812bece'); // AXS token contract
+            }}
+            style={{
+              padding: '8px 16px',
+              backgroundColor: '#4CAF50',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontSize: '14px'
+            }}
+          >
+            🎮 Quick Search: Axie Infinity
+          </button>
+        </div>
       </form>
       <div style={{
         background: '#f5f5f5',
@@ -181,6 +277,42 @@ function App() {
               )}
               {research.financialData.fundingInfo && (
                 <p><strong>Funding Info:</strong> Available</p>
+              )}
+              
+              {/* Ronin Network Data */}
+              {research.financialData.roninTokenInfo && (
+                <div style={{ marginTop: 12, padding: 12, backgroundColor: '#f0f8ff', borderRadius: 8, border: '1px solid #4a90e2' }}>
+                  <h5 style={{ color: '#4a90e2', margin: '0 0 8px 0' }}>🌐 Ronin Network Data</h5>
+                  {research.financialData.roninTokenInfo.symbol && (
+                    <p><strong>Token Symbol:</strong> {research.financialData.roninTokenInfo.symbol}</p>
+                  )}
+                  {research.financialData.roninTokenInfo.totalSupply && (
+                    <p><strong>Total Supply:</strong> {parseInt(research.financialData.roninTokenInfo.totalSupply, 16).toLocaleString()}</p>
+                  )}
+                  {research.financialData.roninTokenInfo.contractAddress && (
+                    <p><strong>Contract:</strong> <code style={{ fontSize: '12px' }}>{research.financialData.roninTokenInfo.contractAddress}</code></p>
+                  )}
+                  {research.financialData.roninTokenInfo.transactionHistory && (
+                    <p><strong>Transactions:</strong> {research.financialData.roninTokenInfo.transactionHistory.transactionCount?.toLocaleString() || 'N/A'}</p>
+                  )}
+                  
+                  {/* Axie Infinity Specific Data */}
+                  {research.financialData.roninTokenInfo.axieSpecificData && (
+                    <div style={{ marginTop: 8, padding: 8, backgroundColor: '#e8f5e8', borderRadius: 4 }}>
+                      <h6 style={{ color: '#2e7d32', margin: '0 0 4px 0' }}>🎮 Axie Infinity Game Data</h6>
+                      {research.financialData.roninTokenInfo.axieSpecificData.gameStats && (
+                        <p style={{ fontSize: '14px', margin: '2px 0' }}>
+                          <strong>Game Stats:</strong> Available
+                        </p>
+                      )}
+                      {research.financialData.roninTokenInfo.axieSpecificData.marketplaceData && (
+                        <p style={{ fontSize: '14px', margin: '2px 0' }}>
+                          <strong>Marketplace Data:</strong> Available
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
               )}
             </div>
           )}

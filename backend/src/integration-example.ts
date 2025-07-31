@@ -20,7 +20,7 @@ export async function enhancedResearchWithAI(
     aliases?: string[];
   }
 ) {
-  console.log(`🚀 Starting enhanced AI-orchestrated research for: ${projectName}`);
+
 
   try {
     // Step 1: Use AI to plan the research strategy
@@ -31,19 +31,13 @@ export async function enhancedResearchWithAI(
     );
 
     if (!aiResult.success) {
-      console.log('❌ AI research planning failed:', aiResult.reason);
-      console.log('Falling back to traditional research method...');
+
       
       // Fallback to traditional research
       return await handleResearchWithQualityGates(projectName);
     }
 
-    console.log('✅ AI research planning completed successfully');
-    console.log(`📊 AI Research Summary:`);
-    console.log(`   - Project Type: ${aiResult.researchPlan.projectClassification.type}`);
-    console.log(`   - AI Confidence: ${aiResult.completeness?.confidence || 'N/A'}`);
-    console.log(`   - Sources Collected: ${aiResult.meta?.sourcesCollected || 'N/A'}`);
-    console.log(`   - Time Spent: ${aiResult.meta?.timeSpent || 'N/A'} minutes`);
+
 
     // Step 2: Use the AI-generated findings with quality gates
     const qualityGateResult = await handleResearchWithQualityGates(
@@ -89,22 +83,18 @@ export async function researchWithCustomDataCollection(
 ) {
   const orchestrator = new AIResearchOrchestrator(anthropicApiKey);
   
-  console.log(`🔍 Starting custom AI-orchestrated research for: ${projectName}`);
+
 
   // Step 1: Generate AI research plan
   const researchPlan = await orchestrator.generateResearchPlan(projectName);
   
-  console.log(`📋 AI Research Plan Generated:`);
-  console.log(`   - Project Type: ${researchPlan.projectClassification.type}`);
-  console.log(`   - Priority Sources: ${researchPlan.prioritySources.length}`);
-  console.log(`   - Estimated Time: ${researchPlan.estimatedResearchTime} minutes`);
+
 
   const findings: any = {};
   const startTime = Date.now();
 
   // Step 2: Execute research with custom data collection
   for (const prioritySource of researchPlan.prioritySources) {
-    console.log(`🔍 Researching: ${prioritySource.source} (${prioritySource.priority} priority)`);
     
     try {
       // Use your custom data collector
@@ -120,8 +110,6 @@ export async function researchWithCustomDataCollection(
         timestamp: new Date(),
         dataPoints: sourceData.dataPoints || 0
       };
-
-      console.log(`✅ Collected data from ${prioritySource.source}: ${findings[prioritySource.source].dataPoints} data points`);
 
     } catch (error) {
       console.error(`❌ Failed to collect from ${prioritySource.source}:`, error);
@@ -145,7 +133,6 @@ export async function researchWithCustomDataCollection(
       );
 
       if (!adaptiveState.shouldContinue) {
-        console.log('🎯 AI recommends stopping research - sufficient data collected');
         break;
       }
     }
@@ -175,10 +162,7 @@ export async function batchResearchWithAI(
   const orchestrator = new AIResearchOrchestrator(anthropicApiKey);
   const results = [];
 
-  console.log(`📦 Starting batch research for ${projectNames.length} projects`);
-
   for (const projectName of projectNames) {
-    console.log(`\n🔍 Researching: ${projectName}`);
     
     try {
       const result = await conductAIOrchestratedResearch(
@@ -195,7 +179,6 @@ export async function batchResearchWithAI(
         sourcesCollected: result.meta?.sourcesCollected || 0
       });
 
-      console.log(`✅ ${projectName}: ${result.success ? 'Success' : 'Failed'}`);
 
     } catch (error) {
       console.error(`❌ ${projectName}: Error -`, error);
@@ -215,13 +198,6 @@ export async function batchResearchWithAI(
   const successful = results.filter(r => r.success);
   const failed = results.filter(r => !r.success);
 
-  console.log(`\n📊 Batch Research Summary:`);
-  console.log(`   - Total Projects: ${results.length}`);
-  console.log(`   - Successful: ${successful.length}`);
-  console.log(`   - Failed: ${failed.length}`);
-  console.log(`   - Average AI Confidence: ${(successful.reduce((sum, r) => sum + r.aiConfidence, 0) / successful.length || 0).toFixed(2)}`);
-  console.log(`   - Average Time Spent: ${(results.reduce((sum, r) => sum + r.timeSpent, 0) / results.length).toFixed(1)} minutes`);
-
   return {
     results,
     summary: {
@@ -240,12 +216,10 @@ export async function exampleUsage() {
   const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
   
   if (!ANTHROPIC_API_KEY) {
-    console.log('⚠️  Please set ANTHROPIC_API_KEY environment variable');
     return;
   }
 
   // Example 1: Enhanced research with AI
-  console.log('\n=== Example 1: Enhanced Research with AI ===');
   const enhancedResult = await enhancedResearchWithAI(
     'Axie Infinity',
     ANTHROPIC_API_KEY,
@@ -261,16 +235,12 @@ export async function exampleUsage() {
     }
   );
 
-  console.log('Enhanced Research Result:', enhancedResult.success ? 'Success' : 'Failed');
-
   // Example 2: Custom data collection
-  console.log('\n=== Example 2: Custom Data Collection ===');
   const customResult = await researchWithCustomDataCollection(
     'Illuvium',
     ANTHROPIC_API_KEY,
     async (sourceName: string, searchTerms: string[]) => {
       // Your custom data collection logic here
-      console.log(`Custom collection for ${sourceName} with terms: ${searchTerms.join(', ')}`);
       
       // Simulate data collection
       return {
@@ -282,23 +252,17 @@ export async function exampleUsage() {
     }
   );
 
-  console.log('Custom Research Result:', customResult.success ? 'Success' : 'Failed');
-
   // Example 3: Batch research
-  console.log('\n=== Example 3: Batch Research ===');
   const batchResult = await batchResearchWithAI(
     ['Axie Infinity', 'Illuvium', 'The Sandbox'],
     ANTHROPIC_API_KEY
   );
-
-  console.log('Batch Research Summary:', batchResult.summary);
 }
 
 // Run example if this file is executed directly
 if (require.main === module) {
   exampleUsage()
     .then(() => {
-      console.log('\n🎉 Integration examples completed!');
       process.exit(0);
     })
     .catch((error) => {

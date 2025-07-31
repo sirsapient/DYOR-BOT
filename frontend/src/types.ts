@@ -12,6 +12,7 @@ export interface ProjectResearch {
     marketCap?: number;
     tokenDistribution?: TokenDistribution;
     fundingInfo?: FundingInfo;
+    roninTokenInfo?: RoninTokenInfo;
   };
   teamAnalysis: TeamAnalysis;
   technicalAssessment: TechnicalAssessment;
@@ -113,4 +114,22 @@ export interface CommunityHealth {
     member_count?: number;
   };
   redditSummary?: string;
+}
+
+export interface RoninTokenInfo {
+  totalSupply?: string;
+  symbol?: string;
+  network?: string;
+  contractAddress?: string;
+  transactionHistory?: {
+    transactionCount?: number;
+    recentTransactions?: any[];
+    network?: string;
+  };
+  axieSpecificData?: {
+    gameStats?: any;
+    marketplaceData?: any;
+    breedingData?: any;
+  };
+  error?: string;
 } 

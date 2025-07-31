@@ -443,16 +443,11 @@ export async function conductAIOrchestratedResearch(
   const orchestrator = new AIResearchOrchestrator(anthropicApiKey);
   const findings: ResearchFindings = {};
   
-  console.log('🤖 Phase 1: Generating AI research plan...');
+  
   
   // Phase 1: Get AI research strategy
   const researchPlan = await orchestrator.generateResearchPlan(projectName, basicInfo);
   
-  console.log(`📋 Research Plan Generated:
-- Project Type: ${researchPlan.projectClassification.type}
-- Priority Sources: ${researchPlan.prioritySources.length}
-- Estimated Time: ${researchPlan.estimatedResearchTime} minutes`);
-
   const startTime = Date.now();
   let shouldContinue = true;
   let adaptiveState: AdaptiveResearchState | null = null;
@@ -462,8 +457,6 @@ export async function conductAIOrchestratedResearch(
     if (!shouldContinue) break;
     
     const timeElapsed = Math.floor((Date.now() - startTime) / 60000);
-    
-    console.log(`🔍 Researching: ${prioritySource.source} (${prioritySource.priority} priority)`);
     
     // Collect data from this source (your existing collection logic)
     const sourceData = await collectFromSource(
@@ -485,13 +478,10 @@ export async function conductAIOrchestratedResearch(
       shouldContinue = adaptiveState.shouldContinue;
       
       if (!shouldContinue) {
-        console.log('🎯 AI recommends stopping research - sufficient data collected');
         break;
       }
     }
   }
-  
-  console.log('📊 Phase 3: Final research assessment...');
   
   // Phase 3: Final completeness check
   const completeness = await orchestrator.assessResearchCompleteness(researchPlan, findings);
@@ -529,8 +519,6 @@ async function collectFromSource(
 ): Promise<any> {
   // This would integrate with your existing data collection functions
   // Return in the ResearchFindings format
-  
-  console.log(`Collecting from ${sourceName} with terms: ${searchTerms.join(', ')}`);
   
   // Placeholder - replace with your actual collection logic
   return {
