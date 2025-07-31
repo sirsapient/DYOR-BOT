@@ -51,11 +51,11 @@ function App() {
     setResearch(null);
     setError(null);
     try {
-      const apiUrl = process.env.REACT_APP_API_URL || 'https://dyor-bot.onrender.com:10000';
+      const apiUrl = process.env.REACT_APP_API_URL || 'https://dyor-bot.onrender.com';
       const endpoint = '/api/research';
       const fullUrl = `${apiUrl}${endpoint}`;
       
-      console.log('Making request to:', fullUrl, '(Updated with port 10000)');
+      console.log('Making request to:', fullUrl, '(Using main URL)');
       
       const res = await fetch(fullUrl, {
         method: 'POST',
