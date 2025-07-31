@@ -28,6 +28,218 @@ app.get('/api/health', (req: any, res: any) => {
   res.json({ status: 'ok' });
 });
 
+// Mock endpoint for testing confidence indicators
+app.post('/api/research-mock', (req: any, res: any) => {
+  const { projectName } = req.body;
+  
+  const mockConfidenceMetrics = {
+    overall: {
+      score: 85,
+      grade: 'A',
+      level: 'high',
+      description: 'Strong data coverage with good source reliability'
+    },
+    breakdown: {
+      dataCompleteness: {
+        score: 75,
+        found: 6,
+        total: 8,
+        missing: ['Documentation', 'Media Coverage']
+      },
+      sourceReliability: {
+        score: 94,
+        official: 1,
+        verified: 5,
+        scraped: 0
+      },
+      dataFreshness: {
+        score: 100,
+        averageAge: 0,
+        oldestSource: 'Blockchain Data'
+      }
+    },
+    sourceDetails: [
+      {
+        name: 'whitepaper',
+        displayName: 'Documentation',
+        found: false,
+        quality: 'low',
+        reliability: 'official',
+        dataPoints: 0,
+        lastUpdated: new Date().toISOString(),
+        confidence: 0,
+        issues: ['No data found'],
+        icon: '📄',
+        description: 'Official project documentation'
+      },
+      {
+        name: 'onchain_data',
+        displayName: 'Blockchain Data',
+        found: true,
+        quality: 'high',
+        reliability: 'verified',
+        dataPoints: 3,
+        lastUpdated: new Date().toISOString(),
+        confidence: 96,
+        issues: [],
+        icon: '⛓️',
+        description: 'On-chain metrics and contracts'
+      },
+      {
+        name: 'team_info',
+        displayName: 'Team Information',
+        found: true,
+        quality: 'medium',
+        reliability: 'verified',
+        dataPoints: 1,
+        lastUpdated: new Date().toISOString(),
+        confidence: 77,
+        issues: ['Limited data points'],
+        icon: '👥',
+        description: 'Founder and team backgrounds'
+      },
+      {
+        name: 'community_health',
+        displayName: 'Community',
+        found: true,
+        quality: 'high',
+        reliability: 'verified',
+        dataPoints: 6,
+        lastUpdated: new Date().toISOString(),
+        confidence: 100,
+        issues: [],
+        icon: '💬',
+        description: 'Discord, Twitter, Telegram activity'
+      },
+      {
+        name: 'financial_data',
+        displayName: 'Financial Data',
+        found: true,
+        quality: 'high',
+        reliability: 'verified',
+        dataPoints: 6,
+        lastUpdated: new Date().toISOString(),
+        confidence: 100,
+        issues: [],
+        icon: '💰',
+        description: 'Market cap, funding, trading data'
+      },
+      {
+        name: 'product_data',
+        displayName: 'Product Metrics',
+        found: true,
+        quality: 'high',
+        reliability: 'verified',
+        dataPoints: 6,
+        lastUpdated: new Date().toISOString(),
+        confidence: 100,
+        issues: [],
+        icon: '🎮',
+        description: 'Game stats, user reviews, usage'
+      },
+      {
+        name: 'security_audits',
+        displayName: 'Security Audits',
+        found: true,
+        quality: 'high',
+        reliability: 'official',
+        dataPoints: 1,
+        lastUpdated: new Date().toISOString(),
+        confidence: 92,
+        issues: ['Limited audit data'],
+        icon: '🛡️',
+        description: 'Smart contract audit reports'
+      },
+      {
+        name: 'media_coverage',
+        displayName: 'Media Coverage',
+        found: false,
+        quality: 'low',
+        reliability: 'scraped',
+        dataPoints: 0,
+        lastUpdated: new Date().toISOString(),
+        confidence: 0,
+        issues: ['No data found'],
+        icon: '📰',
+        description: 'News articles and press coverage'
+      }
+    ],
+    limitations: [
+      'Missing critical data: Documentation',
+      'No official project sources verified'
+    ],
+    strengths: [
+      '5 high-quality data sources',
+      '1 official source verified',
+      'Comprehensive data (22 data points)',
+      'Fresh data from 6 recent sources'
+    ],
+    userGuidance: {
+      trustLevel: 'high',
+      useCase: 'Comprehensive project analysis and research',
+      warnings: [],
+      additionalResearch: [
+        'Search for official project documentation',
+        'Check for recent project updates'
+      ]
+    }
+  };
+
+  const mockResearchReport = {
+    projectName: projectName || 'Mock Project',
+    projectType: 'Web3Game',
+    keyFindings: {
+      positives: [
+        'Strong community engagement',
+        'Active development team',
+        'Good market performance'
+      ],
+      negatives: [
+        'Limited documentation available',
+        'Some data sources missing'
+      ],
+      redFlags: []
+    },
+    financialData: {
+      marketCap: 1000000,
+      tokenDistribution: 'Available',
+      fundingInfo: 'Available'
+    },
+    teamAnalysis: {
+      studioAssessment: [
+        {
+          companyName: 'Mock Studio',
+          isDeveloper: true,
+          isPublisher: true,
+          firstProjectDate: '2020'
+        }
+      ],
+      linkedinSummary: 'Team has strong gaming background',
+      glassdoorSummary: 'Positive company reviews'
+    },
+    technicalAssessment: {
+      securitySummary: 'Security audit completed',
+      reviewSummary: 'Positive user reviews',
+      githubRepo: 'github.com/mock/project',
+      githubStats: 'Active development'
+    },
+    communityHealth: {
+      twitterSummary: 'Active Twitter community',
+      steamReviewSummary: 'Positive Steam reviews',
+      discordData: {
+        server_name: 'Mock Community',
+        member_count: 5000
+      },
+      redditSummary: 'Active Reddit community'
+    },
+    sourcesUsed: ['CoinGecko', 'IGDB', 'Steam', 'Discord', 'Etherscan'],
+    aiSummary: 'This is a mock AI analysis summary for testing confidence indicators.',
+    confidence: mockConfidenceMetrics
+  };
+
+  res.json(mockResearchReport);
+});
+
 const REQUIRED_ENV_VARS = [
   'IGDB_CLIENT_ID',
   'IGDB_CLIENT_SECRET',
@@ -1570,6 +1782,13 @@ ${JSON.stringify({cgData, igdbData, steamData, discordData, etherscanData, solsc
 
   // Add confidence data at the end to ensure it's not overwritten
   researchReport.confidence = confidenceMetrics;
+  
+  // Debug: Log confidence data
+  console.log('🔍 DEBUG: Confidence metrics being added to response:');
+  console.log('- Has confidence field:', !!confidenceMetrics);
+  console.log('- Confidence overall score:', confidenceMetrics?.overall?.score);
+  console.log('- Confidence grade:', confidenceMetrics?.overall?.grade);
+  console.log('- Response keys:', Object.keys(researchReport));
   
   res.json(researchReport);
 });

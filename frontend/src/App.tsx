@@ -45,6 +45,7 @@ function App() {
   const [research, setResearch] = useState<ProjectResearch | null>(null);
   const [researchLoading, setResearchLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [useMockApi, setUseMockApi] = useState(false);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,8 +53,10 @@ function App() {
     setResearch(null);
     setError(null);
     try {
-      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:4000';
-      const fullUrl = `${apiUrl}/api/research`;
+      // Use local backend for mock API, production for real API
+      const apiUrl = useMockApi ? 'http://localhost:4000' : (process.env.REACT_APP_API_URL || 'http://localhost:4000');
+      const endpoint = useMockApi ? '/api/research-mock' : '/api/research';
+      const fullUrl = `${apiUrl}${endpoint}`;
       
       const res = await fetch(fullUrl, {
         method: 'POST',
@@ -85,16 +88,29 @@ function App() {
       <hr />
       <h2>Project Research</h2>
       <form onSubmit={handleSearch} style={{ marginBottom: 16 }}>
-        <input
-          type="text"
-          value={projectName}
-          onChange={e => setProjectName(e.target.value)}
-          placeholder="Enter project or token name"
-          style={{ marginRight: 8 }}
-        />
-        <button type="submit" disabled={researchLoading || !projectName}>
-          {researchLoading ? 'Searching...' : 'Search'}
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+          <input
+            type="text"
+            value={projectName}
+            onChange={e => setProjectName(e.target.value)}
+            placeholder="Enter project or token name"
+            style={{ marginRight: 8 }}
+          />
+          <button type="submit" disabled={researchLoading || !projectName}>
+            {researchLoading ? 'Searching...' : 'Search'}
+          </button>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px' }}>
+          <label>
+            <input
+              type="checkbox"
+              checked={useMockApi}
+              onChange={e => setUseMockApi(e.target.checked)}
+              style={{ marginRight: '4px' }}
+            />
+            Use Mock API (for testing confidence indicators)
+          </label>
+        </div>
       </form>
       <div style={{
         background: '#f5f5f5',

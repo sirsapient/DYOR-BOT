@@ -4,13 +4,13 @@ async function testAPI() {
   try {
     console.log('Testing API confidence data...');
     
-    const response = await fetch('http://localhost:4001/api/research', {
+    const response = await fetch('http://localhost:4000/api/research', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        projectName: 'Axie Infinity'
+        projectName: 'ethereum'
       })
     });
 
