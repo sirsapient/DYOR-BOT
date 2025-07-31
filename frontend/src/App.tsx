@@ -54,7 +54,7 @@ function App() {
     setError(null);
     try {
       // Use local backend for mock API, production for real API
-      const apiUrl = useMockApi ? 'http://localhost:4000' : (process.env.REACT_APP_API_URL || 'https://dyor-bot.onrender.com');
+      const apiUrl = useMockApi ? 'http://localhost:4000' : (process.env.REACT_APP_API_URL || 'https://dyor-bot.onrender.com:10000');
       const endpoint = useMockApi ? '/api/research-mock' : '/api/research';
       const fullUrl = `${apiUrl}${endpoint}`;
       
