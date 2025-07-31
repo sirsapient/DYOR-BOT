@@ -371,6 +371,7 @@ async function fetchWhitepaperUrl(websiteUrl: string): Promise<string | null> {
 // Enhanced function to detect if a project is established
 function isEstablishedProject(projectName: string, aliases: string[]): boolean {
   const establishedKeywords = [
+    'axie', 'infinity', 'skymavis',  // Added Axie Infinity specifically
     'sandbox', 'decentraland', 'mana',
     'illuvium', 'gods', 'unchained',
     'stepn', 'move', 'earn',
@@ -410,81 +411,239 @@ async function findOfficialSourcesForEstablishedProject(projectName: string, ali
     `${aliases[0]?.toLowerCase().replace(/\s+/g, '')}.io`
   ];
   
-  for (const domain of domainPatterns) {
-    try {
-      const websiteUrl = `https://${domain}`;
-      const res = await fetch(websiteUrl);
-      if (res.ok) {
-        // Found official website, now look for whitepaper
-        const whitepaperUrl = await fetchWhitepaperUrl(websiteUrl);
-        if (whitepaperUrl) {
-          officialSources.whitepaper = whitepaperUrl;
-        }
-        
-        // Look for GitHub link
-        const html = await res.text();
-        const $ = cheerio.load(html);
-        const githubLink = $('a[href*="github.com"]').first();
-        if (githubLink.length) {
-          officialSources.github = githubLink.attr('href');
-        }
-        
-        // Look for documentation
-        const docsLink = $('a[href*="docs"], a[href*="documentation"]').first();
-        if (docsLink.length) {
-          officialSources.documentation = docsLink.attr('href');
-        }
-        
-        break;
+  // Strategy 2: AI-powered dynamic URL discovery for any project
+  console.log(`🔍 Using AI-powered discovery for ${projectName}`);
+  
+  // Use AI to find official URLs for this specific project
+  const aiDiscoveredUrls = await discoverOfficialUrlsWithAI(projectName, aliases);
+  
+  if (aiDiscoveredUrls) {
+    console.log(`🤖 AI discovered URLs for ${projectName}:`, aiDiscoveredUrls);
+    
+    // Test each discovered URL
+    for (const [type, url] of Object.entries(aiDiscoveredUrls)) {
+      if (url && typeof url === 'string') {
+        try {
+          const res = await fetch(url, { 
+            method: 'HEAD',
+            timeout: 5000 
+          });
+          if (res.ok) {
+            officialSources[type] = url;
+            console.log(`✅ Found ${type}: ${url}`);
+          } else {
+            console.log(`❌ ${type} not accessible: ${url} (${res.status})`);
+          }
+                 } catch (e) {
+           console.log(`❌ ${type} not accessible: ${url} (${(e as Error).message})`);
+         }
       }
-    } catch (e) {
-      // Continue to next domain
     }
   }
   
-  // Strategy 2: Search for GitHub repositories
-  if (!officialSources.github) {
-    for (const alias of aliases) {
+  // Strategy 3: Fallback to generic domain pattern search
+  if (!officialSources.whitepaper || !officialSources.documentation) {
+    console.log(`🔍 Falling back to domain pattern search for ${projectName}`);
+    
+    for (const domain of domainPatterns) {
       try {
-        const githubRes = await fetch(`https://api.github.com/search/repositories?q=${encodeURIComponent(alias)}`);
-        if (githubRes.ok) {
-          const githubData = await githubRes.json();
-          if (githubData.items && githubData.items.length > 0) {
-            const topRepo = githubData.items[0];
-            if (topRepo.stargazers_count > 100) { // Only consider popular repos
-              officialSources.github = topRepo.html_url;
+        const websiteUrl = `https://${domain}`;
+        const res = await fetch(websiteUrl, { timeout: 5000 });
+        if (res.ok) {
+          console.log(`✅ Found official website: ${websiteUrl}`);
+          
+          // Look for whitepaper
+          if (!officialSources.whitepaper) {
+            const whitepaperUrl = await fetchWhitepaperUrl(websiteUrl);
+            if (whitepaperUrl) {
+              officialSources.whitepaper = whitepaperUrl;
+              console.log(`✅ Found whitepaper via website: ${whitepaperUrl}`);
+            }
+          }
+          
+          // Look for documentation
+          if (!officialSources.documentation) {
+            const html = await res.text();
+            const $ = cheerio.load(html);
+            const docsLink = $('a[href*="docs"], a[href*="documentation"], a[href*="docs."]').first();
+            if (docsLink.length) {
+              const docsUrl = docsLink.attr('href');
+              if (docsUrl) {
+                officialSources.documentation = docsUrl.startsWith('http') ? docsUrl : `${websiteUrl}${docsUrl}`;
+                console.log(`✅ Found documentation via website: ${officialSources.documentation}`);
+              }
+            }
+          }
+          
+          // Look for GitHub
+          if (!officialSources.github) {
+            const html = await res.text();
+            const $ = cheerio.load(html);
+            const githubLink = $('a[href*="github.com"]').first();
+            if (githubLink.length) {
+              officialSources.github = githubLink.attr('href');
+              console.log(`✅ Found GitHub via website: ${officialSources.github}`);
+            }
+          }
+          
+          break; // Found website, no need to try other domains
+        }
+      } catch (e) {
+        console.log(`❌ Domain not accessible: ${domain}`);
+      }
+    }
+  }
+  
+  // Strategy 4: Enhanced web search for official sources
+  if (!officialSources.whitepaper || !officialSources.documentation) {
+    console.log(`🔍 Using enhanced web search for ${projectName}`);
+    
+    const searchTerms = [
+      `"${projectName}" whitepaper official`,
+      `"${projectName}" documentation official`,
+      `"${projectName}" technical paper`,
+      `"${projectName}" github official`
+    ];
+    
+    for (const alias of aliases.slice(0, 2)) {
+      searchTerms.push(`"${alias}" whitepaper official`);
+      searchTerms.push(`"${alias}" documentation official`);
+    }
+    
+    for (const term of searchTerms.slice(0, 4)) {
+      try {
+        const serpRes = await fetch(`https://serpapi.com/search.json?q=${encodeURIComponent(term)}&api_key=${serpApiKey}`);
+        if (serpRes.ok) {
+          const serpJson = await serpRes.json();
+          const results = serpJson.organic_results || [];
+          
+          for (const result of results.slice(0, 3)) {
+            const url = result.link;
+            if (url && !officialSources.whitepaper && term.includes('whitepaper')) {
+              try {
+                const res = await fetch(url, { method: 'HEAD', timeout: 3000 });
+                if (res.ok) {
+                  officialSources.whitepaper = url;
+                  console.log(`✅ Found whitepaper via search: ${url}`);
+                  break;
+                }
+              } catch (e) {
+                // Continue to next result
+              }
+            }
+            
+            if (url && !officialSources.documentation && term.includes('documentation')) {
+              try {
+                const res = await fetch(url, { method: 'HEAD', timeout: 3000 });
+                if (res.ok) {
+                  officialSources.documentation = url;
+                  console.log(`✅ Found documentation via search: ${url}`);
+                  break;
+                }
+              } catch (e) {
+                // Continue to next result
+              }
             }
           }
         }
       } catch (e) {
-        // Continue to next alias
-      }
-    }
-  }
-  
-  // Strategy 3: Search for security audit reports
-  if (!officialSources.securityAudit) {
-    for (const alias of aliases) {
-      try {
-        const auditSearchTerms = [
-          `${alias} security audit`,
-          `${alias} certik audit`,
-          `${alias} audit report`,
-          `${alias} security verification`
-        ];
-        
-        for (const searchTerm of auditSearchTerms) {
-          // This would integrate with a search API like SerpAPI
-          // For now, we'll return a placeholder
-          // TODO: Implement actual audit search functionality
-        }
-      } catch (e) {
-        // Continue to next alias
+        // Continue with next search term
       }
     }
   }
   
   return officialSources;
+}
+
+// New AI-powered function to discover official URLs for any project
+async function discoverOfficialUrlsWithAI(projectName: string, aliases: string[]): Promise<any> {
+  if (!serpApiKey || !process.env.ANTHROPIC_API_KEY) return null;
+  
+  // First, search for the project to get context
+  const searchTerms = [
+    `${projectName} official website`,
+    `${projectName} whitepaper`,
+    `${projectName} documentation`,
+    `${projectName} github`
+  ];
+  
+  for (const alias of aliases.slice(0, 2)) {
+    searchTerms.push(`${alias} official website`);
+    searchTerms.push(`${alias} whitepaper`);
+  }
+  
+  let searchContext = '';
+  
+  // Get search results for context
+  for (const term of searchTerms.slice(0, 3)) {
+    try {
+      const serpRes = await fetch(`https://serpapi.com/search.json?q=${encodeURIComponent(term)}&api_key=${serpApiKey}`);
+      if (serpRes.ok) {
+        const serpJson = await serpRes.json();
+        const results = (serpJson.organic_results || []).slice(0, 3);
+        const snippets = results.map((r: any) => `${r.title}: ${r.snippet}`).join('\n');
+        searchContext += snippets + '\n';
+      }
+    } catch (e) {
+      // Continue with next search term
+    }
+  }
+  
+  if (!searchContext) return null;
+  
+  // Use AI to extract official URLs
+  const prompt = `Given the following search results about "${projectName}", identify the official URLs for:
+1. Official website
+2. Whitepaper/technical paper
+3. Documentation/developer docs
+4. GitHub repository
+
+Return ONLY a JSON object with these keys: website, whitepaper, documentation, github
+If a URL is not found, use null for that key.
+
+Search Results:
+${searchContext.substring(0, 4000)}
+
+Project Name: ${projectName}
+Aliases: ${aliases.join(', ')}
+
+Return only valid JSON:`;
+
+  try {
+    const aiRes = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': process.env.ANTHROPIC_API_KEY,
+        'content-type': 'application/json',
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-opus-4-20250514',
+        max_tokens: 512,
+        messages: [
+          { role: 'user', content: prompt }
+        ]
+      })
+    });
+    
+    if (aiRes.ok) {
+      const aiJson = await aiRes.json();
+      const text = aiJson.content?.[0]?.text || '';
+      
+      // Try to parse JSON from response
+      try {
+        const json = JSON.parse(text);
+        return json;
+      } catch (e) {
+        console.log('Failed to parse AI response as JSON:', text);
+        return null;
+      }
+    }
+  } catch (e) {
+    console.log('AI discovery failed:', (e as Error).message);
+  }
+  
+  return null;
 }
 
 async function fetchPdfBuffer(url: string): Promise<Buffer | null> {
@@ -592,12 +751,23 @@ function extractSocialLinksFromHtml(html: string): {discord?: string, twitter?: 
 async function searchProjectSpecificTokenomics(projectName: string, aliases: string[]): Promise<any | null> {
   if (!serpApiKey || !process.env.ANTHROPIC_API_KEY) return null;
   
-  // Search for project-specific tokenomics information
+  // Enhanced search for project-specific tokenomics information
   const searchTerms = [
     `${projectName} tokenomics`,
     `${projectName} token distribution`,
     `${projectName} whitepaper`,
-    `${projectName} token economics`
+    `${projectName} token economics`,
+    `${projectName} documentation`,
+    `${projectName} technical paper`,
+    `${projectName} economics paper`,
+    `${projectName} governance token`,
+    `${projectName} token allocation`,
+    `${projectName} vesting schedule`,
+    `${projectName} token utility`,
+    `${projectName} staking rewards`,
+    `${projectName} token supply`,
+    `${projectName} tokenomics breakdown`,
+    `${projectName} economic model`
   ];
   
   // Add aliases to search terms
@@ -769,6 +939,20 @@ app.post('/api/research', async (req: any, res: any) => {
         name: projectName,
         aliases: tokenSymbol ? [projectName, tokenSymbol] : [projectName],
         // Add any additional basic info if available
+      },
+      {
+        // Pass the actual data collection functions to the AI Orchestrator
+        fetchWhitepaperUrl,
+        fetchPdfBuffer,
+        extractTokenomicsFromWhitepaper,
+        searchProjectSpecificTokenomics,
+        fetchTwitterProfileAndTweets,
+        fetchSteamDescription,
+        fetchWebsiteAboutSection,
+        fetchRoninTokenData,
+        fetchRoninTransactionHistory,
+        discoverOfficialUrlsWithAI,
+        findOfficialSourcesForEstablishedProject
       }
     );
 
@@ -842,6 +1026,212 @@ app.post('/api/research', async (req: any, res: any) => {
     console.error('❌ Error in AI-orchestrated research:', error);
     // Fall back to traditional research
     return await performTraditionalResearch(req, res);
+  }
+});
+
+// NEW: Enhanced research endpoint with all new features
+app.post('/api/research-enhanced', async (req: any, res: any) => {
+  try {
+    const { projectName, tokenSymbol, contractAddress, feedback } = req.body;
+    
+    if (!projectName) {
+      return res.status(400).json({ error: 'Project name is required' });
+    }
+
+    console.log(`🔍 Enhanced research request for: ${projectName}`);
+    
+    // Create enhanced orchestrator with custom thresholds
+    const enhancedOrchestrator = new AIResearchOrchestrator(process.env.ANTHROPIC_API_KEY!, {
+      confidenceThresholds: {
+        minimumForAnalysis: 75, // Higher threshold for enhanced endpoint
+        highConfidence: 90,
+        refreshThreshold: 65,
+        cacheExpiryHours: 12 // Shorter cache for more frequent updates
+      },
+      retryConfig: {
+        maxRetries: 5,
+        baseDelay: 2000,
+        maxDelay: 15000,
+        backoffMultiplier: 2
+      }
+    });
+
+    // NEW: Process feedback if provided
+    if (feedback) {
+      console.log(`📝 Processing feedback for ${projectName}:`, feedback);
+      const feedbackResult = await enhancedOrchestrator.processSecondAIFeedback(projectName, feedback);
+      
+      if (feedbackResult.shouldCollectMoreData) {
+        console.log(`🔄 Collecting additional data based on feedback: ${feedbackResult.newSourcesToCollect.join(', ')}`);
+        // Continue with enhanced research using feedback
+      }
+    }
+
+    // NEW: Check for real-time updates
+    const updateStatus = await enhancedOrchestrator.checkForUpdates(projectName);
+    console.log(`🔄 Update status for ${projectName}:`, updateStatus);
+
+    // Prepare basic info
+    const basicInfo = {
+      name: projectName,
+      aliases: tokenSymbol ? [projectName, tokenSymbol] : [projectName],
+    };
+
+    // Enhanced data collection functions with retry and caching
+    const enhancedDataCollectionFunctions = {
+      fetchWhitepaperUrl,
+      fetchPdfBuffer,
+      extractTokenomicsFromWhitepaper,
+      searchProjectSpecificTokenomics,
+      fetchTwitterProfileAndTweets,
+      fetchSteamDescription,
+      fetchWebsiteAboutSection,
+      fetchRoninTokenData,
+      fetchRoninTransactionHistory,
+      discoverOfficialUrlsWithAI,
+      findOfficialSourcesForEstablishedProject
+    };
+
+    // Conduct enhanced research
+    const aiResult = await conductAIOrchestratedResearch(
+      projectName,
+      process.env.ANTHROPIC_API_KEY!,
+      basicInfo,
+      enhancedDataCollectionFunctions
+    );
+
+    if (!aiResult.success) {
+      return res.status(400).json({
+        error: aiResult.reason,
+        gaps: aiResult.gaps,
+        recommendations: aiResult.recommendations,
+        needsMoreData: true
+      });
+    }
+
+    // NEW: Enhanced confidence and quality assessment
+    const confidenceCheck = enhancedOrchestrator.shouldPassToSecondAI(aiResult.findings);
+    const qualityGates = new QualityGatesEngine();
+    const gateResult = qualityGates.checkQualityGates(aiResult.findings);
+
+    // NEW: Generate comprehensive response with all new features
+    const enhancedResponse = {
+      projectName,
+      success: true,
+      confidence: {
+        score: confidenceCheck.confidenceScore,
+        shouldPassToSecondAI: confidenceCheck.shouldPass,
+        reason: confidenceCheck.reason,
+        missingForThreshold: confidenceCheck.missingForThreshold
+      },
+      qualityGates: {
+        passed: gateResult.passed,
+        gatesFailed: gateResult.gatesFailed,
+        recommendations: gateResult.recommendations,
+        userMessage: gateResult.userMessage
+      },
+      researchPlan: aiResult.researchPlan,
+      findings: aiResult.findings,
+      completeness: aiResult.completeness,
+      cacheStatus: {
+        hasCachedData: updateStatus.needsUpdate === false,
+        lastUpdateAge: updateStatus.lastUpdateAge,
+        sourcesToUpdate: updateStatus.sourcesToUpdate
+      },
+      feedback: {
+        hasFeedbackHistory: enhancedOrchestrator['feedbackHistory'].has(projectName),
+        feedbackCount: enhancedOrchestrator['feedbackHistory'].get(projectName)?.length || 0
+      },
+      recommendations: {
+        immediate: aiResult.recommendations,
+        longTerm: gateResult.manualResearchSuggestions,
+        confidence: confidenceCheck.shouldPass ? [] : confidenceCheck.missingForThreshold
+      }
+    };
+
+    console.log(`✅ Enhanced research completed for ${projectName} with confidence: ${confidenceCheck.confidenceScore}`);
+    
+    // NEW: Cleanup expired cache periodically
+    const cleanedCount = enhancedOrchestrator.cleanupExpiredCache();
+    if (cleanedCount > 0) {
+      console.log(`🧹 Cleaned ${cleanedCount} expired cache entries`);
+    }
+
+    res.json(enhancedResponse);
+
+  } catch (error) {
+    console.error('Enhanced research error:', error);
+    res.status(500).json({ 
+      error: 'Enhanced research failed', 
+      details: (error as Error).message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// NEW: Feedback endpoint for second AI communication
+app.post('/api/research-feedback', async (req: any, res: any) => {
+  try {
+    const { projectName, feedback } = req.body;
+    
+    if (!projectName || !feedback) {
+      return res.status(400).json({ error: 'Project name and feedback are required' });
+    }
+
+    console.log(`📝 Processing feedback for ${projectName}:`, feedback);
+
+    const orchestrator = new AIResearchOrchestrator(process.env.ANTHROPIC_API_KEY!);
+    const feedbackResult = await orchestrator.processSecondAIFeedback(projectName, feedback);
+
+    res.json({
+      success: true,
+      projectName,
+      feedbackProcessed: true,
+      shouldCollectMoreData: feedbackResult.shouldCollectMoreData,
+      newSourcesToCollect: feedbackResult.newSourcesToCollect,
+      updatedPlan: feedbackResult.updatedPlan,
+      message: feedbackResult.shouldCollectMoreData 
+        ? 'Additional data collection recommended based on feedback'
+        : 'Feedback processed successfully'
+    });
+
+  } catch (error) {
+    console.error('Feedback processing error:', error);
+    res.status(500).json({ 
+      error: 'Feedback processing failed', 
+      details: (error as Error).message 
+    });
+  }
+});
+
+// NEW: Cache management endpoint
+app.get('/api/cache-status', async (req: any, res: any) => {
+  try {
+    const { projectName } = req.query;
+    
+    if (!projectName) {
+      return res.status(400).json({ error: 'Project name is required' });
+    }
+
+    const orchestrator = new AIResearchOrchestrator(process.env.ANTHROPIC_API_KEY!);
+    const updateStatus = await orchestrator.checkForUpdates(projectName as string);
+    const cleanedCount = orchestrator.cleanupExpiredCache();
+
+    res.json({
+      projectName,
+      cacheStatus: updateStatus,
+      cacheCleanup: {
+        cleanedEntries: cleanedCount,
+        timestamp: new Date().toISOString()
+      }
+    });
+
+  } catch (error) {
+    console.error('Cache status error:', error);
+    res.status(500).json({ 
+      error: 'Cache status check failed', 
+      details: (error as Error).message 
+    });
   }
 });
 
@@ -1461,6 +1851,8 @@ export { searchProjectSpecificTokenomics };
 // Ronin Network Support
 async function fetchRoninTokenData(contractAddress: string): Promise<any> {
   try {
+    console.log(`🔍 Fetching Ronin token data for contract: ${contractAddress}`);
+    
     // Ronin Network RPC endpoint
     const roninRpcUrl = 'https://api.roninchain.com/free/mainnet';
     
@@ -1484,6 +1876,7 @@ async function fetchRoninTokenData(contractAddress: string): Promise<any> {
 
     if (tokenDataRes.ok) {
       const tokenData = await tokenDataRes.json();
+      console.log(`✅ Ronin token data response:`, tokenData);
       
       // Fetch token metadata
       const metadataRes = await fetch(roninRpcUrl, {
@@ -1504,6 +1897,7 @@ async function fetchRoninTokenData(contractAddress: string): Promise<any> {
       });
 
       const metadata = await metadataRes.json();
+      console.log(`✅ Ronin metadata response:`, metadata);
       
       return {
         totalSupply: tokenData.result,
@@ -1511,29 +1905,36 @@ async function fetchRoninTokenData(contractAddress: string): Promise<any> {
         network: 'ronin',
         contractAddress: contractAddress
       };
+    } else {
+      console.log(`❌ Ronin RPC failed: ${tokenDataRes.status} ${tokenDataRes.statusText}`);
     }
   } catch (e) {
-
+    console.log(`❌ Ronin token data fetch error:`, e);
   }
   return null;
 }
 
 async function fetchRoninTransactionHistory(contractAddress: string): Promise<any> {
   try {
+    console.log(`🔍 Fetching Ronin transaction history for contract: ${contractAddress}`);
+    
     // Use Ronin blockchain explorer API
     const explorerUrl = `https://explorer.roninchain.com/api/token/${contractAddress}/transactions`;
     const res = await fetch(explorerUrl);
     
     if (res.ok) {
       const data = await res.json();
+      console.log(`✅ Ronin transaction data:`, data);
       return {
         transactionCount: data.total || 0,
         recentTransactions: data.transactions?.slice(0, 10) || [],
         network: 'ronin'
       };
+    } else {
+      console.log(`❌ Ronin explorer failed: ${res.status} ${res.statusText}`);
     }
   } catch (e) {
-
+    console.log(`❌ Ronin transaction history fetch error:`, e);
   }
   return null;
 }

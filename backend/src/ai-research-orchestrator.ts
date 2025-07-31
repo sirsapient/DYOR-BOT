@@ -6,6 +6,64 @@ import { QualityGatesEngine } from './quality-gates';
 import { ResearchFindings } from './research-scoring';
 import { ResearchScoringEngine } from './research-scoring';
 
+// Import the actual data collection functions from index.ts
+// We'll need to pass these as parameters since we can't import from the same file
+
+interface DataCollectionFunctions {
+  fetchWhitepaperUrl: (websiteUrl: string) => Promise<string | null>;
+  fetchPdfBuffer: (url: string) => Promise<Buffer | null>;
+  extractTokenomicsFromWhitepaper: (websiteUrl: string) => Promise<any | null>;
+  searchProjectSpecificTokenomics: (projectName: string, aliases: string[]) => Promise<any | null>;
+  fetchTwitterProfileAndTweets: (handle: string) => Promise<any>;
+  fetchSteamDescription: (appid: string) => Promise<string>;
+  fetchWebsiteAboutSection: (url: string) => Promise<string>;
+  fetchRoninTokenData: (contractAddress: string) => Promise<any>;
+  fetchRoninTransactionHistory: (contractAddress: string) => Promise<any>;
+  discoverOfficialUrlsWithAI: (projectName: string, aliases: string[]) => Promise<any>;
+  findOfficialSourcesForEstablishedProject: (projectName: string, aliases: string[]) => Promise<any>;
+}
+
+// NEW: Feedback interface for second AI communication
+interface SecondAIFeedback {
+  needsMoreData: boolean;
+  missingDataTypes: string[];
+  confidenceLevel: 'high' | 'medium' | 'low';
+  specificRequests: string[];
+  analysisReadiness: boolean;
+  recommendations: string[];
+}
+
+// NEW: Caching interface for discovered sources
+interface CachedSourceData {
+  projectName: string;
+  sources: {
+    [sourceName: string]: {
+      data: any;
+      timestamp: Date;
+      confidence: number;
+      lastRefreshed: Date;
+      refreshInterval: number; // minutes
+    };
+  };
+  lastUpdated: Date;
+  confidenceScore: number;
+}
+
+// NEW: Confidence thresholds configuration
+interface ConfidenceThresholds {
+  minimumForAnalysis: number; // Minimum confidence to pass to second AI
+  highConfidence: number; // Threshold for high confidence data
+  refreshThreshold: number; // Confidence below which to refresh data
+  cacheExpiryHours: number; // How long to cache data
+}
+
+// NEW: Enhanced error handling and retry configuration
+interface RetryConfig {
+  maxRetries: number;
+  baseDelay: number; // milliseconds
+  maxDelay: number; // milliseconds
+  backoffMultiplier: number;
+}
 
 
 // Enhanced extraction patterns for established projects
@@ -105,11 +163,37 @@ class AIResearchOrchestrator {
   private anthropic: Anthropic;
   private qualityGates: QualityGatesEngine;
   private scoringEngine: ResearchScoringEngine;
+  
+  // NEW: Enhanced features
+  private sourceCache: Map<string, CachedSourceData> = new Map();
+  private confidenceThresholds: ConfidenceThresholds;
+  private retryConfig: RetryConfig;
+  private feedbackHistory: Map<string, SecondAIFeedback[]> = new Map();
 
-  constructor(apiKey: string) {
+  constructor(apiKey: string, options?: {
+    confidenceThresholds?: Partial<ConfidenceThresholds>;
+    retryConfig?: Partial<RetryConfig>;
+  }) {
     this.anthropic = new Anthropic({ apiKey });
     this.qualityGates = new QualityGatesEngine();
     this.scoringEngine = new ResearchScoringEngine();
+    
+    // Initialize with default configurations
+    this.confidenceThresholds = {
+      minimumForAnalysis: 70,
+      highConfidence: 85,
+      refreshThreshold: 60,
+      cacheExpiryHours: 24,
+      ...options?.confidenceThresholds
+    };
+    
+    this.retryConfig = {
+      maxRetries: 3,
+      baseDelay: 1000,
+      maxDelay: 10000,
+      backoffMultiplier: 2,
+      ...options?.retryConfig
+    };
   }
 
   // Phase 1: Generate initial research strategy
@@ -190,10 +274,11 @@ class AIResearchOrchestrator {
 
   // Build the initial research planning prompt
   private buildResearchPlanningPrompt(projectName: string, basicInfo?: BasicProjectInfo): string {
-    // Check if this is an established project
-    const isEstablishedProject = this.isEstablishedProject(projectName);
-    
-    return `You are a research strategist for a Web3/Gaming project analysis bot. Your job is to create an optimal research plan.
+    return `You are the AI Research Orchestrator for a Web3/Gaming project analysis bot. Your role is to:
+
+1. FIND THE RIGHT INFORMATION SOURCES - Discover whitepapers, documentation, official websites, and any data that will help the API calls get the information needed
+2. COORDINATE BETWEEN TWO AI CALLS - You are the first AI that plans and executes research, then delivers comprehensive data to a second AI who will analyze everything
+3. ENSURE YOU DELIVER WHAT THE SECOND AI NEEDS - The second AI will be looking at all the collected data to perform research, so make sure you gather everything they need for comprehensive analysis
 
 PROJECT TO RESEARCH: "${projectName}"
 ${basicInfo ? `
@@ -203,25 +288,27 @@ BASIC INFO FOUND:
 - Social Links: ${JSON.stringify(basicInfo.socialLinks || {})}
 - Known Aliases: ${basicInfo.aliases?.join(', ') || 'None'}` : ''}
 
-${isEstablishedProject ? `
-ESTABLISHED PROJECT DETECTED: This appears to be an established project with extensive documentation available.
-ENHANCED RESEARCH APPROACH: Focus on official sources, comprehensive documentation, and institutional backing.
-SPECIAL CONSIDERATIONS:
-- Higher confidence thresholds apply
-- Official documentation should be prioritized
-- Security audits and team verification are critical
-- Post-incident handling (if applicable) should be evaluated positively` : ''}
+YOUR MISSION: Apply ENHANCED research depth for ALL projects. Every project deserves comprehensive analysis including:
+- Aggressive whitepaper and documentation discovery (CRITICAL for second AI analysis)
+- Comprehensive tokenomics analysis (for web3 projects)
+- Detailed technical assessment
+- Thorough community and social media analysis
+- Multiple data source validation
+- Security audit investigation
+- Team background verification
+
+Remember: You are gathering data for another AI to analyze, so focus on finding the most comprehensive and reliable sources possible.
 
 AVAILABLE DATA SOURCES:
-1. Whitepaper/Documentation (Tier 1) - Official project docs, tokenomics, roadmap
-2. On-chain Data (Tier 1) - Contract verification, token metrics, holder data
-3. Team Information (Tier 1) - LinkedIn profiles, backgrounds, previous projects
-4. Community Health (Tier 2) - Discord/Twitter/Telegram engagement
-5. Financial Data (Tier 2) - Market cap, funding, trading metrics
-6. Product Data (Tier 2) - Steam stats, game reviews, user metrics
-7. Security Audits (Tier 3) - CertiK, Immunefi audit reports
-8. Media Coverage (Tier 3) - News articles, influencer coverage
-9. Social Signals (Tier 3) - Reddit sentiment, YouTube engagement
+1. Whitepaper/Documentation (Tier 1 - CRITICAL) - Official project docs, tokenomics, roadmap
+2. On-chain Data (Tier 1 - CRITICAL) - Contract verification, token metrics, holder data
+3. Team Information (Tier 1 - CRITICAL) - LinkedIn profiles, backgrounds, previous projects
+4. Community Health (Tier 2 - HIGH) - Discord/Twitter/Telegram engagement
+5. Financial Data (Tier 2 - HIGH) - Market cap, funding, trading metrics
+6. Product Data (Tier 2 - HIGH) - Steam stats, game reviews, user metrics
+7. Security Audits (Tier 3 - HIGH) - CertiK, Immunefi audit reports
+8. Media Coverage (Tier 3 - MEDIUM) - News articles, influencer coverage
+9. Social Signals (Tier 3 - MEDIUM) - Reddit sentiment, YouTube engagement
 
 Please provide a JSON response with the following structure:
 
@@ -236,8 +323,8 @@ Please provide a JSON response with the following structure:
       "source": "whitepaper",
       "priority": "critical",
       "reasoning": "Need tokenomics for web3 project evaluation",
-      "searchTerms": ["tokenomics", "whitepaper", "documentation"],
-      "expectedDataPoints": ["token_distribution", "roadmap", "use_cases"]
+      "searchTerms": ["tokenomics", "whitepaper", "documentation", "technical paper"],
+      "expectedDataPoints": ["token_distribution", "roadmap", "use_cases", "economic_model"]
     }
   ],
   "riskAreas": [
@@ -248,10 +335,10 @@ Please provide a JSON response with the following structure:
     }
   ],
   "searchAliases": ["projectname", "ticker", "common_misspellings"],
-  "estimatedResearchTime": ${isEstablishedProject ? '25' : '15'},
+  "estimatedResearchTime": 25,
   "successCriteria": {
-    "minimumSources": ${isEstablishedProject ? '6' : '5'},
-    "criticalDataPoints": ["team_verified", "tokenomics_clear", "community_active"${isEstablishedProject ? ', "security_audited", "funding_verified"' : ''}],
+    "minimumSources": 7,
+    "criticalDataPoints": ["team_verified", "tokenomics_clear", "community_active", "security_audited", "funding_verified"],
     "redFlagChecks": ["scam_history", "rug_pull_indicators", "fake_partnerships"]
   }
 }
@@ -261,10 +348,9 @@ Focus on:
 2. Most important sources for THIS specific project type
 3. Key risk areas to investigate
 4. Alternative names/tickers to search
-5. Realistic research goals given available sources
-${isEstablishedProject ? `
-6. For established projects: Prioritize official documentation and institutional backing
-7. Evaluate post-incident handling positively if project has recovered from setbacks` : ''}`;
+5. Comprehensive research goals with high standards for ALL projects
+6. Aggressive documentation and whitepaper discovery
+7. Thorough technical and security assessment`;
   }
 
   // Build adaptive research prompt during collection
@@ -279,7 +365,7 @@ ${isEstablishedProject ? `
       .filter(ps => !foundSources.includes(ps.source))
       .map(ps => ps.source);
 
-    return `You are monitoring an ongoing research process. Based on what we've found so far, should we continue collecting data or is it sufficient?
+    return `You are the AI Research Orchestrator monitoring ongoing data collection. You need to decide if you have enough data for the SECOND AI to perform comprehensive analysis.
 
 ORIGINAL PLAN:
 - Project Type: ${originalPlan.projectClassification.type}
@@ -298,10 +384,12 @@ ${Object.entries(currentFindings)
   .map(([source, finding]) => `- ${source}: ${finding.dataPoints} data points (${finding.quality} quality)`)
   .join('\n')}
 
+CRITICAL QUESTION: Do you have enough comprehensive data for the second AI to perform thorough research analysis?
+
 Provide a JSON response:
 {
   "shouldContinue": true,
-  "reasoning": "Still missing critical team data...",
+  "reasoning": "Still missing critical team data for second AI analysis...",
   "nextPriority": ["team_info", "community_health"],
   "timeRecommendation": 10,
   "adjustments": {
@@ -309,14 +397,15 @@ Provide a JSON response:
     "focusAreas": ["team_verification"],
     "skipSources": ["media_coverage"]
   },
-  "qualityAssessment": "sufficient|needs_more|insufficient"
+  "qualityAssessment": "sufficient|needs_more|insufficient",
+  "secondAIReadiness": "ready|needs_more_data|insufficient_for_analysis"
 }
 
 Decide based on:
-1. Do we have enough for minimum viable analysis?
-2. Are we hitting diminishing returns?
-3. Are there critical gaps that more research could fill?
-4. Is the time investment worth the potential data quality gain?`;
+1. Do we have enough data for the second AI to perform comprehensive analysis?
+2. Are we hitting diminishing returns on data collection?
+3. Are there critical gaps that more research could fill for the second AI?
+4. Is the time investment worth the potential data quality gain for analysis?`;
   }
 
   // Build final completeness assessment prompt
@@ -325,7 +414,7 @@ Decide based on:
     findings: ResearchFindings,
     gateResult: any
   ): string {
-    return `Final research completeness assessment needed.
+    return `Final AI Research Orchestrator assessment: Do we have enough comprehensive data for the SECOND AI to perform thorough research analysis?
 
 RESEARCH PLAN GOALS:
 - Target: ${plan.projectClassification.type} project
@@ -343,14 +432,15 @@ Provide JSON assessment:
   "isComplete": true,
   "confidence": 0.82,
   "gaps": ["team_background_details"],
-  "recommendations": ["Proceed with analysis", "Note confidence level in results"]
+  "recommendations": ["Ready for second AI analysis", "Note confidence level in results"],
+  "secondAIReadiness": "ready|needs_more_data|insufficient_for_analysis"
 }
 
 Consider:
-1. Did we meet the original success criteria?
-2. Are any gaps critical enough to block analysis?
-3. What's our confidence level in the final dataset?
-4. Should we recommend proceeding or gathering more data?`;
+1. Did we meet the original success criteria for comprehensive analysis?
+2. Are any gaps critical enough to block the second AI's analysis?
+3. What's our confidence level that the second AI can perform thorough research?
+4. Should we proceed to second AI analysis or gather more data?`;
   }
 
   // Parse the AI response into ResearchPlan
@@ -551,18 +641,268 @@ Consider:
       }
     };
   }
+
+  // NEW: Cache management methods
+  private getCachedData(projectName: string, sourceName: string): any | null {
+    const cacheKey = `${projectName.toLowerCase()}_${sourceName}`;
+    const cached = this.sourceCache.get(cacheKey);
+    
+    if (!cached) return null;
+    
+    // Check if cache is expired
+    const now = new Date();
+    const cacheAge = now.getTime() - cached.lastUpdated.getTime();
+    const expiryMs = this.confidenceThresholds.cacheExpiryHours * 60 * 60 * 1000;
+    
+    if (cacheAge > expiryMs) {
+      this.sourceCache.delete(cacheKey);
+      return null;
+    }
+    
+    // Check if data needs refresh based on confidence
+    const sourceData = cached.sources[sourceName];
+    if (sourceData && sourceData.confidence < this.confidenceThresholds.refreshThreshold) {
+      const refreshAge = now.getTime() - sourceData.lastRefreshed.getTime();
+      const refreshIntervalMs = sourceData.refreshInterval * 60 * 1000;
+      
+      if (refreshAge > refreshIntervalMs) {
+        return null; // Force refresh
+      }
+    }
+    
+    return sourceData?.data || null;
+  }
+
+  private setCachedData(projectName: string, sourceName: string, data: any, confidence: number): void {
+    const cacheKey = `${projectName.toLowerCase()}_${sourceName}`;
+    const now = new Date();
+    
+    let cached = this.sourceCache.get(cacheKey);
+    if (!cached) {
+      cached = {
+        projectName,
+        sources: {},
+        lastUpdated: now,
+        confidenceScore: 0
+      };
+    }
+    
+    cached.sources[sourceName] = {
+      data,
+      timestamp: now,
+      confidence,
+      lastRefreshed: now,
+      refreshInterval: this.getRefreshInterval(confidence)
+    };
+    
+    cached.lastUpdated = now;
+    cached.confidenceScore = this.calculateOverallConfidence(cached.sources);
+    
+    this.sourceCache.set(cacheKey, cached);
+  }
+
+  private getRefreshInterval(confidence: number): number {
+    // Higher confidence = longer refresh interval
+    if (confidence >= this.confidenceThresholds.highConfidence) return 1440; // 24 hours
+    if (confidence >= this.confidenceThresholds.minimumForAnalysis) return 720; // 12 hours
+    return 60; // 1 hour for low confidence data
+  }
+
+  private calculateOverallConfidence(sources: any): number {
+    const confidences = Object.values(sources).map((s: any) => s.confidence);
+    return confidences.length > 0 ? confidences.reduce((a, b) => a + b, 0) / confidences.length : 0;
+  }
+
+  // NEW: Feedback loop methods
+  public async processSecondAIFeedback(
+    projectName: string, 
+    feedback: SecondAIFeedback
+  ): Promise<{
+    shouldCollectMoreData: boolean;
+    newSourcesToCollect: string[];
+    updatedPlan?: Partial<ResearchPlan>;
+  }> {
+    // Store feedback in history
+    const projectFeedback = this.feedbackHistory.get(projectName) || [];
+    projectFeedback.push(feedback);
+    this.feedbackHistory.set(projectName, projectFeedback);
+    
+    // Analyze feedback to determine next actions
+    const shouldCollectMoreData = feedback.needsMoreData || !feedback.analysisReadiness;
+    const newSourcesToCollect = feedback.missingDataTypes;
+    
+    // Generate updated research plan if needed
+    let updatedPlan: Partial<ResearchPlan> | undefined;
+    if (shouldCollectMoreData) {
+      updatedPlan = await this.generateUpdatedPlanFromFeedback(projectName, feedback);
+    }
+    
+    return {
+      shouldCollectMoreData,
+      newSourcesToCollect,
+      updatedPlan
+    };
+  }
+
+  private async generateUpdatedPlanFromFeedback(
+    projectName: string, 
+    feedback: SecondAIFeedback
+  ): Promise<Partial<ResearchPlan>> {
+    const prompt = `Based on feedback from the second AI analysis, update the research plan for "${projectName}".
+    
+    Feedback received:
+    - Missing data types: ${feedback.missingDataTypes.join(', ')}
+    - Specific requests: ${feedback.specificRequests.join(', ')}
+    - Confidence level: ${feedback.confidenceLevel}
+    - Recommendations: ${feedback.recommendations.join(', ')}
+    
+    Generate an updated research plan that addresses these gaps. Focus on:
+    1. New sources to collect the missing data types
+    2. Higher priority for sources that will improve confidence
+    3. Specific search terms for the missing information
+    4. Adjusted success criteria based on feedback
+    
+    Return a JSON object with the updated plan sections.`;
+    
+    try {
+      const response = await this.anthropic.messages.create({
+        model: 'claude-3-sonnet-20240229',
+        max_tokens: 1000,
+        messages: [{ role: 'user', content: prompt }]
+      });
+      
+      return JSON.parse(response.content[0].text);
+    } catch (error) {
+      console.error('Error generating updated plan from feedback:', error);
+      return {};
+    }
+  }
+
+  // NEW: Confidence threshold checking
+  public shouldPassToSecondAI(findings: ResearchFindings): {
+    shouldPass: boolean;
+    reason: string;
+    confidenceScore: number;
+    missingForThreshold: string[];
+  } {
+    const score = this.scoringEngine.calculateResearchScore(findings);
+    const confidenceScore = score.confidence;
+    
+    const shouldPass = confidenceScore >= this.confidenceThresholds.minimumForAnalysis;
+    const reason = shouldPass 
+      ? `Confidence score (${confidenceScore}) meets minimum threshold (${this.confidenceThresholds.minimumForAnalysis})`
+      : `Confidence score (${confidenceScore}) below minimum threshold (${this.confidenceThresholds.minimumForAnalysis})`;
+    
+    // Identify what's missing to reach threshold
+    const missingForThreshold: string[] = [];
+    if (confidenceScore < this.confidenceThresholds.minimumForAnalysis) {
+      const missingSources = this.identifyInformationGaps({} as ResearchPlan, findings);
+      missingForThreshold.push(...missingSources);
+    }
+    
+    return {
+      shouldPass,
+      reason,
+      confidenceScore,
+      missingForThreshold
+    };
+  }
+
+  // NEW: Enhanced error handling with retry logic
+  private async executeWithRetry<T>(
+    operation: () => Promise<T>,
+    operationName: string
+  ): Promise<T> {
+    let lastError: Error | undefined;
+    
+    for (let attempt = 1; attempt <= this.retryConfig.maxRetries; attempt++) {
+      try {
+        return await operation();
+      } catch (error) {
+        lastError = error as Error;
+        console.warn(`${operationName} attempt ${attempt} failed:`, error);
+        
+        if (attempt < this.retryConfig.maxRetries) {
+          const delay = Math.min(
+            this.retryConfig.baseDelay * Math.pow(this.retryConfig.backoffMultiplier, attempt - 1),
+            this.retryConfig.maxDelay
+          );
+          
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      }
+    }
+    
+    throw new Error(`${operationName} failed after ${this.retryConfig.maxRetries} attempts. Last error: ${lastError?.message || 'Unknown error'}`);
+  }
+
+  // NEW: Real-time update checking
+  public async checkForUpdates(projectName: string): Promise<{
+    needsUpdate: boolean;
+    sourcesToUpdate: string[];
+    lastUpdateAge: number; // minutes
+  }> {
+    const cacheKey = `${projectName.toLowerCase()}`;
+    const cached = this.sourceCache.get(cacheKey);
+    
+    if (!cached) {
+      return { needsUpdate: true, sourcesToUpdate: [], lastUpdateAge: Infinity };
+    }
+    
+    const now = new Date();
+    const lastUpdateAge = (now.getTime() - cached.lastUpdated.getTime()) / (1000 * 60); // minutes
+    
+    const sourcesToUpdate: string[] = [];
+    
+    for (const [sourceName, sourceData] of Object.entries(cached.sources)) {
+      const sourceAge = (now.getTime() - sourceData.lastRefreshed.getTime()) / (1000 * 60);
+      
+      if (sourceAge > sourceData.refreshInterval) {
+        sourcesToUpdate.push(sourceName);
+      }
+    }
+    
+    const needsUpdate = sourcesToUpdate.length > 0 || lastUpdateAge > this.confidenceThresholds.cacheExpiryHours * 60;
+    
+    return {
+      needsUpdate,
+      sourcesToUpdate,
+      lastUpdateAge
+    };
+  }
+
+  // NEW: Cache cleanup
+  public cleanupExpiredCache(): number {
+    const now = new Date();
+    let cleanedCount = 0;
+    
+    for (const [key, cached] of this.sourceCache.entries()) {
+      const cacheAge = now.getTime() - cached.lastUpdated.getTime();
+      const expiryMs = this.confidenceThresholds.cacheExpiryHours * 60 * 60 * 1000;
+      
+      if (cacheAge > expiryMs) {
+        this.sourceCache.delete(key);
+        cleanedCount++;
+      }
+    }
+    
+    return cleanedCount;
+  }
 }
 
 // Main orchestrated research function
 export async function conductAIOrchestratedResearch(
   projectName: string,
   anthropicApiKey: string,
-  basicInfo?: BasicProjectInfo
+  basicInfo?: BasicProjectInfo,
+  dataCollectionFunctions?: DataCollectionFunctions
 ) {
   const orchestrator = new AIResearchOrchestrator(anthropicApiKey);
   const findings: ResearchFindings = {};
   
-  
+  // NEW: Check for cached data first
+  const updateCheck = await orchestrator.checkForUpdates(projectName);
+  console.log(`Update check for ${projectName}:`, updateCheck);
   
   // Phase 1: Get AI research strategy
   const researchPlan = await orchestrator.generateResearchPlan(projectName, basicInfo);
@@ -571,20 +911,47 @@ export async function conductAIOrchestratedResearch(
   let shouldContinue = true;
   let adaptiveState: AdaptiveResearchState | null = null;
   
-  // Phase 2: Execute research with AI adaptation
+  // Phase 2: Execute research with AI adaptation and caching
   for (const prioritySource of researchPlan.prioritySources) {
     if (!shouldContinue) break;
     
     const timeElapsed = Math.floor((Date.now() - startTime) / 60000);
     
-    // Collect data from this source (your existing collection logic)
-    const sourceData = await collectFromSource(
-      prioritySource.source, 
-      prioritySource.searchTerms,
-      researchPlan.searchAliases
-    );
+    // NEW: Check cache first
+    const cachedData = orchestrator['getCachedData'](projectName, prioritySource.source);
+    let sourceData;
+    
+    if (cachedData) {
+      console.log(`Using cached data for ${prioritySource.source}`);
+      sourceData = cachedData;
+    } else {
+      // Collect data from this source using REAL data collection functions with retry
+      sourceData = await orchestrator['executeWithRetry'](
+        () => collectFromSourceWithRealFunctions(
+          prioritySource.source, 
+          prioritySource.searchTerms,
+          researchPlan.searchAliases,
+          projectName,
+          dataCollectionFunctions
+        ),
+        `Data collection for ${prioritySource.source}`
+      );
+      
+      // NEW: Cache the collected data
+      if (sourceData.found) {
+        const confidence = sourceData.quality === 'high' ? 85 : sourceData.quality === 'medium' ? 70 : 50;
+        orchestrator['setCachedData'](projectName, prioritySource.source, sourceData, confidence);
+      }
+    }
     
     findings[prioritySource.source] = sourceData;
+    
+    // NEW: Check confidence threshold before continuing
+    const thresholdCheck = orchestrator.shouldPassToSecondAI(findings);
+    if (!thresholdCheck.shouldPass && Object.keys(findings).length >= 3) {
+      console.log(`Confidence threshold not met: ${thresholdCheck.reason}`);
+      console.log(`Missing for threshold: ${thresholdCheck.missingForThreshold.join(', ')}`);
+    }
     
     // Every 2 sources, check with AI if we should continue
     if (Object.keys(findings).length % 2 === 0) {
@@ -602,13 +969,16 @@ export async function conductAIOrchestratedResearch(
     }
   }
   
-  // Phase 3: Final completeness check
+  // Phase 3: Final completeness check with confidence threshold
   const completeness = await orchestrator.assessResearchCompleteness(researchPlan, findings);
+  const thresholdCheck = orchestrator.shouldPassToSecondAI(findings);
   
-  if (!completeness.isComplete) {
+  if (!completeness.isComplete || !thresholdCheck.shouldPass) {
     return {
       success: false,
-      reason: 'Insufficient research quality after AI-guided collection',
+      reason: thresholdCheck.shouldPass 
+        ? 'Insufficient research quality after AI-guided collection'
+        : thresholdCheck.reason,
       gaps: completeness.gaps,
       recommendations: completeness.recommendations,
       researchPlan,
@@ -631,22 +1001,157 @@ export async function conductAIOrchestratedResearch(
 }
 
 // Helper function - integrate with your existing source collection
-async function collectFromSource(
+async function collectFromSourceWithRealFunctions(
   sourceName: string, 
   searchTerms: string[], 
-  aliases: string[]
+  aliases: string[],
+  projectName: string,
+  dataCollectionFunctions?: DataCollectionFunctions
 ): Promise<any> {
-  // This would integrate with your existing data collection functions
-  // Return in the ResearchFindings format
-  
-  // Placeholder - replace with your actual collection logic
-  return {
-    found: Math.random() > 0.3, // Simulate success rate
-    data: { example: 'data' },
-    quality: 'medium',
-    timestamp: new Date(),
-    dataPoints: Math.floor(Math.random() * 10) + 5
-  };
+  if (!dataCollectionFunctions) {
+    // Fallback to placeholder if no functions provided
+    return {
+      found: Math.random() > 0.3,
+      data: { example: 'data' },
+      quality: 'medium',
+      timestamp: new Date(),
+      dataPoints: Math.floor(Math.random() * 10) + 5
+    };
+  }
+
+  try {
+    switch (sourceName) {
+      case 'whitepaper':
+        // Use AI to discover official URLs first
+        const officialUrls = await dataCollectionFunctions.discoverOfficialUrlsWithAI(projectName, aliases);
+        if (officialUrls?.whitepaper) {
+          const pdfBuffer = await dataCollectionFunctions.fetchPdfBuffer(officialUrls.whitepaper);
+          if (pdfBuffer) {
+            const tokenomics = await dataCollectionFunctions.extractTokenomicsFromWhitepaper(officialUrls.whitepaper);
+            return {
+              found: true,
+              data: { 
+                whitepaperUrl: officialUrls.whitepaper,
+                tokenomics: tokenomics,
+                pdfSize: pdfBuffer.length
+              },
+              quality: 'high',
+              timestamp: new Date(),
+              dataPoints: tokenomics ? Object.keys(tokenomics).length + 5 : 5
+            };
+          }
+        }
+        // Fallback to generic tokenomics search
+        const genericTokenomics = await dataCollectionFunctions.searchProjectSpecificTokenomics(projectName, aliases);
+        return {
+          found: !!genericTokenomics,
+          data: genericTokenomics || {},
+          quality: genericTokenomics ? 'medium' : 'low',
+          timestamp: new Date(),
+          dataPoints: genericTokenomics ? Object.keys(genericTokenomics).length : 0
+        };
+
+      case 'team_info':
+        // Search for team information using official URLs
+        const teamUrls = await dataCollectionFunctions.discoverOfficialUrlsWithAI(projectName, aliases);
+        if (teamUrls?.website) {
+          const aboutSection = await dataCollectionFunctions.fetchWebsiteAboutSection(teamUrls.website);
+          return {
+            found: !!aboutSection,
+            data: { 
+              website: teamUrls.website,
+              aboutSection: aboutSection
+            },
+            quality: aboutSection ? 'medium' : 'low',
+            timestamp: new Date(),
+            dataPoints: aboutSection ? aboutSection.split('.').length : 0
+          };
+        }
+        return {
+          found: false,
+          data: {},
+          quality: 'low',
+          timestamp: new Date(),
+          dataPoints: 0
+        };
+
+      case 'community_health':
+        // Try to find social media links and analyze community
+        const socialUrls = await dataCollectionFunctions.discoverOfficialUrlsWithAI(projectName, aliases);
+        const communityData: any = {};
+        
+        if (socialUrls?.website) {
+          // Extract social links from website
+          const aboutSection = await dataCollectionFunctions.fetchWebsiteAboutSection(socialUrls.website);
+          // This would need social link extraction logic
+        }
+        
+        return {
+          found: Object.keys(communityData).length > 0,
+          data: communityData,
+          quality: Object.keys(communityData).length > 2 ? 'medium' : 'low',
+          timestamp: new Date(),
+          dataPoints: Object.keys(communityData).length
+        };
+
+      case 'onchain_data':
+        // For Ronin projects, try to get on-chain data
+        // This would need contract address discovery logic
+        return {
+          found: false,
+          data: {},
+          quality: 'low',
+          timestamp: new Date(),
+          dataPoints: 0
+        };
+
+      case 'financial_data':
+        // Search for funding information, market data
+        const financialUrls = await dataCollectionFunctions.discoverOfficialUrlsWithAI(projectName, aliases);
+        return {
+          found: !!financialUrls?.website,
+          data: { website: financialUrls?.website },
+          quality: 'medium',
+          timestamp: new Date(),
+          dataPoints: 1
+        };
+
+      case 'security_audit':
+        // Search for security audit information
+        const auditSearch = await dataCollectionFunctions.searchProjectSpecificTokenomics(
+          projectName, 
+          [...aliases, 'security audit', 'certik', 'immunefi']
+        );
+        return {
+          found: !!auditSearch,
+          data: auditSearch || {},
+          quality: auditSearch ? 'high' : 'low',
+          timestamp: new Date(),
+          dataPoints: auditSearch ? Object.keys(auditSearch).length : 0
+        };
+
+      default:
+        // Generic search for any other source
+        const genericSearch = await dataCollectionFunctions.searchProjectSpecificTokenomics(projectName, aliases);
+        return {
+          found: !!genericSearch,
+          data: genericSearch || {},
+          quality: genericSearch ? 'medium' : 'low',
+          timestamp: new Date(),
+          dataPoints: genericSearch ? Object.keys(genericSearch).length : 0
+        };
+    }
+  } catch (error) {
+    console.error(`Error collecting data from ${sourceName}:`, error);
+    return {
+      found: false,
+      data: {},
+      quality: 'low',
+      timestamp: new Date(),
+      dataPoints: 0,
+      error: (error as Error).message
+    };
+  }
 }
 
 export { AIResearchOrchestrator, AdaptiveResearchState, BasicProjectInfo }; 

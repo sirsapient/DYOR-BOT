@@ -48,6 +48,8 @@ function App() {
   const [selectedNetwork, setSelectedNetwork] = useState<'auto' | 'ethereum' | 'ronin'>('auto');
   const [contractAddress, setContractAddress] = useState('');
   const [roninContractAddress, setRoninContractAddress] = useState('');
+  const [useEnhancedResearch, setUseEnhancedResearch] = useState(false);
+  const [feedback, setFeedback] = useState('');
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,10 +58,8 @@ function App() {
     setError(null);
     try {
       const apiUrl = process.env.REACT_APP_API_URL || 'https://dyor-bot.onrender.com';
-      const endpoint = '/api/research';
+      const endpoint = useEnhancedResearch ? '/api/research-enhanced' : '/api/research';
       const fullUrl = `${apiUrl}${endpoint}`;
-      
-
       
       const requestBody: any = { projectName };
       
@@ -74,6 +74,18 @@ function App() {
         if (roninContractAddress) requestBody.roninContractAddress = roninContractAddress;
       }
       
+      // Add feedback for enhanced research
+      if (useEnhancedResearch && feedback) {
+        requestBody.feedback = {
+          needsMoreData: true,
+          missingDataTypes: ['whitepaper', 'team_info'],
+          confidenceLevel: 'medium',
+          specificRequests: [feedback],
+          analysisReadiness: false,
+          recommendations: ['Need more comprehensive data']
+        };
+      }
+      
       const res = await fetch(fullUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -82,16 +94,12 @@ function App() {
       
       if (!res.ok) {
         const errorText = await res.text();
-  
         throw new Error(`API error: ${res.status} ${res.statusText}`);
       }
       
       const data = await res.json();
-
-      
       setResearch(data);
     } catch (err) {
-
       setError(`Failed to fetch research: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
       setResearchLoading(false);
@@ -104,30 +112,134 @@ function App() {
       <h1>DYOR BOT</h1>
       <hr />
       <h2>Project Research</h2>
-      <form onSubmit={handleSearch} style={{ marginBottom: 16 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+      <form onSubmit={handleSearch} style={{ 
+        marginBottom: 16, 
+        maxWidth: 600, 
+        margin: '0 auto 16px auto',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: '12px'
+      }}>
+        
+        {/* Quick Search Buttons */}
+        <div style={{ 
+          display: 'flex', 
+          gap: '8px', 
+          marginBottom: '8px',
+          flexWrap: 'wrap',
+          justifyContent: 'center'
+        }}>
+          <button
+            type="button"
+            onClick={() => {
+              setProjectName('Axie Infinity');
+              setSelectedNetwork('ronin');
+              setRoninContractAddress('0x97a9107c1793bc407d6f527b77e7fff4d812bece');
+            }}
+            style={{
+              padding: '6px 12px',
+              borderRadius: '4px',
+              border: '1px solid #4a90e2',
+              backgroundColor: '#f0f8ff',
+              color: '#4a90e2',
+              fontSize: '14px',
+              cursor: 'pointer'
+            }}
+          >
+            🔍 Axie Infinity (Ronin)
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setProjectName('Axie Infinity');
+              setSelectedNetwork('auto');
+              setContractAddress('');
+              setRoninContractAddress('0x97a9107c1793bc407d6f527b77e7fff4d812bece');
+            }}
+            style={{
+              padding: '6px 12px',
+              borderRadius: '4px',
+              border: '1px solid #28a745',
+              backgroundColor: '#f8fff8',
+              color: '#28a745',
+              fontSize: '14px',
+              cursor: 'pointer'
+            }}
+          >
+            🔍 Axie Infinity (Auto)
+          </button>
+        </div>
+        <div style={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          gap: '8px', 
+          marginBottom: '8px',
+          width: '100%',
+          maxWidth: 500
+        }}>
           <input
             type="text"
             value={projectName}
             onChange={e => setProjectName(e.target.value)}
             placeholder="Enter project or token name"
-            style={{ marginRight: 8, flex: 1 }}
+            style={{ 
+              marginRight: 8, 
+              flex: 1,
+              padding: '8px 12px',
+              borderRadius: '6px',
+              border: '1px solid #ddd',
+              fontSize: '16px'
+            }}
           />
-          <button type="submit" disabled={researchLoading || !projectName}>
+          <button 
+            type="submit" 
+            disabled={researchLoading || !projectName}
+            style={{
+              padding: '8px 16px',
+              borderRadius: '6px',
+              border: 'none',
+              backgroundColor: '#007bff',
+              color: 'white',
+              fontSize: '16px',
+              cursor: researchLoading || !projectName ? 'not-allowed' : 'pointer',
+              opacity: researchLoading || !projectName ? 0.6 : 1
+            }}
+          >
             {researchLoading ? 'Searching...' : 'Search'}
           </button>
         </div>
 
         {/* Network Selection */}
-        <div style={{ marginBottom: '12px' }}>
-          <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px', fontWeight: 500 }}>
+        <div style={{ 
+          marginBottom: '12px',
+          width: '100%',
+          maxWidth: 500
+        }}>
+          <label style={{ 
+            display: 'block', 
+            marginBottom: '4px', 
+            fontSize: '14px', 
+            fontWeight: 500,
+            textAlign: 'left'
+          }}>
             Network (Optional):
           </label>
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <div style={{ 
+            display: 'flex', 
+            gap: '8px', 
+            alignItems: 'center',
+            flexWrap: 'wrap'
+          }}>
             <select
               value={selectedNetwork}
               onChange={e => setSelectedNetwork(e.target.value as 'auto' | 'ethereum' | 'ronin')}
-              style={{ padding: '4px 8px', borderRadius: '4px', border: '1px solid #ddd' }}
+              style={{ 
+                padding: '6px 8px', 
+                borderRadius: '4px', 
+                border: '1px solid #ddd',
+                fontSize: '14px'
+              }}
             >
               <option value="auto">Auto-detect</option>
               <option value="ethereum">Ethereum</option>
@@ -140,7 +252,13 @@ function App() {
                 value={contractAddress}
                 onChange={e => setContractAddress(e.target.value)}
                 placeholder="Ethereum contract address (0x...)"
-                style={{ flex: 1, padding: '4px 8px', borderRadius: '4px', border: '1px solid #ddd' }}
+                style={{ 
+                  flex: 1, 
+                  padding: '6px 8px', 
+                  borderRadius: '4px', 
+                  border: '1px solid #ddd',
+                  fontSize: '14px'
+                }}
               />
             )}
             
@@ -150,32 +268,90 @@ function App() {
                 value={roninContractAddress}
                 onChange={e => setRoninContractAddress(e.target.value)}
                 placeholder="Ronin contract address (0x...)"
-                style={{ flex: 1, padding: '4px 8px', borderRadius: '4px', border: '1px solid #ddd' }}
+                style={{ 
+                  flex: 1, 
+                  padding: '6px 8px', 
+                  borderRadius: '4px', 
+                  border: '1px solid #ddd',
+                  fontSize: '14px'
+                }}
               />
             )}
             
             {selectedNetwork === 'auto' && (
-              <div style={{ display: 'flex', gap: '8px', flex: 1 }}>
+              <div style={{ 
+                display: 'flex', 
+                gap: '8px', 
+                flex: 1,
+                flexWrap: 'wrap'
+              }}>
                 <input
                   type="text"
                   value={contractAddress}
                   onChange={e => setContractAddress(e.target.value)}
                   placeholder="Ethereum contract (optional)"
-                  style={{ flex: 1, padding: '4px 8px', borderRadius: '4px', border: '1px solid #ddd' }}
+                  style={{ 
+                    flex: 1, 
+                    padding: '6px 8px', 
+                    borderRadius: '4px', 
+                    border: '1px solid #ddd',
+                    fontSize: '14px',
+                    minWidth: '200px'
+                  }}
                 />
                 <input
                   type="text"
                   value={roninContractAddress}
                   onChange={e => setRoninContractAddress(e.target.value)}
                   placeholder="Ronin contract (optional)"
-                  style={{ flex: 1, padding: '4px 8px', borderRadius: '4px', border: '1px solid #ddd' }}
+                  style={{ 
+                    flex: 1, 
+                    padding: '6px 8px', 
+                    borderRadius: '4px', 
+                    border: '1px solid #ddd',
+                    fontSize: '14px',
+                    minWidth: '200px'
+                  }}
                 />
               </div>
             )}
           </div>
+
+          {/* NEW: Enhanced Research Options */}
+          <div style={{ marginTop: 16 }}>
+            <label style={{ display: 'flex', alignItems: 'center', marginBottom: 8, fontWeight: 600 }}>
+              <input
+                type="checkbox"
+                checked={useEnhancedResearch}
+                onChange={(e) => setUseEnhancedResearch(e.target.checked)}
+                style={{ marginRight: 8 }}
+              />
+              Use Enhanced Research (Caching, Confidence Thresholds, Feedback Loop)
+            </label>
+          </div>
+
+          {useEnhancedResearch && (
+            <div style={{ marginTop: 12 }}>
+              <label style={{ display: 'block', marginBottom: 8, fontWeight: 600 }}>
+                Feedback for Second AI (Optional):
+              </label>
+              <textarea
+                value={feedback}
+                onChange={(e) => setFeedback(e.target.value)}
+                placeholder="Enter specific data requests or feedback for the AI orchestrator..."
+                style={{ 
+                  width: '100%', 
+                  padding: '8px', 
+                  borderRadius: '4px', 
+                  border: '1px solid #ddd',
+                  minHeight: 60,
+                  resize: 'vertical',
+                  fontSize: '14px'
+                }}
+              />
+            </div>
+          )}
         </div>
-
-
       </form>
       <div style={{
         background: '#f5f5f5',
