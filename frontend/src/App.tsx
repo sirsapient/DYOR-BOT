@@ -54,9 +54,12 @@ function App() {
     setError(null);
     try {
       // Use local backend for mock API, production for real API
-      const apiUrl = useMockApi ? 'http://localhost:4000' : (process.env.REACT_APP_API_URL || 'http://localhost:4000');
+      const apiUrl = useMockApi ? 'http://localhost:4000' : (process.env.REACT_APP_API_URL || 'https://dyor-bot.onrender.com');
       const endpoint = useMockApi ? '/api/research-mock' : '/api/research';
       const fullUrl = `${apiUrl}${endpoint}`;
+      
+      console.log('Making request to:', fullUrl); // Debug log
+      console.log('useMockApi:', useMockApi); // Debug log
       
       const res = await fetch(fullUrl, {
         method: 'POST',
@@ -64,16 +67,19 @@ function App() {
         body: JSON.stringify({ projectName }),
       });
       
-      const data = await res.json();
-      
       if (!res.ok) {
-        throw new Error('API error');
+        const errorText = await res.text();
+        console.error('API Error Response:', errorText);
+        throw new Error(`API error: ${res.status} ${res.statusText}`);
       }
+      
+      const data = await res.json();
+      console.log('API Response received:', data); // Debug log
       
       setResearch(data);
     } catch (err) {
       console.error('Fetch error:', err);
-      setError('Failed to fetch research');
+      setError(`Failed to fetch research: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
       setResearchLoading(false);
     }
@@ -108,9 +114,14 @@ function App() {
               onChange={e => setUseMockApi(e.target.checked)}
               style={{ marginRight: '4px' }}
             />
-            Use Mock API (for testing confidence indicators)
+            Use Mock API (for testing confidence indicators locally)
           </label>
         </div>
+        {!useMockApi && (
+          <div style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>
+            Note: Using production API. If you get errors, try checking "Use Mock API" for local testing.
+          </div>
+        )}
       </form>
       <div style={{
         background: '#f5f5f5',
