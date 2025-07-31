@@ -1237,7 +1237,7 @@ app.get('/api/cache-status', async (req: any, res: any) => {
 
 // Traditional research method (fallback)
 async function performTraditionalResearch(req: any, res: any) {
-  const { projectName, tokenSymbol, contractAddress, roninContractAddress } = req.body;
+  const { projectName, tokenSymbol, contractAddress, roninContractAddress, avalancheContractAddress } = req.body;
   
   // --- Alias collection logic ---
   let aliases = [projectName];
@@ -1246,7 +1246,7 @@ async function performTraditionalResearch(req: any, res: any) {
   // Try to get from website domain after fetch
 
   const sourcesUsed = [];
-  let cgData = null, igdbData = null, steamData = null, discordData = null, etherscanData = null, solscanData = null, youtubeData = null, aiSummary = null, nftData = null, preLaunch = false, devTimeYears = null, fundingType = 'unknown', tokenomics = {}, steamReviewSummary = '', githubRepo = null, githubStats = null, steamChartsSummary = '', redditSummary = '', openseaSummary = '', magicEdenSummary = '', crunchbaseSummary = '', duneSummary = '', securitySummary = '', reviewSummary = '', linkedinSummary = '', glassdoorSummary = '', twitterSummary = '', blogSummary = '', telegramSummary = '';
+  let cgData = null, igdbData = null, steamData = null, discordData = null, etherscanData = null, solscanData = null, snowtraceData = null, youtubeData = null, aiSummary = null, nftData = null, preLaunch = false, devTimeYears = null, fundingType = 'unknown', tokenomics = {}, steamReviewSummary = '', githubRepo = null, githubStats = null, steamChartsSummary = '', redditSummary = '', openseaSummary = '', magicEdenSummary = '', crunchbaseSummary = '', duneSummary = '', securitySummary = '', reviewSummary = '', linkedinSummary = '', glassdoorSummary = '', twitterSummary = '', blogSummary = '', telegramSummary = '';
   let roninTokenInfo = null;
 
   // Enhanced CoinGecko fetch
@@ -1577,6 +1577,42 @@ async function performTraditionalResearch(req: any, res: any) {
     }
   }
 
+  // --- Snowtrace (Avalanche) data fetch ---
+  let avaxAddress = null;
+  if (avalancheContractAddress) {
+    avaxAddress = avalancheContractAddress;
+  } else if (cgData && cgData.platforms && cgData.platforms.avalanche) {
+    avaxAddress = cgData.platforms.avalanche;
+  }
+
+  if (avaxAddress) {
+    try {
+      // Fetch Avalanche token data using Snowtrace API
+      const snowtraceRes = await fetch(`https://api.snowtrace.io/api?module=contract&action=getabi&address=${avaxAddress}&apikey=${process.env.SNOWTRACE_API_KEY || ''}`);
+      if (snowtraceRes.ok) {
+        const snowtraceJson = await snowtraceRes.json();
+        if (snowtraceJson.result && snowtraceJson.result !== 'Contract source code not verified') {
+          snowtraceData = snowtraceJson.result;
+          sourcesUsed.push('Snowtrace');
+        }
+      }
+      
+      // Fetch additional token information if available
+      if (process.env.SNOWTRACE_API_KEY) {
+        const tokenInfoRes = await fetch(`https://api.snowtrace.io/api?module=token&action=tokeninfo&contractaddress=${avaxAddress}&apikey=${process.env.SNOWTRACE_API_KEY}`);
+        if (tokenInfoRes.ok) {
+          const tokenInfoJson = await tokenInfoRes.json();
+          if (tokenInfoJson.result && tokenInfoJson.result[0]) {
+            if (!snowtraceData) snowtraceData = {};
+            snowtraceData.tokenInfo = tokenInfoJson.result[0];
+          }
+        }
+      }
+    } catch (e) {
+      snowtraceData = { error: 'Snowtrace fetch failed' };
+    }
+  }
+
   // --- Ronin Network data fetch ---
   let roninAddress = null;
   if (roninContractAddress) {
@@ -1648,6 +1684,7 @@ Data Sources:
 - Steam: ${steamData ? 'Available' : 'Not found'}
 - Discord: ${discordData ? 'Available' : 'Not found'}
 - Etherscan: ${etherscanData ? 'Available' : 'Not found'}
+- Snowtrace: ${snowtraceData ? 'Available' : 'Not found'}
 - YouTube: ${youtubeData ? 'Available' : 'Not found'}
 
 Key Data Points:
@@ -1707,6 +1744,7 @@ Format the response as a clear, structured analysis suitable for investors and r
     steamData,
     discordData,
     etherscanData,
+    snowtraceData,
     roninTokenInfo,
     studioAssessment: igdbData?.studioAssessment,
     securitySummary,
@@ -1766,6 +1804,7 @@ Format the response as a clear, structured analysis suitable for investors and r
     financialData: {
       marketCap: cgData?.market_data?.market_cap?.usd,
       roninTokenInfo,
+      avalancheTokenInfo: snowtraceData,
     },
     teamAnalysis: {
       studioAssessment: igdbData?.studioAssessment,

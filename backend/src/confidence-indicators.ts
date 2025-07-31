@@ -84,6 +84,7 @@ export class ConfidenceCalculator {
     const sourceConfigs = [
       { key: 'whitepaper', name: 'Documentation', icon: '📄', desc: 'Official project documentation' },
       { key: 'onchain_data', name: 'Blockchain Data', icon: '⛓️', desc: 'On-chain metrics and contracts' },
+      { key: 'avalanche_data', name: 'Avalanche Network', icon: '❄️', desc: 'Avalanche blockchain data and contracts' },
       { key: 'ronin_data', name: 'Ronin Network', icon: '🌐', desc: 'Ronin blockchain data and transactions' },
       { key: 'team_info', name: 'Team Information', icon: '👥', desc: 'Founder and team backgrounds' },
       { key: 'community_health', name: 'Community', icon: '💬', desc: 'Discord, Twitter, Telegram activity' },

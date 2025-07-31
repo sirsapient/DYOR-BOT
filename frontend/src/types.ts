@@ -13,6 +13,7 @@ export interface ProjectResearch {
     tokenDistribution?: TokenDistribution;
     fundingInfo?: FundingInfo;
     roninTokenInfo?: RoninTokenInfo;
+    avalancheTokenInfo?: AvalancheTokenInfo;
   };
   teamAnalysis: TeamAnalysis;
   technicalAssessment: TechnicalAssessment;
@@ -125,6 +126,20 @@ export interface RoninTokenInfo {
     transactionCount?: number;
     recentTransactions?: any[];
     network?: string;
+  };
+  error?: string;
+}
+
+export interface AvalancheTokenInfo {
+  totalSupply?: string;
+  symbol?: string;
+  network?: string;
+  contractAddress?: string;
+  tokenInfo?: {
+    tokenName?: string;
+    tokenSymbol?: string;
+    totalSupply?: string;
+    decimals?: number;
   };
   error?: string;
 } 

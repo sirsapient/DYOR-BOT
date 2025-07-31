@@ -39,6 +39,7 @@ export class ResearchScoringEngine {
     { name: 'whitepaper', tier: 1, weight: 20, reliability: 'official', isRequired: true },
     { name: 'documentation', tier: 1, weight: 15, reliability: 'official', isRequired: false },
     { name: 'onchain_data', tier: 1, weight: 15, reliability: 'verified', isRequired: true },
+    { name: 'avalanche_data', tier: 1, weight: 15, reliability: 'verified', isRequired: false },
     { name: 'ronin_data', tier: 1, weight: 15, reliability: 'verified', isRequired: false },
     { name: 'team_info', tier: 1, weight: 15, reliability: 'verified', isRequired: true },
     
@@ -519,6 +520,17 @@ export function mapDataToFindings(data: any): ResearchFindings {
       quality: 'high',
       timestamp: new Date(),
       dataPoints: countDataPoints(data.etherscanData)
+    };
+  }
+  
+  // Map Snowtrace (Avalanche) data to avalanche_data
+  if (data.snowtraceData && !data.snowtraceData.error) {
+    findings.avalanche_data = {
+      found: true,
+      data: data.snowtraceData,
+      quality: 'high',
+      timestamp: new Date(),
+      dataPoints: countDataPoints(data.snowtraceData)
     };
   }
   
