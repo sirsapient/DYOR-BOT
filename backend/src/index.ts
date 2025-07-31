@@ -1192,9 +1192,9 @@ Format the response as a clear, structured analysis suitable for investors and r
     projectType: 'Web3Game', // Placeholder, real logic needed
 
     keyFindings: {
-      positives,
-      negatives,
-      redFlags,
+      positives: [],
+      negatives: [],
+      redFlags: [],
     },
     financialData: {
       marketCap: cgData?.market_data?.market_cap?.usd,
