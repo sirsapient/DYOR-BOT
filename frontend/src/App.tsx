@@ -45,21 +45,17 @@ function App() {
   const [research, setResearch] = useState<ProjectResearch | null>(null);
   const [researchLoading, setResearchLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [useMockApi, setUseMockApi] = useState(true); // Default to mock API for now
-
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     setResearchLoading(true);
     setResearch(null);
     setError(null);
     try {
-      // Use local backend for mock API, production for real API
-      const apiUrl = useMockApi ? 'http://localhost:4000' : (process.env.REACT_APP_API_URL || 'https://dyor-bot.onrender.com:10000');
-      const endpoint = useMockApi ? '/api/research-mock' : '/api/research';
+      const apiUrl = process.env.REACT_APP_API_URL || 'https://dyor-bot.onrender.com:10000';
+      const endpoint = '/api/research';
       const fullUrl = `${apiUrl}${endpoint}`;
       
-      console.log('Making request to:', fullUrl); // Debug log - Updated with port 10000
-      console.log('useMockApi:', useMockApi); // Debug log
+      console.log('Making request to:', fullUrl);
       
       const res = await fetch(fullUrl, {
         method: 'POST',
@@ -104,22 +100,7 @@ function App() {
             {researchLoading ? 'Searching...' : 'Search'}
           </button>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px' }}>
-          <label>
-            <input
-              type="checkbox"
-              checked={useMockApi}
-              onChange={e => setUseMockApi(e.target.checked)}
-              style={{ marginRight: '4px' }}
-            />
-            Use Mock API (recommended for testing)
-          </label>
-        </div>
-        {!useMockApi && (
-          <div style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>
-            Note: Production API is currently having issues. Use Mock API for reliable testing.
-          </div>
-        )}
+
       </form>
       <div style={{
         background: '#f5f5f5',
