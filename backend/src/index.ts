@@ -633,36 +633,54 @@ app.post('/api/research', async (req: any, res: any) => {
       }
     } else {
       // 2. Otherwise, fetch all coins and try to match using all aliases
+      console.log('🔍 Starting CoinGecko search for:', projectName);
+      console.log('🔍 Initial aliases:', aliases);
+      
       const listRes = await fetch('https://api.coingecko.com/api/v3/coins/list');
       if (listRes.ok) {
         const coins: any[] = await listRes.json();
+        console.log('🔍 CoinGecko list fetched, total coins:', coins.length);
         
         // Try all aliases for id, name, symbol, partial/fuzzy
         let candidates: any[] = [];
         for (const alias of aliases) {
           const lowerAlias = alias.toLowerCase();
           candidates = coins.filter((c: any) => c.id.toLowerCase() === lowerAlias || c.name.toLowerCase() === lowerAlias);
-          if (candidates.length) break;
+          if (candidates.length) {
+            console.log('🔍 Found exact match for alias:', alias, 'candidates:', candidates.length);
+            break;
+          }
         }
         if (!candidates.length && tokenSymbol) {
           candidates = coins.filter((c: any) => c.symbol.toLowerCase() === tokenSymbol.toLowerCase());
+          if (candidates.length) {
+            console.log('🔍 Found exact match for token symbol:', tokenSymbol, 'candidates:', candidates.length);
+          }
         }
         if (!candidates.length) {
           for (const alias of aliases) {
             const lowerAlias = alias.toLowerCase();
             candidates = coins.filter((c: any) => c.id.toLowerCase().includes(lowerAlias) || c.name.toLowerCase().includes(lowerAlias));
-            if (candidates.length) break;
+            if (candidates.length) {
+              console.log('🔍 Found partial match for alias:', alias, 'candidates:', candidates.length);
+              break;
+            }
           }
         }
         if (!candidates.length && tokenSymbol) {
           candidates = coins.filter((c: any) => c.symbol.toLowerCase().includes(tokenSymbol.toLowerCase()));
+          if (candidates.length) {
+            console.log('🔍 Found partial match for token symbol:', tokenSymbol, 'candidates:', candidates.length);
+          }
         }
         if (candidates.length) {
           coinId = candidates[0].id;
+          console.log('🔍 Selected coin ID:', coinId);
           const cgRes = await fetch(`https://api.coingecko.com/api/v3/coins/${coinId}`);
           if (cgRes.ok) {
             cgData = await cgRes.json();
             sourcesUsed.push('CoinGecko');
+            console.log('🔍 CoinGecko data fetched successfully');
             if (cgData.name) aliases.push(cgData.name);
             if (cgData.symbol) aliases.push(cgData.symbol);
             if (cgData.links && cgData.links.homepage && cgData.links.homepage[0]) {
@@ -671,8 +689,10 @@ app.post('/api/research', async (req: any, res: any) => {
             }
           } else {
             cgData = { error: `CoinGecko: ${cgRes.status} ${cgRes.statusText}` };
+            console.log('🔍 CoinGecko fetch failed:', cgData.error);
           }
         } else {
+          console.log('🔍 No CoinGecko candidates found for aliases:', aliases);
           // Fallback: LLM-powered web search for contract address using all aliases
           let llmAddress = null;
           for (const alias of aliases) {
@@ -681,16 +701,20 @@ app.post('/api/research', async (req: any, res: any) => {
           }
           if (llmAddress) {
             cgData = { fallback_contract_address: llmAddress };
+            console.log('🔍 Found contract address via LLM:', llmAddress);
           } else {
             cgData = { error: 'No matching token found on CoinGecko (checked id, name, symbol, partial matches, all aliases), and LLM web search did not find a contract address.' };
+            console.log('🔍 No CoinGecko data found and no contract address via LLM');
           }
         }
       } else {
         cgData = { error: `CoinGecko list: ${listRes.status} ${listRes.statusText}` };
+        console.log('🔍 CoinGecko list fetch failed:', cgData.error);
       }
     }
   } catch (e) {
     cgData = { error: 'CoinGecko fetch failed' };
+    console.log('🔍 CoinGecko fetch exception:', e);
   }
 
   // IGDB fetch
