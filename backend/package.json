@@ -13,9 +13,12 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.18.0",
+    "cheerio": "^1.1.2",
     "cors": "^2.8.5",
     "ethers": "^6.15.0",
     "express": "^5.1.0",
+    "node-fetch": "^3.3.2",
     "pdf-parse": "^1.1.1",
     "steam-search": "^1.0.0"
   },

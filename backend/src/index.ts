@@ -1,5 +1,5 @@
-import express from 'express';
-import cors from 'cors';
+const express = require('express');
+const cors = require('cors');
 // @ts-ignore
 const fetch = require('node-fetch');
 require('dotenv').config();
@@ -9,6 +9,9 @@ const cheerio = require('cheerio');
 const https = require('https');
 const http = require('http');
 const { URL } = require('url');
+import { ResearchScoringEngine, mapDataToFindings } from './research-scoring';
+import { QualityGatesEngine, formatQualityGateResponse, ProjectType } from './quality-gates';
+import { generateConfidenceMetrics, ConfidenceMetrics } from './confidence-indicators';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -17,11 +20,11 @@ app.use(cors());
 app.use(express.json());
 
 // Add root route
-app.get('/', (req, res) => {
+app.get('/', (req: any, res: any) => {
   res.send('DYOR BOT API is running');
 });
 
-app.get('/api/health', (req, res) => {
+app.get('/api/health', (req: any, res: any) => {
   res.json({ status: 'ok' });
 });
 
@@ -35,6 +38,7 @@ const REQUIRED_ENV_VARS = [
 const missingVars = REQUIRED_ENV_VARS.filter((v) => !process.env[v]);
 if (missingVars.length > 0) {
   console.warn('WARNING: Missing required environment variables:', missingVars.join(', '));
+  console.warn('Server will start but some features may not work properly.');
 }
 
 const serpApiKey = process.env.SERPAPI_KEY;
@@ -81,13 +85,40 @@ async function fetchWhitepaperUrl(websiteUrl: string): Promise<string | null> {
     const html = await res.text();
     const $ = cheerio.load(html);
     let found = null;
+    
+    // Look for various tokenomics-related links
     $('a').each((_: any, el: any) => {
       const href = $(el).attr('href');
-      if (href && /whitepaper|tokenomics/i.test(href)) {
-        found = href.startsWith('http') ? href : new URL(href, websiteUrl).toString();
-        return false;
+      const text = $(el).text().toLowerCase();
+      
+      if (href) {
+        // Check href for tokenomics-related terms
+        if (/whitepaper|tokenomics|token[-_]economics|token[-_]distribution|economics|docs?|documentation/i.test(href)) {
+          found = href.startsWith('http') ? href : new URL(href, websiteUrl).toString();
+          return false;
+        }
+        
+        // Check link text for tokenomics-related terms
+        if (/whitepaper|tokenomics|token economics|token distribution|economics|documentation/i.test(text)) {
+          found = href.startsWith('http') ? href : new URL(href, websiteUrl).toString();
+          return false;
+        }
       }
     });
+    
+    // If no specific tokenomics link found, look for general documentation
+    if (!found) {
+      $('a').each((_: any, el: any) => {
+        const href = $(el).attr('href');
+        const text = $(el).text().toLowerCase();
+        
+        if (href && /docs?|documentation|learn|about/i.test(href) && /docs?|documentation|learn|about/i.test(text)) {
+          found = href.startsWith('http') ? href : new URL(href, websiteUrl).toString();
+          return false;
+        }
+      });
+    }
+    
     return found;
   } catch (e) {
     return null;
@@ -133,7 +164,20 @@ async function extractTokenomicsFromWhitepaper(websiteUrl: string): Promise<any 
   }
   if (!text) return null;
   // Use Anthropic Claude to extract tokenomics
-  const prompt = `Given the following text from a crypto project whitepaper or tokenomics page, extract the tokenomics details (total supply, distribution breakdown, vesting schedule, etc.). Return as structured JSON.\n\nText:\n${text.substring(0, 12000)}`;
+  const prompt = `Given the following text from a crypto project whitepaper or tokenomics page, extract the tokenomics details. Focus on:
+
+1. Token names and symbols (e.g., AXS, SLP for Axie Infinity)
+2. Total supply and circulating supply
+3. Token distribution breakdown (team, community, treasury, etc.)
+4. Vesting schedules and unlock periods
+5. Token utility and use cases
+6. Inflation/deflation mechanisms
+7. Staking rewards and tokenomics
+
+Return as structured JSON with clear field names. If no clear tokenomics data is found, return null.
+
+Text:
+${text.substring(0, 12000)}`;
   const aiRes = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -181,6 +225,84 @@ function extractSocialLinksFromHtml(html: string): {discord?: string, twitter?: 
     }
   });
   return { discord, twitter };
+}
+
+async function searchProjectSpecificTokenomics(projectName: string, aliases: string[]): Promise<any | null> {
+  if (!serpApiKey || !process.env.ANTHROPIC_API_KEY) return null;
+  
+  // Search for project-specific tokenomics information
+  const searchTerms = [
+    `${projectName} tokenomics`,
+    `${projectName} token distribution`,
+    `${projectName} whitepaper`,
+    `${projectName} token economics`
+  ];
+  
+  // Add aliases to search terms
+  for (const alias of aliases.slice(0, 3)) { // Limit to first 3 aliases
+    searchTerms.push(`${alias} tokenomics`);
+    searchTerms.push(`${alias} token distribution`);
+  }
+  
+  let allSnippets = '';
+  
+  // Search each term
+  for (const term of searchTerms.slice(0, 4)) { // Limit to first 4 terms
+    try {
+      const serpRes = await fetch(`https://serpapi.com/search.json?q=${encodeURIComponent(term)}&api_key=${serpApiKey}`);
+      if (serpRes.ok) {
+        const serpJson = await serpRes.json();
+        const snippets = (serpJson.organic_results || []).map((r: any) => r.snippet || r.title || '').filter(Boolean).join('\n');
+        allSnippets += snippets + '\n';
+      }
+    } catch (e) {
+      // Continue with next search term
+    }
+  }
+  
+  if (!allSnippets) return null;
+  
+  // Use AI to extract tokenomics from search results
+  const prompt = `Given the following web search results about ${projectName}, extract the tokenomics details (total supply, distribution breakdown, vesting schedule, token names, etc.). Return as structured JSON. If no clear tokenomics data is found, return null.
+
+Search Results:
+${allSnippets.substring(0, 8000)}`;
+
+  try {
+    const aiRes = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': process.env.ANTHROPIC_API_KEY,
+        'content-type': 'application/json',
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-opus-4-20250514',
+        max_tokens: 512,
+        messages: [
+          { role: 'user', content: prompt }
+        ]
+      })
+    });
+    
+    if (aiRes.ok) {
+      const aiJson = await aiRes.json();
+      const text = aiJson.content?.[0]?.text || '';
+      
+      // Try to parse JSON from response
+      try {
+        const json = JSON.parse(text);
+        return json;
+      } catch (e) {
+        // If not valid JSON, return as extracted text
+        return { extracted_text: text };
+      }
+    }
+  } catch (e) {
+    // Return null if AI extraction fails
+  }
+  
+  return null;
 }
 
 // List of Nitter instances to try
@@ -260,8 +382,7 @@ async function fetchWebsiteAboutSection(url: string): Promise<string> {
   } catch (e) { return ''; }
 }
 
-app.post('/api/research', async (req, res) => {
-  console.log('Received POST /api/research', req.body);
+app.post('/api/research', async (req: any, res: any) => {
   const { projectName, tokenSymbol, contractAddress, roninContractAddress } = req.body;
   if (!projectName) {
     return res.status(400).json({ error: 'Missing projectName' });
@@ -274,18 +395,23 @@ app.post('/api/research', async (req, res) => {
   // Try to get from website domain after fetch
 
   const sourcesUsed = [];
-  let cgData = null, igdbData = null, steamData = null, discordData = null, etherscanData = null, solscanData = null, youtubeData = null, aiSummary = null, aiRiskScore = null, nftData = null, preLaunch = false, devTimeYears = null, fundingType = 'unknown', tokenomics = {}, steamReviewSummary = '', githubRepo = null, githubStats = null, steamChartsSummary = '', redditSummary = '', openseaSummary = '', magicEdenSummary = '', crunchbaseSummary = '', duneSummary = '', securitySummary = '', reviewSummary = '', linkedinSummary = '', glassdoorSummary = '', twitterSummary = '', blogSummary = '', telegramSummary = '';
+  let cgData = null, igdbData = null, steamData = null, discordData = null, etherscanData = null, solscanData = null, youtubeData = null, aiSummary = null, nftData = null, preLaunch = false, devTimeYears = null, fundingType = 'unknown', tokenomics = {}, steamReviewSummary = '', githubRepo = null, githubStats = null, steamChartsSummary = '', redditSummary = '', openseaSummary = '', magicEdenSummary = '', crunchbaseSummary = '', duneSummary = '', securitySummary = '', reviewSummary = '', linkedinSummary = '', glassdoorSummary = '', twitterSummary = '', blogSummary = '', telegramSummary = '';
   let roninTokenInfo = null;
 
   // Enhanced CoinGecko fetch
   try {
     let coinId = null;
+    console.log('🔍 Starting CoinGecko search for:', projectName);
+    console.log('🔍 Initial aliases:', aliases);
+    
     // 1. If contract address is provided, try contract endpoint (Ethereum only for now)
     if (contractAddress) {
+      console.log('🔍 Using contract address:', contractAddress);
       const contractRes = await fetch(`https://api.coingecko.com/api/v3/coins/ethereum/contract/${contractAddress}`);
       if (contractRes.ok) {
         cgData = await contractRes.json();
         sourcesUsed.push('CoinGecko');
+        console.log('✅ CoinGecko contract search successful');
         if (cgData.name) aliases.push(cgData.name);
         if (cgData.symbol) aliases.push(cgData.symbol);
         if (cgData.links && cgData.links.homepage && cgData.links.homepage[0]) {
@@ -294,38 +420,48 @@ app.post('/api/research', async (req, res) => {
         }
       } else {
         cgData = { error: `CoinGecko contract: ${contractRes.status} ${contractRes.statusText}` };
+        console.log('❌ CoinGecko contract search failed:', contractRes.status, contractRes.statusText);
       }
     } else {
       // 2. Otherwise, fetch all coins and try to match using all aliases
+      console.log('🔍 Fetching CoinGecko coins list...');
       const listRes = await fetch('https://api.coingecko.com/api/v3/coins/list');
       if (listRes.ok) {
         const coins: any[] = await listRes.json();
+        console.log('📊 CoinGecko coins list loaded, total coins:', coins.length);
+        
         // Try all aliases for id, name, symbol, partial/fuzzy
         let candidates: any[] = [];
         for (const alias of aliases) {
           const lowerAlias = alias.toLowerCase();
           candidates = coins.filter((c: any) => c.id.toLowerCase() === lowerAlias || c.name.toLowerCase() === lowerAlias);
+          console.log(`🔍 Searching for exact match "${lowerAlias}":`, candidates.length, 'candidates found');
           if (candidates.length) break;
         }
         if (!candidates.length && tokenSymbol) {
           candidates = coins.filter((c: any) => c.symbol.toLowerCase() === tokenSymbol.toLowerCase());
+          console.log(`🔍 Searching for token symbol "${tokenSymbol}":`, candidates.length, 'candidates found');
         }
         if (!candidates.length) {
           for (const alias of aliases) {
             const lowerAlias = alias.toLowerCase();
             candidates = coins.filter((c: any) => c.id.toLowerCase().includes(lowerAlias) || c.name.toLowerCase().includes(lowerAlias));
+            console.log(`🔍 Searching for partial match "${lowerAlias}":`, candidates.length, 'candidates found');
             if (candidates.length) break;
           }
         }
         if (!candidates.length && tokenSymbol) {
           candidates = coins.filter((c: any) => c.symbol.toLowerCase().includes(tokenSymbol.toLowerCase()));
+          console.log(`🔍 Searching for partial token symbol "${tokenSymbol}":`, candidates.length, 'candidates found');
         }
         if (candidates.length) {
           coinId = candidates[0].id;
+          console.log('✅ Found CoinGecko candidate:', coinId);
           const cgRes = await fetch(`https://api.coingecko.com/api/v3/coins/${coinId}`);
           if (cgRes.ok) {
             cgData = await cgRes.json();
             sourcesUsed.push('CoinGecko');
+            console.log('✅ CoinGecko data fetched successfully');
             if (cgData.name) aliases.push(cgData.name);
             if (cgData.symbol) aliases.push(cgData.symbol);
             if (cgData.links && cgData.links.homepage && cgData.links.homepage[0]) {
@@ -334,8 +470,10 @@ app.post('/api/research', async (req, res) => {
             }
           } else {
             cgData = { error: `CoinGecko: ${cgRes.status} ${cgRes.statusText}` };
+            console.log('❌ CoinGecko data fetch failed:', cgRes.status, cgRes.statusText);
           }
         } else {
+          console.log('❌ No CoinGecko candidates found for any alias');
           // Fallback: LLM-powered web search for contract address using all aliases
           let llmAddress = null;
           for (const alias of aliases) {
@@ -344,23 +482,29 @@ app.post('/api/research', async (req, res) => {
           }
           if (llmAddress) {
             cgData = { fallback_contract_address: llmAddress };
+            console.log('🔍 LLM found contract address:', llmAddress);
           } else {
             cgData = { error: 'No matching token found on CoinGecko (checked id, name, symbol, partial matches, all aliases), and LLM web search did not find a contract address.' };
+            console.log('❌ No contract address found via LLM');
           }
         }
       } else {
         cgData = { error: `CoinGecko list: ${listRes.status} ${listRes.statusText}` };
+        console.log('❌ CoinGecko list fetch failed:', listRes.status, listRes.statusText);
       }
     }
   } catch (e) {
     cgData = { error: 'CoinGecko fetch failed' };
+    console.log('❌ CoinGecko fetch exception:', e);
   }
 
   // IGDB fetch
   try {
+    console.log('🔍 Starting IGDB search for:', projectName);
     const igdbTokenRes = await fetch(`https://id.twitch.tv/oauth2/token?client_id=${process.env.IGDB_CLIENT_ID}&client_secret=${process.env.IGDB_CLIENT_SECRET}&grant_type=client_credentials`, { method: 'POST' });
     const igdbTokenJson = await igdbTokenRes.json();
     const igdbToken = igdbTokenJson.access_token;
+    console.log('🔍 IGDB token obtained');
     const igdbRes = await fetch('https://api.igdb.com/v4/games', {
       method: 'POST',
       headers: {
@@ -374,7 +518,12 @@ app.post('/api/research', async (req, res) => {
     if (igdbRes.ok) {
       const igdbJson = await igdbRes.json();
       igdbData = igdbJson[0] || null;
-      if (igdbData) sourcesUsed.push('IGDB');
+      if (igdbData) {
+        sourcesUsed.push('IGDB');
+        console.log('✅ IGDB data found:', igdbData.name);
+      } else {
+        console.log('❌ No IGDB data found');
+      }
       if (igdbData && igdbData.name) aliases.push(igdbData.name);
       if (igdbData && igdbData.websites && Array.isArray(igdbData.websites)) {
         for (const w of igdbData.websites) {
@@ -424,97 +573,26 @@ app.post('/api/research', async (req, res) => {
   // Deduplicate and prioritize aliases
   aliases = Array.from(new Set(aliases.map(a => a.trim().toLowerCase()).filter(Boolean)));
 
-  // Enhanced CoinGecko fetch
-  try {
-    let coinId = null;
-    // 1. If contract address is provided, try contract endpoint (Ethereum only for now)
-    if (contractAddress) {
-      const contractRes = await fetch(`https://api.coingecko.com/api/v3/coins/ethereum/contract/${contractAddress}`);
-      if (contractRes.ok) {
-        cgData = await contractRes.json();
-        sourcesUsed.push('CoinGecko');
-        if (cgData.name) aliases.push(cgData.name);
-        if (cgData.symbol) aliases.push(cgData.symbol);
-        if (cgData.links && cgData.links.homepage && cgData.links.homepage[0]) {
-          const dom = extractDomain(cgData.links.homepage[0]);
-          if (dom) aliases.push(dom);
-        }
-      } else {
-        cgData = { error: `CoinGecko contract: ${contractRes.status} ${contractRes.statusText}` };
-      }
-    } else {
-      // 2. Otherwise, fetch all coins and try to match using all aliases
-      const listRes = await fetch('https://api.coingecko.com/api/v3/coins/list');
-      if (listRes.ok) {
-        const coins: any[] = await listRes.json();
-        // Try all aliases for id, name, symbol, partial/fuzzy
-        let candidates: any[] = [];
-        for (const alias of aliases) {
-          const lowerAlias = alias.toLowerCase();
-          candidates = coins.filter((c: any) => c.id.toLowerCase() === lowerAlias || c.name.toLowerCase() === lowerAlias);
-          if (candidates.length) break;
-        }
-        if (!candidates.length && tokenSymbol) {
-          candidates = coins.filter((c: any) => c.symbol.toLowerCase() === tokenSymbol.toLowerCase());
-        }
-        if (!candidates.length) {
-          for (const alias of aliases) {
-            const lowerAlias = alias.toLowerCase();
-            candidates = coins.filter((c: any) => c.id.toLowerCase().includes(lowerAlias) || c.name.toLowerCase().includes(lowerAlias));
-            if (candidates.length) break;
-          }
-        }
-        if (!candidates.length && tokenSymbol) {
-          candidates = coins.filter((c: any) => c.symbol.toLowerCase().includes(tokenSymbol.toLowerCase()));
-        }
-        if (candidates.length) {
-          coinId = candidates[0].id;
-          const cgRes = await fetch(`https://api.coingecko.com/api/v3/coins/${coinId}`);
-          if (cgRes.ok) {
-            cgData = await cgRes.json();
-            sourcesUsed.push('CoinGecko');
-            if (cgData.name) aliases.push(cgData.name);
-            if (cgData.symbol) aliases.push(cgData.symbol);
-            if (cgData.links && cgData.links.homepage && cgData.links.homepage[0]) {
-              const dom = extractDomain(cgData.links.homepage[0]);
-              if (dom) aliases.push(dom);
-            }
-          } else {
-            cgData = { error: `CoinGecko: ${cgRes.status} ${cgRes.statusText}` };
-          }
-        } else {
-          // Fallback: LLM-powered web search for contract address using all aliases
-          let llmAddress = null;
-          for (const alias of aliases) {
-            llmAddress = await searchContractAddressWithLLM(alias);
-            if (llmAddress) break;
-          }
-          if (llmAddress) {
-            cgData = { fallback_contract_address: llmAddress };
-          } else {
-            cgData = { error: 'No matching token found on CoinGecko (checked id, name, symbol, partial matches, all aliases), and LLM web search did not find a contract address.' };
-          }
-        }
-      } else {
-        cgData = { error: `CoinGecko list: ${listRes.status} ${listRes.statusText}` };
-      }
-    }
-  } catch (e) {
-    cgData = { error: 'CoinGecko fetch failed' };
-  }
-
   // Steam fetch
   try {
+    console.log('🔍 Starting Steam search for:', projectName);
     const steamRes = await fetch(`https://store.steampowered.com/api/storesearch/?term=${encodeURIComponent(projectName)}&cc=us&l=en`);
     if (steamRes.ok) {
       const steamJson = await steamRes.json();
       steamData = steamJson.items && steamJson.items.length > 0 ? steamJson.items[0] : null;
-      if (steamData) sourcesUsed.push('Steam');
+      if (steamData) {
+        sourcesUsed.push('Steam');
+        console.log('✅ Steam data found:', steamData.name);
+      } else {
+        console.log('❌ No Steam data found');
+      }
     } else {
       steamData = { error: `Steam: ${steamRes.status} ${steamRes.statusText}` };
+      console.log('❌ Steam search failed:', steamRes.status, steamRes.statusText);
     }
   } catch (e) {
     steamData = { error: 'Steam fetch failed' };
+    console.log('❌ Steam fetch exception:', e);
   }
 
   // Collect all possible homepages/website URLs from CoinGecko, IGDB, and aliases
@@ -869,10 +947,36 @@ app.post('/api/research', async (req, res) => {
       holders: etherscanData && etherscanData.holders,
       // Add more fields as needed
     };
-  } else if (cgData && cgData.links && cgData.links.homepage && cgData.links.homepage[0]) {
-    // Fallback: try to extract from whitepaper
-    const extracted = await extractTokenomicsFromWhitepaper(cgData.links.homepage[0]);
-    if (extracted) tokenomics = extracted;
+  }
+  
+  // Enhanced tokenomics extraction - try multiple sources
+  if (Object.keys(tokenomics).length === 0 || !(tokenomics as any).total_supply) {
+    // Try to extract from whitepaper/documentation
+    let extractedTokenomics = null;
+    
+    // 1. Try CoinGecko homepage
+    if (cgData && cgData.links && cgData.links.homepage && cgData.links.homepage[0]) {
+      extractedTokenomics = await extractTokenomicsFromWhitepaper(cgData.links.homepage[0]);
+    }
+    
+    // 2. Try IGDB websites
+    if (!extractedTokenomics && igdbData && igdbData.websites && Array.isArray(igdbData.websites)) {
+      for (const website of igdbData.websites) {
+        if (website.url) {
+          extractedTokenomics = await extractTokenomicsFromWhitepaper(website.url);
+          if (extractedTokenomics) break;
+        }
+      }
+    }
+    
+    // 3. Try project-specific tokenomics search
+    if (!extractedTokenomics) {
+      extractedTokenomics = await searchProjectSpecificTokenomics(projectName, aliases);
+    }
+    
+    if (extractedTokenomics) {
+      tokenomics = { ...tokenomics, ...extractedTokenomics };
+    }
   }
 
   // Steam review sentiment summary (basic)
@@ -1123,67 +1227,144 @@ app.post('/api/research', async (req, res) => {
     studioBackground = igdbData.studioAssessment.map((s: any) => `${s.companyName}: Developer: ${s.isDeveloper}, Publisher: ${s.isPublisher}, First project: ${s.firstProjectDate}`).join(' | ');
   }
 
-  // AI Summary (Anthropic Claude)
-  try {
-    if (process.env.ANTHROPIC_API_KEY) {
-      // Derive team size and funding info if possible
-      let teamSize = 'unknown';
-      let funding = 'unknown';
-      if (igdbData && igdbData.involved_companies && Array.isArray(igdbData.involved_companies)) {
-        teamSize = igdbData.involved_companies.length.toString();
-      }
-      if (cgData && cgData.market_data && cgData.market_data.market_cap && cgData.market_data.market_cap.usd) {
-        funding = `$${cgData.market_data.market_cap.usd}`;
-      }
-      // Derive community sentiment (basic: count negative/positive Steam reviews if available)
-      let communitySentiment = 'unknown';
-      if (steamData && steamData.review_score_desc) {
-        communitySentiment = steamData.review_score_desc;
-      }
-      // Delivery status (basic: check for recent updates or negative comments about updates)
-      let deliveryStatus = 'unknown';
-      if (steamData && steamData.release_date && steamData.release_date.date) {
-        deliveryStatus = `Released: ${steamData.release_date.date}`;
-      }
-      // Compose AI prompt
-      const aiPrompt = `You are an expert game project analyst. Given the following data about a game or Web3 project, write a comprehensive, user-friendly summary for users.\n\n- Provide a detailed, readable description of the game, its genre, and current status (alpha, beta, live, etc.) using all available sources (IGDB, Steam, website, etc.).\n- Provide background on the studio/developer: experience, previous projects, reputation.\n- Summarize community presence (Discord, Twitter, Reddit, etc.).\n- Summarize tokenomics and blockchain integration.\n- Provide a risk score and investment grade.\n- Highlight red flags and positive indicators.\n- Be honest, specific, and clear.\n- IMPORTANT: If data for a category is missing, say 'No data found' or 'Could not verify' rather than 'does not exist.' Only state that something does not exist if you are certain from the data.\n- Do NOT include a 'Key Findings' section.\n\nGame Description:\n${gameDescription}\n\nStudio Background:\n${studioBackground}\n\nData:\n${JSON.stringify({cgData, igdbData, steamData, discordData, etherscanData, solscanData, youtubeData, nftData, preLaunch, devTimeYears, fundingType, tokenomics, steamReviewSummary, githubRepo, githubStats, steamChartsSummary, redditSummary, openseaSummary, magicEdenSummary, crunchbaseSummary, duneSummary, securitySummary, reviewSummary, linkedinSummary, glassdoorSummary, twitterSummary, blogSummary, telegramSummary}, null, 2)}\n`;
-      const aiRes = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'x-api-key': process.env.ANTHROPIC_API_KEY,
-          'content-type': 'application/json',
-          'anthropic-version': '2023-06-01',
-        },
-        body: JSON.stringify({
-          model: 'claude-opus-4-20250514',
-          max_tokens: 512,
-          messages: [
-            { role: 'user', content: aiPrompt }
-          ]
-        })
-      });
-      if (aiRes.ok) {
-        const aiJson = await aiRes.json();
-        aiSummary = aiJson.content?.[0]?.text || null;
-        // Optionally extract risk score from summary if present
-        const riskMatch = aiSummary && aiSummary.match(/risk score\s*[:=\-]?\s*(\d{1,3})/i);
-        if (riskMatch) {
-          aiRiskScore = parseInt(riskMatch[1], 10);
+  // Quality Gates Integration
+  const qualityGates = new QualityGatesEngine();
+  const allData = {
+    cgData, igdbData, steamData, discordData, etherscanData, solscanData, 
+    youtubeData, nftData, preLaunch, devTimeYears, fundingType, tokenomics, 
+    steamReviewSummary, githubRepo, githubStats, steamChartsSummary, 
+    redditSummary, openseaSummary, magicEdenSummary, crunchbaseSummary, 
+    duneSummary, securitySummary, reviewSummary, linkedinSummary, 
+    glassdoorSummary, twitterSummary, blogSummary, telegramSummary,
+    studioAssessment: igdbData?.studioAssessment
+  };
+  
+  const findings = mapDataToFindings(allData);
+  
+  // Debug: Log the data being passed to mapDataToFindings
+  console.log('Data passed to mapDataToFindings:');
+  console.log('- cgData:', !!allData.cgData);
+  console.log('- igdbData:', !!allData.igdbData);
+  console.log('- steamData:', !!allData.steamData);
+  console.log('- discordData:', !!allData.discordData);
+  console.log('- etherscanData:', !!allData.etherscanData);
+  console.log('- studioAssessment:', !!allData.studioAssessment);
+  console.log('- securitySummary:', !!allData.securitySummary);
+  console.log('- twitterSummary:', !!allData.twitterSummary);
+  console.log('- redditSummary:', !!allData.redditSummary);
+  console.log('- telegramSummary:', !!allData.telegramSummary);
+  
+  console.log('Resulting findings:');
+  console.log('- findings keys:', Object.keys(findings));
+  console.log('- findings count:', Object.keys(findings).length);
+  console.log('- findings details:', JSON.stringify(findings, null, 2));
+  
+  // Determine project type based on available data
+  const projectType: ProjectType = {
+    type: 'unknown',
+    confidence: 0.5
+  };
+  
+  if (etherscanData && !etherscanData.error) {
+    projectType.type = 'web3_game';
+    projectType.confidence = 0.8;
+  } else if (steamData && steamData.name) {
+    projectType.type = 'traditional_game';
+    projectType.confidence = 0.7;
+  }
+  
+  // Check quality gates before proceeding
+  const gateResult = qualityGates.checkQualityGates(findings, projectType);
+  const proceed = gateResult.passed;
+  const reason = gateResult.userMessage;
+  const score = qualityGates['scoringEngine'].calculateResearchScore(findings);
+  
+  // AI Summary (Anthropic Claude) - only if research quality passes threshold
+  if (proceed) {
+    try {
+      if (process.env.ANTHROPIC_API_KEY) {
+        // Derive team size and funding info if possible
+        let teamSize = 'unknown';
+        let funding = 'unknown';
+        if (igdbData && igdbData.involved_companies && Array.isArray(igdbData.involved_companies)) {
+          teamSize = igdbData.involved_companies.length.toString();
         }
-        sourcesUsed.push('Anthropic');
-      } else {
-        let errorMsg = aiRes.statusText || '';
-        if (aiRes.status === 529) {
-          errorMsg = 'Anthropic API is overloaded or rate-limited. Please try again later.';
+        if (cgData && cgData.market_data && cgData.market_data.market_cap && cgData.market_data.market_cap.usd) {
+          funding = `$${cgData.market_data.market_cap.usd}`;
         }
-        if (!errorMsg) {
-          errorMsg = 'Error from Anthropic API. Please try again later.';
+        // Derive community sentiment (basic: count negative/positive Steam reviews if available)
+        let communitySentiment = 'unknown';
+        if (steamData && steamData.review_score_desc) {
+          communitySentiment = steamData.review_score_desc;
         }
-        aiSummary = `Anthropic: ${aiRes.status} ${errorMsg}`;
+        // Delivery status (basic: check for recent updates or negative comments about updates)
+        let deliveryStatus = 'unknown';
+        if (steamData && steamData.release_date && steamData.release_date.date) {
+          deliveryStatus = `Released: ${steamData.release_date.date}`;
+        }
+        // Compose AI prompt
+        const aiPrompt = `You are an expert game project analyst. Given the following data about a game or Web3 project, write a comprehensive, user-friendly summary for users.
+
+- Provide a detailed, readable description of the game, its genre, and current status (alpha, beta, live, etc.) using all available sources (IGDB, Steam, website, etc.).
+- Provide background on the studio/developer: experience, previous projects, reputation.
+- Summarize community presence (Discord, Twitter, Reddit, etc.).
+- Summarize tokenomics and blockchain integration. For Web3 games, specifically mention:
+  * Token names and symbols (e.g., AXS, SLP for Axie Infinity)
+  * Token distribution and supply
+  * Token utility and use cases
+  * Staking and earning mechanisms
+  * If no tokenomics data is found, explicitly state "No specific tokenomics data was found"
+- Highlight red flags and positive indicators.
+- Be honest, specific, and clear.
+- IMPORTANT: If data for a category is missing, say 'No data found' or 'Could not verify' rather than 'does not exist.' Only state that something does not exist if you are certain from the data.
+- Do NOT include a 'Key Findings' section.
+
+Game Description:
+${gameDescription}
+
+Studio Background:
+${studioBackground}
+
+Data:
+${JSON.stringify({cgData, igdbData, steamData, discordData, etherscanData, solscanData, youtubeData, nftData, preLaunch, devTimeYears, fundingType, tokenomics, steamReviewSummary, githubRepo, githubStats, steamChartsSummary, redditSummary, openseaSummary, magicEdenSummary, crunchbaseSummary, duneSummary, securitySummary, reviewSummary, linkedinSummary, glassdoorSummary, twitterSummary, blogSummary, telegramSummary}, null, 2)}
+`;
+        const aiRes = await fetchWithRetry('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'x-api-key': process.env.ANTHROPIC_API_KEY,
+            'content-type': 'application/json',
+            'anthropic-version': '2023-06-01',
+          },
+          body: JSON.stringify({
+            model: 'claude-opus-4-20250514',
+            max_tokens: 512,
+            messages: [
+              { role: 'user', content: aiPrompt }
+            ]
+          })
+        });
+        if (aiRes.ok) {
+          const aiJson = await aiRes.json();
+          aiSummary = aiJson.content?.[0]?.text || null;
+          sourcesUsed.push('Anthropic');
+        } else {
+          let errorMsg = aiRes.statusText || '';
+          if (aiRes.status === 529) {
+            errorMsg = 'Anthropic API is overloaded or rate-limited. Please try again later.';
+          }
+          if (!errorMsg) {
+            errorMsg = 'Error from Anthropic API. Please try again later.';
+          }
+          aiSummary = `Anthropic: ${aiRes.status} ${errorMsg}`;
+        }
       }
+    } catch (e) {
+      aiSummary = 'AI summary failed.';
     }
-  } catch (e) {
-    aiSummary = 'AI summary failed.';
+  } else {
+    // If quality gates fail, provide detailed feedback with suggestions
+    const formattedResponse = formatQualityGateResponse(gateResult);
+    aiSummary = `Quality gates failed: ${reason}. ${formattedResponse.actionItems.length > 0 ? 'Suggested actions: ' + formattedResponse.actionItems.join(', ') : ''}`;
   }
 
   // Enhanced Key Findings
@@ -1261,17 +1442,98 @@ app.post('/api/research', async (req, res) => {
     negatives.push('No key findings available for this project');
   }
 
+  // Debug: Log final sourcesUsed array
+  console.log('📊 Final sourcesUsed array:', sourcesUsed);
+  console.log('📊 sourcesUsed.length:', sourcesUsed.length);
+  
   // If all sources failed, return 404
   if (sourcesUsed.length === 0) {
+    console.log('❌ No sources found, returning 404');
     return res.status(404).json({ error: 'No data found for this project from any source.' });
   }
 
+  // Generate confidence metrics
+  const researchPlan = {
+    projectClassification: {
+      type: projectType.type as 'web3_game' | 'traditional_game' | 'publisher' | 'platform' | 'unknown',
+      confidence: projectType.confidence,
+      reasoning: 'Based on available data'
+    },
+    prioritySources: [],
+    riskAreas: [],
+    searchAliases: aliases,
+    estimatedResearchTime: 30,
+    successCriteria: {
+      minimumSources: 3,
+      criticalDataPoints: [],
+      redFlagChecks: []
+    }
+  };
+  
+
+  
+  // Initialize confidenceMetrics with a default value
+  let confidenceMetrics: ConfidenceMetrics = {
+    overall: {
+      score: 0,
+      grade: 'F',
+      level: 'very_low',
+      description: 'Default confidence metrics'
+    },
+    breakdown: {
+      dataCompleteness: { score: 0, found: 0, total: 0, missing: [] },
+      sourceReliability: { score: 0, official: 0, verified: 0, scraped: 0 },
+      dataFreshness: { score: 0, averageAge: 0, oldestSource: 'None' }
+    },
+    sourceDetails: [],
+    limitations: ['Default confidence calculation'],
+    strengths: [],
+    userGuidance: {
+      trustLevel: 'low',
+      useCase: 'Use with caution',
+      warnings: ['Default confidence metrics'],
+      additionalResearch: ['Verify data manually']
+    }
+  };
+  
+  try {
+    const generatedMetrics = generateConfidenceMetrics(findings, score, researchPlan);
+    
+    if (generatedMetrics && typeof generatedMetrics === 'object') {
+      confidenceMetrics = generatedMetrics;
+    } else {
+      throw new Error('Invalid confidence metrics data');
+    }
+  } catch (error) {
+    confidenceMetrics = {
+      overall: {
+        score: 0,
+        grade: 'F',
+        level: 'very_low',
+        description: 'Error generating confidence metrics'
+      },
+      breakdown: {
+        dataCompleteness: { score: 0, found: 0, total: 0, missing: [] },
+        sourceReliability: { score: 0, official: 0, verified: 0, scraped: 0 },
+        dataFreshness: { score: 0, averageAge: 0, oldestSource: 'None' }
+      },
+      sourceDetails: [],
+      limitations: ['Error in confidence calculation'],
+      strengths: [],
+      userGuidance: {
+        trustLevel: 'low',
+        useCase: 'Use with extreme caution',
+        warnings: ['Confidence calculation failed'],
+        additionalResearch: ['Verify all data manually']
+      }
+    };
+  }
+
   // Research report
-  const researchReport = {
+  const researchReport: any = {
     projectName: cgData?.name || igdbData?.name || projectName,
     projectType: 'Web3Game', // Placeholder, real logic needed
-    riskScore: aiRiskScore || 50, // Placeholder
-    investmentGrade: 'C', // Placeholder
+
     keyFindings: {
       positives,
       negatives,
@@ -1281,9 +1543,23 @@ app.post('/api/research', async (req, res) => {
       marketCap: cgData?.market_data?.market_cap?.usd,
       roninTokenInfo,
     },
-    teamAnalysis: {},
-    technicalAssessment: {},
-    communityHealth: {},
+    teamAnalysis: {
+      studioAssessment: igdbData?.studioAssessment,
+      linkedinSummary,
+      glassdoorSummary,
+    },
+    technicalAssessment: {
+      securitySummary,
+      reviewSummary,
+      githubRepo,
+      githubStats,
+    },
+    communityHealth: {
+      twitterSummary,
+      steamReviewSummary,
+      discordData,
+      redditSummary,
+    },
     recommendation: {},
     sourcesUsed,
     aiSummary,
@@ -1295,10 +1571,53 @@ app.post('/api/research', async (req, res) => {
     reviewSummary,
     glassdoorSummary,
     studioAssessment: igdbData?.studioAssessment,
+    
+    // Quality Gates Results
+    researchQuality: {
+      score: score.totalScore,
+      grade: score.grade,
+      confidence: score.confidence,
+      passesThreshold: proceed,
+      breakdown: score.breakdown,
+      missingCritical: score.missingCritical,
+      recommendations: score.recommendations,
+      proceedWithAnalysis: proceed,
+      reason: reason,
+      qualityGates: {
+        passed: gateResult.passed,
+        gatesFailed: gateResult.gatesFailed,
+        recommendations: gateResult.recommendations,
+        manualSuggestions: gateResult.manualResearchSuggestions,
+        retryAfter: gateResult.retryAfter,
+        severity: gateResult.gatesFailed.includes('red_flags') ? 'critical' : 
+                  gateResult.gatesFailed.includes('critical_sources') ? 'high' : 'medium'
+      }
+    }
   };
+
+  // Add confidence data at the end to ensure it's not overwritten
+  researchReport.confidence = confidenceMetrics;
+  
   res.json(researchReport);
 });
 
 app.listen(PORT, () => {
   console.log(`Backend server running on port ${PORT}`);
-}); 
+});
+
+// Helper: Retry logic for Anthropic API
+async function fetchWithRetry(url: string, options: any, retries = 3, backoff = 1000): Promise<Response> {
+  for (let i = 0; i < retries; i++) {
+    const res = await fetch(url, options);
+    if (res.status !== 529) {
+      return res;
+    }
+    // Wait before retrying
+    await new Promise(resolve => setTimeout(resolve, backoff * Math.pow(2, i)));
+  }
+  // Final attempt
+  return await fetch(url, options);
+}
+
+// Export functions for testing
+export { searchProjectSpecificTokenomics }; 

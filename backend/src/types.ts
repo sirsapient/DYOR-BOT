@@ -3,8 +3,6 @@
 export interface ProjectResearch {
   projectName: string;
   projectType: 'Web3Game' | 'TraditionalGame' | 'Publisher' | 'Platform';
-  riskScore: number;
-  investmentGrade: 'A' | 'B' | 'C' | 'D' | 'F';
   keyFindings: {
     positives: string[];
     negatives: string[];
@@ -18,7 +16,40 @@ export interface ProjectResearch {
   teamAnalysis: TeamAnalysis;
   technicalAssessment: TechnicalAssessment;
   communityHealth: CommunityHealth;
-  recommendation: InvestmentRecommendation;
+  researchQuality?: ResearchQuality;
+  // Additional data fields
+  studioAssessment?: any[];
+  linkedinSummary?: string;
+  glassdoorSummary?: string;
+  securitySummary?: string;
+  reviewSummary?: string;
+  twitterSummary?: string;
+  steamReviewSummary?: string;
+  redditSummary?: string;
+  githubRepo?: string;
+  githubStats?: string;
+  discordData?: {
+    server_name?: string;
+    member_count?: number;
+  };
+  aiSummary?: string;
+  sourcesUsed?: string[];
+}
+
+export interface ResearchQuality {
+  score: number;
+  grade: 'A' | 'B' | 'C' | 'D' | 'F';
+  confidence: number;
+  passesThreshold: boolean;
+  breakdown: {
+    dataCoverage: number;
+    sourceReliability: number;
+    recencyFactor: number;
+  };
+  missingCritical: string[];
+  recommendations: string[];
+  proceedWithAnalysis: boolean;
+  reason?: string;
 }
 
 // Placeholder types for referenced interfaces
@@ -29,16 +60,25 @@ export interface FundingInfo {
   [key: string]: any;
 }
 export interface TeamAnalysis {
-  [key: string]: any;
+  studioAssessment?: any[];
+  linkedinSummary?: string;
+  glassdoorSummary?: string;
 }
 export interface TechnicalAssessment {
-  [key: string]: any;
+  securitySummary?: string;
+  reviewSummary?: string;
+  githubRepo?: string;
+  githubStats?: string;
 }
 export interface CommunityHealth {
-  [key: string]: any;
-}
-export interface InvestmentRecommendation {
-  [key: string]: any;
+  twitterSummary?: string;
+  steamReviewSummary?: string;
+  discordData?: {
+    server_name?: string;
+    member_count?: number;
+  };
+  redditSummary?: string;
 }
 
+// @ts-ignore
 declare module 'steam-search'; 

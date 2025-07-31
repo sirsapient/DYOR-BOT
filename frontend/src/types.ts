@@ -3,8 +3,6 @@
 export interface ProjectResearch {
   projectName: string;
   projectType: 'Web3Game' | 'TraditionalGame' | 'Publisher' | 'Platform';
-  riskScore: number;
-  investmentGrade: 'A' | 'B' | 'C' | 'D' | 'F';
   keyFindings: {
     positives: string[];
     negatives: string[];
@@ -18,9 +16,75 @@ export interface ProjectResearch {
   teamAnalysis: TeamAnalysis;
   technicalAssessment: TechnicalAssessment;
   communityHealth: CommunityHealth;
-  recommendation: InvestmentRecommendation;
   sourcesUsed?: string[];
   aiSummary?: string;
+  confidence?: ConfidenceMetrics;
+  // Additional data fields from backend
+  studioAssessment?: any[];
+  linkedinSummary?: string;
+  glassdoorSummary?: string;
+  securitySummary?: string;
+  reviewSummary?: string;
+  twitterSummary?: string;
+  steamReviewSummary?: string;
+  redditSummary?: string;
+  githubRepo?: string;
+  githubStats?: string;
+  discordData?: {
+    server_name?: string;
+    member_count?: number;
+  };
+}
+
+export interface ConfidenceMetrics {
+  overall: {
+    score: number; // 0-100
+    grade: 'A' | 'B' | 'C' | 'D' | 'F';
+    level: 'very_high' | 'high' | 'medium' | 'low' | 'very_low';
+    description: string;
+  };
+  breakdown: {
+    dataCompleteness: {
+      score: number;
+      found: number;
+      total: number;
+      missing: string[];
+    };
+    sourceReliability: {
+      score: number;
+      official: number;
+      verified: number;
+      scraped: number;
+    };
+    dataFreshness: {
+      score: number;
+      averageAge: number; // days
+      oldestSource: string;
+    };
+  };
+  sourceDetails: SourceConfidence[];
+  limitations: string[];
+  strengths: string[];
+  userGuidance: {
+    trustLevel: 'high' | 'medium' | 'low';
+    useCase: string;
+    warnings: string[];
+    additionalResearch: string[];
+  };
+}
+
+export interface SourceConfidence {
+  name: string;
+  displayName: string;
+  found: boolean;
+  quality: 'high' | 'medium' | 'low';
+  reliability: 'official' | 'verified' | 'scraped';
+  dataPoints: number;
+  lastUpdated: string; // ISO string format
+  confidence: number; // 0-100
+  issues?: string[];
+  icon: string;
+  description: string;
 }
 
 // Placeholder types for referenced interfaces
@@ -31,14 +95,22 @@ export interface FundingInfo {
   [key: string]: any;
 }
 export interface TeamAnalysis {
-  [key: string]: any;
+  studioAssessment?: any[];
+  linkedinSummary?: string;
+  glassdoorSummary?: string;
 }
 export interface TechnicalAssessment {
-  [key: string]: any;
+  securitySummary?: string;
+  reviewSummary?: string;
+  githubRepo?: string;
+  githubStats?: string;
 }
 export interface CommunityHealth {
-  [key: string]: any;
-}
-export interface InvestmentRecommendation {
-  [key: string]: any;
+  twitterSummary?: string;
+  steamReviewSummary?: string;
+  discordData?: {
+    server_name?: string;
+    member_count?: number;
+  };
+  redditSummary?: string;
 } 

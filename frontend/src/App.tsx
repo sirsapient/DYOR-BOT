@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ProjectResearch } from './types';
+import { ConfidenceIndicator } from './components/ConfidenceIndicator';
 import './App.css';
 import ReactMarkdown from 'react-markdown';
 
@@ -51,21 +52,31 @@ function App() {
     setResearch(null);
     setError(null);
     try {
-      const apiUrl = process.env.REACT_APP_API_URL || '';
-      const res = await fetch(`${apiUrl}/api/research`, {
+      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:4000';
+      const fullUrl = `${apiUrl}/api/research`;
+      
+      const res = await fetch(fullUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ projectName }),
       });
-      if (!res.ok) throw new Error('API error');
+      
       const data = await res.json();
+      
+      if (!res.ok) {
+        throw new Error('API error');
+      }
+      
       setResearch(data);
     } catch (err) {
+      console.error('Fetch error:', err);
       setError('Failed to fetch research');
     } finally {
       setResearchLoading(false);
     }
   };
+
+
 
   return (
     <div className="App">
@@ -95,35 +106,180 @@ function App() {
         fontSize: '1.1em',
         color: '#333',
       }}>
-        <strong>About:</strong> DYOR BOT is a research tool for analyzing Web3 and gaming projects. It uses over 10 data sources to provide risk scores, investment grades, and key findings.<br/><br/>
+        <strong>About:</strong> DYOR BOT is a research tool for analyzing Web3 and gaming projects. It uses over 10 data sources to provide comprehensive project analysis and key findings.<br/><br/>
         <strong>How to use:</strong> Type a project or token name and press Search. Review the summary and details to make informed decisions.
       </div>
+
       {error && <p style={{ color: 'red' }}>{error}</p>}
       {research && (
         <div className="research-container">
-          <p>Type: {research.projectType}</p>
-          <p>Risk Score: {research.riskScore}</p>
-          <p>Investment Grade: {research.investmentGrade}</p>
+          <h3>Project: {research.projectName}</h3>
+          <p><strong>Type:</strong> {research.projectType}</p>
+          
+          {/* Confidence Indicator */}
+          {research.confidence && (
+            <ConfidenceIndicator confidence={research.confidence} />
+          )}
+          
+
+          
           {research.aiSummary && research.aiSummary.startsWith('Anthropic:') ? (
             <div className="markdown-content" style={{ marginBottom: 12, color: 'red' }}>
               There was an issue retrieving the AI summary. Please try again later.
             </div>
           ) : research.aiSummary ? (
             <div className="markdown-content" style={{ marginBottom: 12 }}>
+              <h4>AI Analysis Summary</h4>
               <ReactMarkdown>{research.aiSummary}</ReactMarkdown>
             </div>
           ) : null}
-          <details>
-            <summary>Details</summary>
-            <ul>
-              {research.keyFindings.positives.map((p, i) => <li key={i}>+ {p}</li>)}
-              {research.keyFindings.negatives.map((n, i) => <li key={i}>- {n}</li>)}
-              {research.keyFindings.redFlags.map((r, i) => <li key={i}>!! {r}</li>)}
-            </ul>
-          </details>
+
+          <div style={{ marginBottom: 16 }}>
+            <h4>Key Findings</h4>
+            {research.keyFindings.positives.length > 0 && (
+              <div style={{ marginBottom: 12 }}>
+                <h5 style={{ color: 'green' }}>✅ Positive Aspects</h5>
+                <ul style={{ textAlign: 'left' }}>
+                  {research.keyFindings.positives.map((p, i) => <li key={i}>{p}</li>)}
+                </ul>
+              </div>
+            )}
+            
+            {research.keyFindings.negatives.length > 0 && (
+              <div style={{ marginBottom: 12 }}>
+                <h5 style={{ color: 'orange' }}>⚠️ Negative Aspects</h5>
+                <ul style={{ textAlign: 'left' }}>
+                  {research.keyFindings.negatives.map((n, i) => <li key={i}>{n}</li>)}
+                </ul>
+              </div>
+            )}
+            
+            {research.keyFindings.redFlags.length > 0 && (
+              <div style={{ marginBottom: 12 }}>
+                <h5 style={{ color: 'red' }}>🚨 Red Flags</h5>
+                <ul style={{ textAlign: 'left' }}>
+                  {research.keyFindings.redFlags.map((r, i) => <li key={i}>{r}</li>)}
+                </ul>
+              </div>
+            )}
+          </div>
+
+          {research.financialData && (
+            <div style={{ marginBottom: 16 }}>
+              <h4>Financial Data</h4>
+              {research.financialData.marketCap && (
+                <p><strong>Market Cap:</strong> ${research.financialData.marketCap.toLocaleString()}</p>
+              )}
+              {research.financialData.tokenDistribution && (
+                <p><strong>Token Distribution:</strong> Available</p>
+              )}
+              {research.financialData.fundingInfo && (
+                <p><strong>Funding Info:</strong> Available</p>
+              )}
+            </div>
+          )}
+
+          {research.teamAnalysis && (
+            <div style={{ marginBottom: 16 }}>
+              <h4>Team Analysis</h4>
+              {research.teamAnalysis.studioAssessment && research.teamAnalysis.studioAssessment.length > 0 && (
+                <div style={{ marginBottom: 12 }}>
+                  <h5 style={{ color: '#2c5aa0' }}>🏢 Studio Background</h5>
+                  <ul style={{ textAlign: 'left' }}>
+                    {research.teamAnalysis.studioAssessment.map((studio: any, i: number) => (
+                      <li key={i}>
+                        <strong>{studio.companyName}</strong>: 
+                        {studio.isDeveloper ? ' Developer' : ''}
+                        {studio.isPublisher ? ' Publisher' : ''}
+                        {studio.firstProjectDate && studio.firstProjectDate !== 'N/A' ? 
+                          ` | First project: ${studio.firstProjectDate}` : ''}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {research.teamAnalysis.linkedinSummary && (
+                <div style={{ marginBottom: 12 }}>
+                  <h5 style={{ color: '#2c5aa0' }}>💼 LinkedIn Insights</h5>
+                  <p style={{ textAlign: 'left' }}>{research.teamAnalysis.linkedinSummary}</p>
+                </div>
+              )}
+              {research.teamAnalysis.glassdoorSummary && (
+                <div style={{ marginBottom: 12 }}>
+                  <h5 style={{ color: '#2c5aa0' }}>🏢 Company Reviews</h5>
+                  <p style={{ textAlign: 'left' }}>{research.teamAnalysis.glassdoorSummary}</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {research.technicalAssessment && (
+            <div style={{ marginBottom: 16 }}>
+              <h4>Technical Assessment</h4>
+              {research.technicalAssessment.securitySummary && (
+                <div style={{ marginBottom: 12 }}>
+                  <h5 style={{ color: '#2c5aa0' }}>🔒 Security Analysis</h5>
+                  <p style={{ textAlign: 'left' }}>{research.technicalAssessment.securitySummary}</p>
+                </div>
+              )}
+              {research.technicalAssessment.reviewSummary && (
+                <div style={{ marginBottom: 12 }}>
+                  <h5 style={{ color: '#2c5aa0' }}>📊 Review Scores</h5>
+                  <p style={{ textAlign: 'left' }}>{research.technicalAssessment.reviewSummary}</p>
+                </div>
+              )}
+              {research.technicalAssessment.githubRepo && (
+                <div style={{ marginBottom: 12 }}>
+                  <h5 style={{ color: '#2c5aa0' }}>💻 GitHub Activity</h5>
+                  <p style={{ textAlign: 'left' }}>
+                    <strong>Repository:</strong> {research.technicalAssessment.githubRepo}
+                    {research.technicalAssessment.githubStats && (
+                      <span> | <strong>Stats:</strong> {research.technicalAssessment.githubStats}</span>
+                    )}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {research.communityHealth && (
+            <div style={{ marginBottom: 16 }}>
+              <h4>Community Health</h4>
+              {research.communityHealth.twitterSummary && (
+                <div style={{ marginBottom: 12 }}>
+                  <h5 style={{ color: '#2c5aa0' }}>🐦 Twitter Activity</h5>
+                  <p style={{ textAlign: 'left' }}>{research.communityHealth.twitterSummary}</p>
+                </div>
+              )}
+              {research.communityHealth.steamReviewSummary && (
+                <div style={{ marginBottom: 12 }}>
+                  <h5 style={{ color: '#2c5aa0' }}>🎮 Steam Reviews</h5>
+                  <p style={{ textAlign: 'left' }}>{research.communityHealth.steamReviewSummary}</p>
+                </div>
+              )}
+              {research.communityHealth.discordData && research.communityHealth.discordData.server_name && (
+                <div style={{ marginBottom: 12 }}>
+                  <h5 style={{ color: '#2c5aa0' }}>💬 Discord Community</h5>
+                  <p style={{ textAlign: 'left' }}>
+                    <strong>Server:</strong> {research.communityHealth.discordData.server_name}
+                    {research.communityHealth.discordData.member_count && (
+                      <span> | <strong>Members:</strong> {research.communityHealth.discordData.member_count.toLocaleString()}</span>
+                    )}
+                  </p>
+                </div>
+              )}
+              {research.communityHealth.redditSummary && (
+                <div style={{ marginBottom: 12 }}>
+                  <h5 style={{ color: '#2c5aa0' }}>📱 Reddit Community</h5>
+                  <p style={{ textAlign: 'left' }}>{research.communityHealth.redditSummary}</p>
+                </div>
+              )}
+            </div>
+          )}
+
           {research.sourcesUsed && research.sourcesUsed.length > 0 && (
-            <div style={{ fontSize: '0.9em', color: '#666', marginTop: 8 }}>
-              <strong>Cited:</strong> {research.sourcesUsed.join(', ')}
+            <div style={{ fontSize: '0.9em', color: '#666', marginTop: 16, paddingTop: 16, borderTop: '1px solid #eee' }}>
+              <strong>Data Sources:</strong> {research.sourcesUsed.join(', ')}
             </div>
           )}
         </div>
