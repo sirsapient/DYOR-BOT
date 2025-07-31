@@ -493,9 +493,9 @@ Consider:
   private extractDataFromText(text: string, patterns: any): any {
     const extracted: any = {};
     
-    for (const [category, categoryPatterns] of Object.entries(patterns)) {
+    for (const [category, categoryPatterns] of Object.entries(patterns as Record<string, any>)) {
       extracted[category] = {};
-      for (const [key, pattern] of Object.entries(categoryPatterns)) {
+      for (const [key, pattern] of Object.entries(categoryPatterns as Record<string, any>)) {
         const match = text.match(pattern as RegExp);
         if (match) {
           extracted[category][key] = match[1] || match[0];

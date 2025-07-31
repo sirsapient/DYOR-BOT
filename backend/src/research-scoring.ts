@@ -101,33 +101,7 @@ export class ResearchScoringEngine {
     };
   }
 
-  private calculateDataCoverage(findings: ResearchFindings): number {
-    let coverageScore = 0;
-    let maxPossibleScore = 0;
 
-    for (const source of this.DATA_SOURCES) {
-      maxPossibleScore += source.weight;
-      
-      const finding = findings[source.name];
-      if (finding?.found) {
-        let qualityMultiplier = 1.0;
-        
-        switch (finding.quality) {
-          case 'high': qualityMultiplier = 1.0; break;
-          case 'medium': qualityMultiplier = 0.7; break;
-          case 'low': qualityMultiplier = 0.4; break;
-        }
-
-        // Bonus for having many data points
-        const dataPointBonus = Math.min(finding.dataPoints / 10, 1.2);
-        
-        coverageScore += source.weight * qualityMultiplier * dataPointBonus;
-      }
-    }
-
-    // Normalize to 40 points max (40% of total score)
-    return Math.min((coverageScore / maxPossibleScore) * 40, 40);
-  }
 
   private calculateSourceReliability(findings: ResearchFindings): number {
     let reliabilityScore = 0;
@@ -394,8 +368,8 @@ export class ResearchScoringEngine {
         
         // Enhanced weight for established projects
         let sourceWeight = source.weight;
-        if (isEstablishedProject && this.ESTABLISHED_PROJECT_WEIGHTS[source.name as keyof typeof this.ESTABLISHED_PROJECT_WEIGHTS]) {
-          sourceWeight = this.ESTABLISHED_PROJECT_WEIGHTS[source.name as keyof typeof this.ESTABLISHED_PROJECT_WEIGHTS];
+        if (isEstablishedProject && source.name in this.ESTABLISHED_PROJECT_WEIGHTS) {
+          sourceWeight = (this.ESTABLISHED_PROJECT_WEIGHTS as any)[source.name] || source.weight;
         }
         
         coverageScore += sourceWeight * qualityMultiplier * dataPointBonus;
