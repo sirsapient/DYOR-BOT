@@ -146,6 +146,19 @@ function SocialLinks({ research }: { research: ProjectResearch }) {
     links.push({ name, url, icon });
   }
   
+  // NEW: Add LinkedIn link when team information is available
+  if (research.teamAnalysis?.linkedinSummary && research.teamAnalysis.linkedinSummary.trim() !== '') {
+    // Try to extract LinkedIn URL from the summary or create a company search link
+    const projectName = research.projectName.toLowerCase().replace(/\s+/g, '');
+    const linkedinUrl = `https://www.linkedin.com/search/results/companies/?keywords=${encodeURIComponent(research.projectName)}`;
+    
+    links.push({ 
+      name: 'LinkedIn Insights', 
+      url: linkedinUrl, 
+      icon: '💼' 
+    });
+  }
+  
   // Add common social patterns
   const projectName = research.projectName.toLowerCase().replace(/\s+/g, '');
   const commonSocials: SocialLink[] = [
