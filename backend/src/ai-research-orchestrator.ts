@@ -884,7 +884,14 @@ Consider:
 
   // NEW: Enhanced universal source discovery methods
   private async discoverUniversalSources(projectName: string, aliases: string[]): Promise<any> {
-    console.log(`🔍 Universal source discovery for ${projectName}`);
+    console.log(`🔍 Starting universal source discovery for: ${projectName}`);
+    
+    // NEW: Check if this is an established project and use priority sources
+    const prioritySources = this.getPrioritySourcesForEstablishedProject(projectName);
+    if (prioritySources.length > 0) {
+      console.log(`🎯 Using priority sources for established project: ${projectName}`);
+      return await this.discoverFromPrioritySources(projectName, prioritySources);
+    }
     
     const discoveredSources: any = {
       documentation: [],
@@ -1822,6 +1829,76 @@ Be thorough but only include verified, official sources.`;
     
     const normalizedName = projectName.toLowerCase();
     return establishedProjects.some(project => normalizedName.includes(project));
+  }
+
+  // NEW: Priority source list for established projects
+  private getPrioritySourcesForEstablishedProject(projectName: string): string[] {
+    const lowerName = projectName.toLowerCase();
+    
+    // Axie Infinity specific sources
+    if (lowerName.includes('axie')) {
+      return [
+        'https://axieinfinity.com',
+        'https://docs.axieinfinity.com',
+        'https://whitepaper.axieinfinity.com',
+        'https://medium.com/@axieinfinity',
+        'https://blog.axieinfinity.com',
+        'https://github.com/axieinfinity',
+        'https://roninchain.com',
+        'https://docs.roninchain.com'
+      ];
+    }
+    
+    // Add more established projects as needed
+    return [];
+  }
+
+  // NEW: Discover from priority sources for established projects
+  private async discoverFromPrioritySources(projectName: string, prioritySources: string[]): Promise<any> {
+    console.log(`🎯 Discovering from ${prioritySources.length} priority sources for ${projectName}`);
+    
+    const discoveredSources: any = {
+      documentation: [],
+      technical: [],
+      security: [],
+      company: [],
+      funding: []
+    };
+
+    for (const source of prioritySources) {
+      try {
+        console.log(`🔗 Testing priority source: ${source}`);
+        
+        const response = await fetch(source, {
+          method: 'HEAD',
+          signal: AbortSignal.timeout(3000)
+        });
+
+        if (response.ok) {
+          console.log(`✅ Found priority source: ${source}`);
+          
+          // Categorize the source
+          if (source.includes('docs') || source.includes('whitepaper')) {
+            discoveredSources.documentation.push(source);
+          } else if (source.includes('github')) {
+            discoveredSources.technical.push(source);
+          } else if (source.includes('medium') || source.includes('blog')) {
+            discoveredSources.company.push(source);
+          } else if (source.includes('ronin')) {
+            discoveredSources.technical.push(source);
+          } else {
+            discoveredSources.company.push(source);
+          }
+        } else {
+          console.log(`❌ Priority source failed: ${source} - ${response.status}`);
+        }
+      } catch (error) {
+        console.log(`❌ Priority source error: ${source} - ${(error as Error).message}`);
+      }
+    }
+
+    console.log(`✅ Priority source discovery completed for ${projectName}`);
+    return discoveredSources;
   }
 
   // Enhanced data collection for established projects
