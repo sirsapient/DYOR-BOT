@@ -65,6 +65,301 @@ interface RetryConfig {
   backoffMultiplier: number;
 }
 
+// NEW: Universal source discovery patterns for ALL projects
+const UNIVERSAL_SOURCE_PATTERNS = {
+  
+  // Official documentation patterns
+  documentation: [
+    '{project}.com',
+    'docs.{project}.com', 
+    '{project}.org',
+    'whitepaper.{project}.com',
+    '{project}.io/docs',
+    '{project}.finance/docs',
+    '{project}.game/docs',
+    '{project}.app/docs',
+    '{project}.xyz/docs',
+    'docs.{project}.io',
+    'docs.{project}.org',
+    'docs.{project}.app',
+    'docs.{project}.xyz',
+    '{project}.com/docs',
+    '{project}.com/documentation',
+    '{project}.com/whitepaper',
+    '{project}.com/tokenomics',
+    '{project}.com/economics',
+    '{project}.com/governance',
+    '{project}.com/technical'
+  ],
+  
+  // Developer resources
+  technical: [
+    'github.com/{project}',
+    'github.com/{company}',
+    'github.com/{project}-team',
+    'github.com/{project}-dev',
+    'github.com/{project}-protocol',
+    'docs.{project}.*',
+    'developers.{project}.*',
+    'api.{project}.*',
+    'developer.{project}.*',
+    'dev.{project}.*',
+    '{project}.com/api',
+    '{project}.com/developer',
+    '{project}.com/developers',
+    '{project}.com/technical',
+    '{project}.com/architecture'
+  ],
+  
+  // Security & audit sources
+  security: [
+    'skynet.certik.com/projects/{project}',
+    'certik.com/projects/{project}',
+    'immunefi.com/bounty/{project}',
+    'consensys.net/diligence/audits/{project}',
+    'blog.openzeppelin.com/audit-{project}',
+    'trailofbits.com/audits/{project}',
+    'quantstamp.com/audits/{project}',
+    'docs.{project}.*/audit*',
+    'docs.{project}.*/security*',
+    'github.com/{project}/*audit*',
+    'github.com/{project}/*security*',
+    '{project}.com/audit',
+    '{project}.com/security',
+    '{project}.com/audits',
+    '{project}.com/security-audit',
+    '{project}.com/certik',
+    '{project}.com/immunefi'
+  ],
+  
+  // Company/team sources
+  company: [
+    'blog.{project}.*',
+    'medium.com/@{project}',
+    'medium.com/{project}',
+    '{company}.com/team',
+    '{company}.com/about',
+    '{company}.com/company',
+    'linkedin.com/company/{company}',
+    'linkedin.com/company/{project}',
+    '{project}.com/team',
+    '{project}.com/about',
+    '{project}.com/company',
+    '{project}.com/founders',
+    '{project}.com/leadership',
+    '{project}.com/team-members',
+    '{project}.com/our-team'
+  ],
+  
+  // Funding and financial sources
+  funding: [
+    'crunchbase.com/organization/{project}',
+    'crunchbase.com/company/{project}',
+    '{project}.com/funding',
+    '{project}.com/investors',
+    '{project}.com/backers',
+    '{project}.com/partners',
+    'blog.{project}.*/funding',
+    'medium.com/@{project}/funding',
+    '{project}.com/press',
+    '{project}.com/news',
+    '{project}.com/announcements'
+  ],
+  
+  // Community and social sources
+  community: [
+    'discord.gg/{project}',
+    'discord.com/invite/{project}',
+    't.me/{project}',
+    'telegram.me/{project}',
+    'twitter.com/{project}',
+    'x.com/{project}',
+    'reddit.com/r/{project}',
+    'reddit.com/r/{project}token',
+    '{project}.com/community',
+    '{project}.com/social',
+    '{project}.com/links',
+    '{project}.com/connect'
+  ]
+};
+
+// NEW: Multi-stage source discovery strategy
+const SOURCE_DISCOVERY_STRATEGY = {
+  
+  stage1_official: {
+    // Start with most reliable sources
+    priority: 'highest',
+    sources: ['official_website', 'whitepaper', 'docs_site'],
+    weight: 60,
+    searchTerms: ['official website', 'whitepaper', 'documentation', 'technical paper']
+  },
+  
+  stage2_technical: {
+    // Find technical documentation
+    priority: 'high', 
+    sources: ['github_repos', 'audit_reports', 'smart_contracts', 'api_docs'],
+    weight: 25,
+    searchTerms: ['github', 'audit', 'security', 'smart contract', 'api', 'developer']
+  },
+  
+  stage3_ecosystem: {
+    // Community and ecosystem data
+    priority: 'medium',
+    sources: ['governance_forums', 'community_channels', 'media_coverage', 'funding_info'],
+    weight: 15,
+    searchTerms: ['community', 'discord', 'telegram', 'twitter', 'funding', 'investment']
+  }
+};
+
+// NEW: Universal data extraction patterns
+const UNIVERSAL_EXTRACTION_PATTERNS = {
+  
+  // Team/founder information
+  teamVerification: {
+    founders: /founder|ceo|cto|co-founder|cofounder/i,
+    background: /background|experience|previously|education|university/i,
+    linkedin: /linkedin\.com\/in\/[a-zA-Z0-9-]+/,
+    twitter: /twitter\.com\/[a-zA-Z0-9_]+/,
+    github: /github\.com\/[a-zA-Z0-9_-]+/,
+    experience: /experience|worked at|previously at|former|ex-/i,
+    education: /university|college|degree|bachelor|master|phd/i
+  },
+  
+  // Security audit results
+  securityAudits: {
+    auditFirm: /certik|consensys|trail of bits|quantstamp|openzeppelin|hacken|slowmist/i,
+    criticalIssues: /(\d+)\s*critical/i,
+    majorIssues: /(\d+)\s*major/i,
+    auditDate: /audit.*?(\d{4})/i,
+    findings: /(\d+)\s*total.*?finding/i,
+    securityScore: /(\d+)% security score/i,
+    auditStatus: /verified|completed|passed|successful/i
+  },
+  
+  // Funding information
+  fundingData: {
+    totalRaised: /raised.*?\$([0-9.,]+\s*[MBK])/i,
+    leadInvestor: /led by.*?([A-Z][a-z\s&]+)/i,
+    seriesRound: /(seed|series [A-Z]|strategic|pre-seed)/i,
+    valuation: /valuation.*?\$([0-9.,]+\s*[MBK])/i,
+    investors: /investors?.*?([A-Z][a-z\s&,]+)/i,
+    fundingDate: /funding.*?(\d{4})/i,
+    fundingAmount: /(\$[0-9.,]+)\s*(million|billion|thousand)/i
+  },
+  
+  // Technical foundation
+  technicalMetrics: {
+    smartContracts: /contract.*?verified|etherscan\.io|bscscan\.com|polygonscan\.com/i,
+    githubActivity: /commits?.*?(\d+)|contributors?.*?(\d+)|stars.*?(\d+)/i,
+    codeQuality: /test.*?coverage|documentation|readme/i,
+    blockchain: /ethereum|polygon|avalanche|binance|solana|ronin/i,
+    deployment: /deployed|mainnet|testnet|beta|alpha/i
+  },
+  
+  // Tokenomics data
+  tokenomicsData: {
+    totalSupply: /(\d+).*?total.*?supply/i,
+    tokenDistribution: /team.*?(\d+)%|community.*?(\d+)%|treasury.*?(\d+)%/i,
+    vestingSchedule: /vesting.*?schedule|unlock.*?period|cliff.*?(\d+)/i,
+    tokenUtility: /staking|governance|rewards|utility|burning|minting/i,
+    tokenName: /token.*?name.*?([A-Z]{2,10})/i,
+    tokenSymbol: /symbol.*?([A-Z]{2,10})/i
+  }
+};
+
+// NEW: Dynamic scoring for established projects
+const DYNAMIC_SCORING_SYSTEM = {
+  
+  // Baseline scoring
+  baselineWeights: {
+    officialSources: 30,
+    securityAudits: 25, 
+    teamVerification: 20,
+    technicalFoundation: 15,
+    communityHealth: 10
+  },
+  
+  // Bonuses for well-documented projects
+  establishedProjectBonuses: {
+    multiYearOperation: {
+      condition: 'launch_date > 2 years ago',
+      bonus: +10,
+      reasoning: 'Proven track record'
+    },
+    
+    institutionalBacking: {
+      condition: 'tier1_vc_funding OR audit_by_major_firm',
+      bonus: +15,
+      reasoning: 'Professional due diligence completed'
+    },
+    
+    postIncidentHandling: {
+      condition: 'security_incident_with_transparent_response',
+      bonus: +10,
+      reasoning: 'Demonstrated crisis management'
+    },
+    
+    activeEcosystem: {
+      condition: 'multiple_products OR developer_ecosystem',
+      bonus: +5,
+      reasoning: 'Sustainable business model'
+    },
+    
+    comprehensiveDocumentation: {
+      condition: 'whitepaper_AND_docs_AND_github',
+      bonus: +10,
+      reasoning: 'Complete technical documentation'
+    }
+  },
+  
+  // Quality thresholds by project type
+  qualityThresholds: {
+    defi_protocol: { minimum: 75, target: 90 },
+    gaming_project: { minimum: 70, target: 85 }, 
+    infrastructure: { minimum: 80, target: 95 },
+    newer_project: { minimum: 60, target: 75 },
+    established_project: { minimum: 80, target: 95 }
+  }
+};
+
+// NEW: Systematic quality gates
+const ENHANCED_QUALITY_GATES = {
+  
+  gate1_minimum_data: {
+    requirement: 'Score >= dynamic_minimum_based_on_project_age',
+    action_if_fail: 'Flag as insufficient data'
+  },
+  
+  gate2_source_diversity: {
+    requirement: 'At least 2 Tier1 + 2 Tier2 sources found',
+    action_if_fail: 'Expand source discovery patterns'
+  },
+  
+  gate3_official_verification: {
+    requirement: 'Official source (whitepaper OR docs) found',
+    action_if_fail: 'Mark as "unofficial sources only"'
+  },
+  
+  gate4_security_assessment: {
+    requirement: 'Security audit OR bug bounty program found',
+    action_if_fail: 'Flag security posture as unknown'
+  },
+  
+  gate5_team_transparency: {
+    requirement: 'Founder/team information verifiable',
+    action_if_fail: 'Mark team as anonymous/unverified'
+  },
+  
+  gate6_technical_foundation: {
+    requirement: 'Smart contracts OR working product OR comprehensive docs',
+    action_if_fail: 'Flag technical foundation as weak'
+  },
+  
+  gate7_financial_transparency: {
+    requirement: 'Funding info OR tokenomics OR market data available',
+    action_if_fail: 'Flag financial transparency as unknown'
+  }
+};
 
 // Enhanced extraction patterns for established projects
 const EXTRACTION_PATTERNS = {
@@ -545,6 +840,359 @@ Consider:
     return gaps;
   }
 
+  // NEW: Enhanced universal source discovery methods
+  private async discoverUniversalSources(projectName: string, aliases: string[]): Promise<any> {
+    console.log(`🔍 Universal source discovery for ${projectName}`);
+    
+    const discoveredSources: any = {
+      documentation: [],
+      technical: [],
+      security: [],
+      company: [],
+      funding: [],
+      community: []
+    };
+    
+    // Stage 1: Official sources (highest priority)
+    console.log(`📋 Stage 1: Discovering official sources for ${projectName}`);
+    const officialSources = await this.discoverOfficialSources(projectName, aliases);
+    discoveredSources.documentation = officialSources.documentation || [];
+    discoveredSources.company = officialSources.company || [];
+    
+    // Stage 2: Technical sources
+    console.log(`🔧 Stage 2: Discovering technical sources for ${projectName}`);
+    const technicalSources = await this.discoverTechnicalSources(projectName, aliases);
+    discoveredSources.technical = technicalSources.technical || [];
+    discoveredSources.security = technicalSources.security || [];
+    
+    // Stage 3: Ecosystem sources
+    console.log(`🌐 Stage 3: Discovering ecosystem sources for ${projectName}`);
+    const ecosystemSources = await this.discoverEcosystemSources(projectName, aliases);
+    discoveredSources.funding = ecosystemSources.funding || [];
+    discoveredSources.community = ecosystemSources.community || [];
+    
+    console.log(`✅ Universal source discovery completed for ${projectName}:`, discoveredSources);
+    return discoveredSources;
+  }
+  
+  private async discoverOfficialSources(projectName: string, aliases: string[]): Promise<any> {
+    const sources: any = { documentation: [], company: [] };
+    
+    // Generate URL patterns for all aliases
+    const allNames = [projectName, ...aliases];
+    
+    for (const name of allNames.slice(0, 5)) { // Limit to first 5 aliases
+      const normalizedName = name.toLowerCase().replace(/\s+/g, '');
+      
+             // Test documentation patterns
+       for (const pattern of UNIVERSAL_SOURCE_PATTERNS.documentation) {
+         const url = pattern.replace(/{project}/g, normalizedName);
+         try {
+           const res = await fetch(`https://${url}`, { 
+             method: 'HEAD'
+           });
+           if (res.ok) {
+             sources.documentation.push(`https://${url}`);
+             console.log(`✅ Found documentation: https://${url}`);
+           }
+         } catch (e) {
+           // Continue to next pattern
+         }
+       }
+      
+             // Test company patterns
+       for (const pattern of UNIVERSAL_SOURCE_PATTERNS.company) {
+         const url = pattern.replace(/{project}/g, normalizedName).replace(/{company}/g, normalizedName);
+         try {
+           const res = await fetch(`https://${url}`, { 
+             method: 'HEAD'
+           });
+           if (res.ok) {
+             sources.company.push(`https://${url}`);
+             console.log(`✅ Found company info: https://${url}`);
+           }
+         } catch (e) {
+           // Continue to next pattern
+         }
+       }
+    }
+    
+    return sources;
+  }
+  
+  private async discoverTechnicalSources(projectName: string, aliases: string[]): Promise<any> {
+    const sources: any = { technical: [], security: [] };
+    
+    const allNames = [projectName, ...aliases];
+    
+    for (const name of allNames.slice(0, 3)) {
+      const normalizedName = name.toLowerCase().replace(/\s+/g, '');
+      
+             // Test technical patterns
+       for (const pattern of UNIVERSAL_SOURCE_PATTERNS.technical) {
+         const url = pattern.replace(/{project}/g, normalizedName).replace(/{company}/g, normalizedName);
+         try {
+           const res = await fetch(`https://${url}`, { 
+             method: 'HEAD'
+           });
+           if (res.ok) {
+             sources.technical.push(`https://${url}`);
+             console.log(`✅ Found technical source: https://${url}`);
+           }
+         } catch (e) {
+           // Continue to next pattern
+         }
+       }
+       
+       // Test security patterns
+       for (const pattern of UNIVERSAL_SOURCE_PATTERNS.security) {
+         const url = pattern.replace(/{project}/g, normalizedName);
+         try {
+           const res = await fetch(`https://${url}`, { 
+             method: 'HEAD'
+           });
+           if (res.ok) {
+             sources.security.push(`https://${url}`);
+             console.log(`✅ Found security source: https://${url}`);
+           }
+         } catch (e) {
+           // Continue to next pattern
+         }
+       }
+    }
+    
+    return sources;
+  }
+  
+  private async discoverEcosystemSources(projectName: string, aliases: string[]): Promise<any> {
+    const sources: any = { funding: [], community: [] };
+    
+    const allNames = [projectName, ...aliases];
+    
+    for (const name of allNames.slice(0, 3)) {
+      const normalizedName = name.toLowerCase().replace(/\s+/g, '');
+      
+             // Test funding patterns
+       for (const pattern of UNIVERSAL_SOURCE_PATTERNS.funding) {
+         const url = pattern.replace(/{project}/g, normalizedName).replace(/{company}/g, normalizedName);
+         try {
+           const res = await fetch(`https://${url}`, { 
+             method: 'HEAD'
+           });
+           if (res.ok) {
+             sources.funding.push(`https://${url}`);
+             console.log(`✅ Found funding source: https://${url}`);
+           }
+         } catch (e) {
+           // Continue to next pattern
+         }
+       }
+       
+       // Test community patterns
+       for (const pattern of UNIVERSAL_SOURCE_PATTERNS.community) {
+         const url = pattern.replace(/{project}/g, normalizedName);
+         try {
+           const res = await fetch(`https://${url}`, { 
+             method: 'HEAD'
+           });
+           if (res.ok) {
+             sources.community.push(`https://${url}`);
+             console.log(`✅ Found community source: https://${url}`);
+           }
+         } catch (e) {
+           // Continue to next pattern
+         }
+       }
+    }
+    
+    return sources;
+  }
+  
+  // NEW: Enhanced data extraction using universal patterns
+  private async extractDataFromSources(sources: any, projectName: string): Promise<any> {
+    const extractedData: any = {
+      teamInfo: {},
+      securityAudits: {},
+      fundingData: {},
+      technicalMetrics: {},
+      tokenomicsData: {}
+    };
+    
+    // Extract team information from company sources
+    for (const companyUrl of sources.company || []) {
+      try {
+        const res = await fetch(companyUrl);
+        if (res.ok) {
+          const html = await res.text();
+          const teamData = this.extractDataFromText(html, UNIVERSAL_EXTRACTION_PATTERNS.teamVerification);
+          if (Object.keys(teamData).length > 0) {
+            extractedData.teamInfo = { ...extractedData.teamInfo, ...teamData };
+          }
+        }
+      } catch (e) {
+        console.log(`❌ Failed to extract team data from ${companyUrl}`);
+      }
+    }
+    
+    // Extract security audit information
+    for (const securityUrl of sources.security || []) {
+      try {
+        const res = await fetch(securityUrl);
+        if (res.ok) {
+          const html = await res.text();
+          const auditData = this.extractDataFromText(html, UNIVERSAL_EXTRACTION_PATTERNS.securityAudits);
+          if (Object.keys(auditData).length > 0) {
+            extractedData.securityAudits = { ...extractedData.securityAudits, ...auditData };
+          }
+        }
+      } catch (e) {
+        console.log(`❌ Failed to extract security data from ${securityUrl}`);
+      }
+    }
+    
+    // Extract funding information
+    for (const fundingUrl of sources.funding || []) {
+      try {
+        const res = await fetch(fundingUrl);
+        if (res.ok) {
+          const html = await res.text();
+          const fundingData = this.extractDataFromText(html, UNIVERSAL_EXTRACTION_PATTERNS.fundingData);
+          if (Object.keys(fundingData).length > 0) {
+            extractedData.fundingData = { ...extractedData.fundingData, ...fundingData };
+          }
+        }
+      } catch (e) {
+        console.log(`❌ Failed to extract funding data from ${fundingUrl}`);
+      }
+    }
+    
+    // Extract technical metrics
+    for (const technicalUrl of sources.technical || []) {
+      try {
+        const res = await fetch(technicalUrl);
+        if (res.ok) {
+          const html = await res.text();
+          const technicalData = this.extractDataFromText(html, UNIVERSAL_EXTRACTION_PATTERNS.technicalMetrics);
+          if (Object.keys(technicalData).length > 0) {
+            extractedData.technicalMetrics = { ...extractedData.technicalMetrics, ...technicalData };
+          }
+        }
+      } catch (e) {
+        console.log(`❌ Failed to extract technical data from ${technicalUrl}`);
+      }
+    }
+    
+    // Extract tokenomics from documentation
+    for (const docUrl of sources.documentation || []) {
+      try {
+        const res = await fetch(docUrl);
+        if (res.ok) {
+          const html = await res.text();
+          const tokenomicsData = this.extractDataFromText(html, UNIVERSAL_EXTRACTION_PATTERNS.tokenomicsData);
+          if (Object.keys(tokenomicsData).length > 0) {
+            extractedData.tokenomicsData = { ...extractedData.tokenomicsData, ...tokenomicsData };
+          }
+        }
+      } catch (e) {
+        console.log(`❌ Failed to extract tokenomics from ${docUrl}`);
+      }
+    }
+    
+    return extractedData;
+  }
+  
+  // NEW: Dynamic scoring adjustment for established projects
+  private calculateDynamicScore(baseScore: number, findings: ResearchFindings, projectType: string): number {
+    let adjustedScore = baseScore;
+    
+    // Apply established project bonuses
+    if (this.isEstablishedProjectFromFindings(findings)) {
+      for (const [bonusType, bonusConfig] of Object.entries(DYNAMIC_SCORING_SYSTEM.establishedProjectBonuses)) {
+        if (this.checkBonusCondition(bonusType, findings)) {
+          adjustedScore += bonusConfig.bonus;
+          console.log(`✅ Applied ${bonusType} bonus: +${bonusConfig.bonus} (${bonusConfig.reasoning})`);
+        }
+      }
+    }
+    
+    // Apply quality thresholds based on project type
+    const threshold = DYNAMIC_SCORING_SYSTEM.qualityThresholds[projectType as keyof typeof DYNAMIC_SCORING_SYSTEM.qualityThresholds];
+    if (threshold && adjustedScore < threshold.minimum) {
+      console.log(`⚠️ Score ${adjustedScore} below minimum threshold ${threshold.minimum} for ${projectType}`);
+    }
+    
+    return Math.min(adjustedScore, 100); // Cap at 100
+  }
+  
+  private checkBonusCondition(bonusType: string, findings: ResearchFindings): boolean {
+    switch (bonusType) {
+      case 'multiYearOperation':
+        return this.hasMultiYearOperation(findings);
+      case 'institutionalBacking':
+        return this.hasInstitutionalBacking(findings);
+      case 'postIncidentHandling':
+        return this.hasPostIncidentHandling(findings);
+      case 'activeEcosystem':
+        return this.hasActiveEcosystem(findings);
+      case 'comprehensiveDocumentation':
+        return this.hasComprehensiveDocumentation(findings);
+      default:
+        return false;
+    }
+  }
+  
+  // NEW: Helper methods for bonus conditions
+  private hasMultiYearOperation(findings: ResearchFindings): boolean {
+    // Check for indicators of long-term operation
+    const hasEstablishedData = findings.onchain_data?.found || findings.financial_data?.found;
+    const hasHistoricalData = findings.community_health?.found || findings.product_data?.found;
+    
+    return hasEstablishedData && hasHistoricalData;
+  }
+
+  private hasInstitutionalBacking(findings: ResearchFindings): boolean {
+    // Check for institutional backing indicators
+    const hasFinancialData = findings.financial_data?.found;
+    const hasTeamInfo = findings.team_info?.found;
+    
+    // Projects with detailed financial data and team information
+    // often indicate institutional backing
+    return hasFinancialData && hasTeamInfo;
+  }
+
+  private hasPostIncidentHandling(findings: ResearchFindings): boolean {
+    // Check for indicators of post-incident recovery
+    const hasSecurityAudit = findings.security_audits?.found;
+    const hasTeamInfo = findings.team_info?.found;
+    const hasDocumentation = findings.documentation?.found;
+    
+    // Projects that have security audits and comprehensive documentation
+    // after incidents show good recovery practices
+    return hasSecurityAudit && hasTeamInfo && hasDocumentation;
+  }
+  
+  // NEW: Helper method to detect established projects from findings
+  private isEstablishedProjectFromFindings(findings: ResearchFindings): boolean {
+    const hasOfficialWhitepaper = findings.whitepaper?.found && findings.whitepaper?.quality === 'high';
+    const hasSecurityAudit = findings.security_audits?.found && findings.security_audits?.quality === 'high';
+    const hasInstitutionalBacking = findings.financial_data?.data?.institutional_investors;
+    const hasExtensiveDocumentation = findings.whitepaper?.dataPoints > 20;
+    
+    return hasOfficialWhitepaper && (hasSecurityAudit || hasInstitutionalBacking || hasExtensiveDocumentation);
+  }
+  
+  private hasComprehensiveDocumentation(findings: ResearchFindings): boolean {
+    return findings.whitepaper?.found && 
+           findings.documentation?.found && 
+           findings.github_activity?.found;
+  }
+  
+  private hasActiveEcosystem(findings: ResearchFindings): boolean {
+    return findings.community_health?.found && 
+           findings.product_data?.found && 
+           findings.financial_data?.found;
+  }
+
   // Helper method to detect established projects
   private isEstablishedProject(projectName: string): boolean {
     const establishedProjects = [
@@ -556,7 +1204,8 @@ Consider:
       'alien worlds', 'tlm',
       'star atlas', 'atlas',
       'big time', 'bigtime',
-      'gala games', 'gala'
+      'gala games', 'gala',
+      'axie', 'infinity', 'skymavis' // Added Axie Infinity specifically
     ];
     
     const normalizedName = projectName.toLowerCase();
