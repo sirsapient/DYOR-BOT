@@ -43,8 +43,8 @@ export async function enhancedResearchWithAI(
     const qualityGateResult = await handleResearchWithQualityGates(
       projectName,
       {
-        type: aiResult.researchPlan.projectClassification.type,
-        confidence: aiResult.researchPlan.projectClassification.confidence
+        type: aiResult.researchPlan?.projectClassification?.type || 'unknown',
+        confidence: aiResult.researchPlan?.projectClassification?.confidence || 0
       }
     );
 
@@ -54,18 +54,18 @@ export async function enhancedResearchWithAI(
       aiResearch: aiResult,
       qualityGates: qualityGateResult,
       combinedInsights: {
-        projectType: aiResult.researchPlan.projectClassification.type,
+        projectType: aiResult.researchPlan?.projectClassification?.type || 'unknown',
         aiConfidence: aiResult.completeness?.confidence || 0,
         qualityScore: qualityGateResult.success ? 'High' : 'Low',
         recommendations: [
           ...(aiResult.completeness?.recommendations || []),
           ...(qualityGateResult.recommendations || [])
         ],
-        riskAreas: aiResult.researchPlan.riskAreas.map(risk => ({
+        riskAreas: aiResult.researchPlan?.riskAreas?.map(risk => ({
           area: risk.area,
           priority: risk.priority,
           approach: risk.investigationApproach
-        }))
+        })) || []
       }
     };
 

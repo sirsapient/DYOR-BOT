@@ -2474,7 +2474,6 @@ export async function conductAIOrchestratedResearch(
         }
       };
     }
-  }
 }
 
 // Helper function - integrate with your existing source collection

@@ -1376,8 +1376,8 @@ app.post('/api/research', async (req: any, res: any) => {
 
     // Transform AI result to match expected response format
     const researchReport = {
-      projectName: aiResult.researchPlan.projectClassification.type === 'web3_game' ? projectName : projectName,
-      projectType: aiResult.researchPlan.projectClassification.type === 'web3_game' ? 'Web3Game' : 'TraditionalGame',
+      projectName: aiResult.researchPlan?.projectClassification?.type === 'web3_game' ? projectName : projectName,
+      projectType: aiResult.researchPlan?.projectClassification?.type === 'web3_game' ? 'Web3Game' : 'TraditionalGame',
       keyFindings: {
         positives: aiResult.completeness?.recommendations?.filter(r => !r.includes('missing')) || [],
         negatives: aiResult.completeness?.gaps || [],
@@ -1428,7 +1428,14 @@ app.post('/api/research', async (req: any, res: any) => {
         },
         missingCritical: [],
         recommendations: aiResult.completeness?.recommendations || []
-      }, aiResult.researchPlan)
+      }, aiResult.researchPlan || {
+        projectClassification: { type: 'unknown' as const, confidence: 0, reasoning: '' },
+        prioritySources: [],
+        riskAreas: [],
+        searchAliases: [],
+        estimatedResearchTime: 0,
+        successCriteria: { minimumSources: 0, criticalDataPoints: [], redFlagChecks: [] }
+      })
     };
 
     res.json(researchReport);
