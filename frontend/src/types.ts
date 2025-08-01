@@ -36,6 +36,19 @@ export interface ProjectResearch {
     server_name?: string;
     member_count?: number;
   };
+  // NEW: Whitepaper and documentation data
+  whitepaper?: {
+    found: boolean;
+    data?: {
+      url?: string;
+      tokenomics?: any;
+      tokenInfo?: any;
+      chainInfo?: any;
+    };
+    quality?: 'high' | 'medium' | 'low';
+    timestamp?: Date;
+    dataPoints?: number;
+  };
 }
 
 export interface ConfidenceMetrics {

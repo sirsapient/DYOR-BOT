@@ -136,6 +136,16 @@ function SocialLinks({ research }: { research: ProjectResearch }) {
     });
   }
   
+  // NEW: Add whitepaper and litepaper links from research data
+  if (research.whitepaper?.found && research.whitepaper.data?.url) {
+    const url = research.whitepaper.data.url;
+    const isLitepaper = url.toLowerCase().includes('lite') || url.toLowerCase().includes('lite-paper');
+    const name = isLitepaper ? 'Litepaper' : 'Whitepaper';
+    const icon = isLitepaper ? '📋' : '📄';
+    
+    links.push({ name, url, icon });
+  }
+  
   // Add common social patterns
   const projectName = research.projectName.toLowerCase().replace(/\s+/g, '');
   const commonSocials: SocialLink[] = [

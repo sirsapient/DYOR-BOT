@@ -1345,6 +1345,32 @@ app.post('/api/research', async (req: any, res: any) => {
           },
           sourcesUsed: ['Fallback Data', 'Known Sources'],
           aiSummary: 'AI analysis failed, but using known Axie Infinity data',
+          // NEW: Include whitepaper data for Axie Infinity fallback
+          whitepaper: {
+            found: true,
+            data: {
+              url: 'https://whitepaper.axieinfinity.com',
+              tokenomics: {
+                tokenSymbol: 'AXS',
+                totalSupply: '270000000',
+                tokenName: 'Axie Infinity Shards'
+              },
+              tokenInfo: {
+                symbol: 'AXS',
+                name: 'Axie Infinity Shards',
+                totalSupply: '270000000',
+                contractAddress: '0x97a9107C1793BC407d6F527b77e7fff4D812bece',
+                network: 'Ronin'
+              },
+              chainInfo: {
+                network: 'Ronin',
+                blockchain: 'Ethereum-based sidechain'
+              }
+            },
+            quality: 'high' as const,
+            timestamp: new Date(),
+            dataPoints: 8
+          },
           confidence: {
             overall: {
               score: 85,
@@ -1416,6 +1442,8 @@ app.post('/api/research', async (req: any, res: any) => {
       },
       sourcesUsed: aiResult.meta?.sourcesCollected ? ['AI-Orchestrated'] : [],
       aiSummary: `AI Analysis: ${aiResult.completeness?.confidence || 0}% confidence. ${aiResult.completeness?.recommendations?.join(', ') || 'Analysis complete'}`,
+      // NEW: Include whitepaper data from AI research results
+      whitepaper: aiResult.findings && 'whitepaper' in aiResult.findings ? aiResult.findings.whitepaper : null,
       confidence: await generateConfidenceMetrics({
         whitepaper: { found: true, data: {}, quality: 'high' as const, timestamp: new Date(), dataPoints: 1 },
         onchain_data: { found: true, data: {}, quality: 'high' as const, timestamp: new Date(), dataPoints: 1 },
@@ -1518,6 +1546,14 @@ app.post('/api/research', async (req: any, res: any) => {
       },
       sourcesUsed: ['Fallback System'],
       aiSummary: 'AI orchestration failed, but system provided fallback response',
+      // NEW: Include whitepaper data for general fallback
+      whitepaper: {
+        found: false,
+        data: null,
+        quality: 'low' as const,
+        timestamp: new Date(),
+        dataPoints: 0
+      },
       confidence: {
         overall: {
           score: 50,
