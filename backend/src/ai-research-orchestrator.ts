@@ -517,7 +517,7 @@ class AIResearchOrchestrator {
     
     // Initialize with default configurations
     this.confidenceThresholds = {
-      minimumForAnalysis: 30, // Lowered from 70 to allow more research to complete
+      minimumForAnalysis: 10, // Lowered from 30 to allow more research to complete
       highConfidence: 85,
       refreshThreshold: 60,
       cacheExpiryHours: 24,
@@ -2269,7 +2269,7 @@ Be thorough but only include verified, official sources.`;
       
       const response = await this.executeWithRetry(
         () => this.anthropic.messages.create({
-          model: 'claude-3-sonnet-20240229',
+          model: 'claude-3-5-sonnet-20241022',
           max_tokens: 100,
           temperature: 0.1,
           messages: [{ role: 'user', content: tokenPrompt }]
@@ -2277,19 +2277,29 @@ Be thorough but only include verified, official sources.`;
         `Lightweight token discovery for ${projectName}`
       );
       
-      const aiResponse = response.content[0].type === 'text' ? response.content[0].text : '';
-      console.log(`🤖 Token discovery AI response: ${aiResponse}`);
-      
-      // Parse AI response
-      let tokens: string[] = [];
-      try {
-        const parsed = JSON.parse(aiResponse);
-        tokens = Array.isArray(parsed) ? parsed : [];
-        console.log(`✅ AI discovered tokens: ${tokens.join(', ')}`);
-      } catch (parseError) {
-        console.log(`❌ Failed to parse AI token response: ${parseError}`);
-        tokens = [];
-      }
+             const aiResponse = response.content[0].type === 'text' ? response.content[0].text : '';
+       console.log(`🤖 Token discovery AI response: ${aiResponse}`);
+       
+       // Parse AI response - handle potential JSON formatting issues
+       let tokens: string[] = [];
+       try {
+         // Clean up the response - remove markdown code blocks if present
+         let cleanedResponse = aiResponse.trim();
+         if (cleanedResponse.startsWith('```json')) {
+           cleanedResponse = cleanedResponse.substring(7);
+         }
+         if (cleanedResponse.endsWith('```')) {
+           cleanedResponse = cleanedResponse.substring(0, cleanedResponse.length - 3);
+         }
+         cleanedResponse = cleanedResponse.trim();
+         
+         const parsed = JSON.parse(cleanedResponse);
+         tokens = Array.isArray(parsed) ? parsed : [];
+         console.log(`✅ AI discovered tokens: ${tokens.join(', ')}`);
+       } catch (parseError) {
+         console.log(`❌ Failed to parse AI token response: ${parseError}`);
+         tokens = [];
+       }
       
       // Stage 2: Fallback to CoinGecko if AI fails
       let fallbackUsed = false;
@@ -2587,7 +2597,7 @@ Be thorough but only include verified, official sources.`;
       
       const response = await this.executeWithRetry(
         () => this.anthropic.messages.create({
-          model: 'claude-3-sonnet-20240229',
+          model: 'claude-3-5-sonnet-20241022',
           max_tokens: 500,
           temperature: 0.1,
           messages: [{ role: 'user', content: prompt }]
@@ -2595,11 +2605,21 @@ Be thorough but only include verified, official sources.`;
         `AI-assisted documentation discovery for ${projectName}`
       );
       
-      const aiResponse = response.content[0].type === 'text' ? response.content[0].text : '';
-      
-      try {
-        const parsed = JSON.parse(aiResponse);
-        const urls = Array.isArray(parsed) ? parsed : [];
+             const aiResponse = response.content[0].type === 'text' ? response.content[0].text : '';
+       
+       try {
+         // Clean up the response - remove markdown code blocks if present
+         let cleanedResponse = aiResponse.trim();
+         if (cleanedResponse.startsWith('```json')) {
+           cleanedResponse = cleanedResponse.substring(7);
+         }
+         if (cleanedResponse.endsWith('```')) {
+           cleanedResponse = cleanedResponse.substring(0, cleanedResponse.length - 3);
+         }
+         cleanedResponse = cleanedResponse.trim();
+         
+         const parsed = JSON.parse(cleanedResponse);
+         const urls = Array.isArray(parsed) ? parsed : [];
         
         // Verify AI-discovered URLs
         for (const url of urls.slice(0, 3)) {
@@ -3087,11 +3107,6 @@ interface TokenDiscoveryResult {
 const ENHANCED_WHITEPAPER_PATTERNS = {
   stage1_direct: [
     // Direct pattern matching
-    '{project}/whitepaper',
-    '{project}/whitepaper.pdf', 
-    'docs.{project}.com',
-    '{project}.gitbook.io',
-    'github.com/{org}/{project}/blob/main/whitepaper.pdf',
     '{project}.com/whitepaper',
     '{project}.com/whitepaper.pdf',
     '{project}.com/white-paper',
@@ -3100,7 +3115,11 @@ const ENHANCED_WHITEPAPER_PATTERNS = {
     '{project}.com/litepaper.pdf',
     '{project}.com/tokenomics.pdf',
     '{project}.com/economics.pdf',
-    '{project}.com/governance.pdf'
+    '{project}.com/governance.pdf',
+    'whitepaper.{project}.com',
+    'docs.{project}.com',
+    '{project}.gitbook.io',
+    'github.com/{org}/{project}/blob/main/whitepaper.pdf'
   ],
   
   stage2_search_terms: [
