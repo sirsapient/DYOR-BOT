@@ -135,28 +135,30 @@ export const ConfidenceIndicator: React.FC<ConfidenceIndicatorProps> = ({
       <p style={{ color: '#374151', marginBottom: '16px' }}>{confidence.overall.description}</p>
 
       {/* User Guidance */}
-      <div style={{ 
-        padding: '12px', 
-        borderRadius: '8px', 
-        border: '1px solid',
-        ...(confidence.userGuidance.trustLevel === 'high' ? 
-          { backgroundColor: '#f0fdf4', borderColor: '#bbf7d0' } :
-          confidence.userGuidance.trustLevel === 'medium' ? 
-          { backgroundColor: '#fffbeb', borderColor: '#fed7aa' } :
-          { backgroundColor: '#fef2f2', borderColor: '#fecaca' }
-        )
-      }}>
-        <div style={{ fontSize: '14px' }}>
-          <div style={{ fontWeight: '500', color: '#111827', marginBottom: '4px' }}>
-            Recommended Use: {confidence.userGuidance.useCase}
-          </div>
-          {confidence.userGuidance.warnings.length > 0 && (
-            <div style={{ color: '#b45309' }}>
-              ⚠️ {confidence.userGuidance.warnings.join(', ')}
+      {confidence.userGuidance && (
+        <div style={{ 
+          padding: '12px', 
+          borderRadius: '8px', 
+          border: '1px solid',
+          ...(confidence.userGuidance.trustLevel === 'high' ? 
+            { backgroundColor: '#f0fdf4', borderColor: '#bbf7d0' } :
+            confidence.userGuidance.trustLevel === 'medium' ? 
+            { backgroundColor: '#fffbeb', borderColor: '#fed7aa' } :
+            { backgroundColor: '#fef2f2', borderColor: '#fecaca' }
+          )
+        }}>
+          <div style={{ fontSize: '14px' }}>
+            <div style={{ fontWeight: '500', color: '#111827', marginBottom: '4px' }}>
+              Recommended Use: {confidence.userGuidance.useCase || 'General research'}
             </div>
-          )}
+            {confidence.userGuidance.warnings && confidence.userGuidance.warnings.length > 0 && (
+              <div style={{ color: '#b45309' }}>
+                ⚠️ {confidence.userGuidance.warnings.join(', ')}
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Detailed Breakdown */}
       {expanded && (
@@ -211,7 +213,7 @@ export const ConfidenceIndicator: React.FC<ConfidenceIndicatorProps> = ({
           </div>
 
           {/* Additional Research Suggestions */}
-          {confidence.userGuidance.additionalResearch.length > 0 && (
+          {confidence.userGuidance && confidence.userGuidance.additionalResearch && confidence.userGuidance.additionalResearch.length > 0 && (
             <div>
               <h5 style={{ fontWeight: '500', color: '#2563eb', marginBottom: '8px' }}>🔍 Suggested Additional Research</h5>
               <ul style={{ fontSize: '14px', color: '#4b5563', listStyle: 'none', padding: 0 }}>
