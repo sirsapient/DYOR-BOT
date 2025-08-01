@@ -63,11 +63,38 @@ export class ResearchScoringEngine {
     team_info: 20,        // Increased from 15
     github_activity: 10,  // New source for established projects
     funding_data: 15,     // New source for established projects
-    institutional_backing: 10 // New source for established projects
+    institutional_backing: 10, // New source for established projects
+    documentation: 15,    // Increased from 15
+    onchain_data: 15,     // Keep same weight
+    community_health: 15, // Keep same weight
+    financial_data: 10,   // Keep same weight
+    product_data: 10,     // Keep same weight
+    game_specific: 10     // Keep same weight
+  };
+
+  // NEW: Universal source patterns for enhanced discovery
+  private readonly UNIVERSAL_SOURCE_PATTERNS = {
+    documentation: ['whitepaper', 'docs', 'documentation', 'technical', 'tokenomics'],
+    security: ['audit', 'security', 'certik', 'immunefi', 'consensys'],
+    team: ['team', 'founders', 'about', 'leadership'],
+    funding: ['funding', 'investment', 'backers', 'partners'],
+    technical: ['github', 'api', 'developer', 'technical'],
+    community: ['discord', 'telegram', 'twitter', 'reddit']
+  };
+
+  // Special handling for post-incident recovery
+  private readonly POST_INCIDENT_BONUS = {
+    userReimbursement: 10,    // Full user compensation
+    securityUpgrades: 15,     // Security improvements
+    transparency: 10,          // Communication quality
+    institutionalBacking: 10   // Strong investor support
   };
 
   private readonly MINIMUM_THRESHOLD = 60;
   private readonly MINIMUM_DATA_POINTS = 15;
+  
+  // Enhanced threshold for established projects
+  private readonly ESTABLISHED_PROJECT_THRESHOLD = 70;
   
   public calculateResearchScore(findings: ResearchFindings): ResearchScore {
     // Check if this is an established project
@@ -199,7 +226,7 @@ export class ResearchScoringEngine {
 
   private checkThreshold(findings: ResearchFindings, score: number, isEstablishedProject: boolean = false): boolean {
     // Must pass score threshold (higher for established projects)
-    const threshold = isEstablishedProject ? 70 : this.MINIMUM_THRESHOLD;
+    const threshold = isEstablishedProject ? this.ESTABLISHED_PROJECT_THRESHOLD : this.MINIMUM_THRESHOLD;
     if (score < threshold) return false;
     
     // Must have minimum data points (higher for established projects)
@@ -249,7 +276,7 @@ export class ResearchScoringEngine {
   private generateRecommendations(findings: ResearchFindings, score: number, isEstablishedProject: boolean = false): string[] {
     const recommendations: string[] = [];
     
-    const threshold = isEstablishedProject ? 70 : this.MINIMUM_THRESHOLD;
+    const threshold = isEstablishedProject ? this.ESTABLISHED_PROJECT_THRESHOLD : this.MINIMUM_THRESHOLD;
     if (score < threshold) {
       recommendations.push(`Insufficient data for reliable analysis (minimum: ${threshold})`);
     }
@@ -300,85 +327,168 @@ export class ResearchScoringEngine {
 
   // Helper method to detect established projects
   private isEstablishedProject(findings: ResearchFindings): boolean {
-    // Check for established project indicators in the data
-    const hasOfficialWhitepaper = findings.whitepaper?.found && findings.whitepaper?.quality === 'high';
-    const hasSecurityAudit = findings.security_audits?.found && findings.security_audits?.quality === 'high';
-    const hasInstitutionalBacking = findings.financial_data?.data?.funding_rounds || 
-                                   findings.financial_data?.data?.institutional_investors;
-    const hasExtensiveDocumentation = findings.whitepaper?.dataPoints > 20;
+    // Check for established project indicators
+    const hasWhitepaper = findings.whitepaper?.found;
+    const hasSecurityAudit = findings.security_audits?.found;
+    const hasTeamInfo = findings.team_info?.found;
+    const hasDocumentation = findings.documentation?.found;
+    const hasOnchainData = findings.onchain_data?.found;
     
-    return hasOfficialWhitepaper && (hasSecurityAudit || hasInstitutionalBacking || hasExtensiveDocumentation);
+    // Established projects typically have multiple official sources
+    const officialSourceCount = [hasWhitepaper, hasSecurityAudit, hasTeamInfo, hasDocumentation].filter(Boolean).length;
+    
+    // Check for high-quality data indicators
+    const hasHighQualityData = Object.values(findings).some(finding => 
+      finding?.found && finding.quality === 'high' && finding.dataPoints > 5
+    );
+    
+    // Established projects should have at least 3 official sources and high-quality data
+    return officialSourceCount >= 3 && hasHighQualityData;
   }
 
   // Apply bonus for established projects
   private applyEstablishedProjectBonus(baseScore: number, findings: ResearchFindings): number {
     let bonus = 0;
     
-    // Multi-year operation bonus
-    if (findings.whitepaper?.found && findings.whitepaper?.data?.founded_date) {
-      const foundedYear = parseInt(findings.whitepaper.data.founded_date);
-      const currentYear = new Date().getFullYear();
-      if (currentYear - foundedYear >= 2) {
-        bonus += 10; // +10 points for 2+ years of operation
-      }
+    // Multi-year operation bonus (projects running for 2+ years)
+    if (this.hasMultiYearOperation(findings)) {
+      bonus += 10;
     }
     
-    // Post-incident recovery bonus
-    if (findings.security_audits?.found && findings.security_audits?.data?.post_incident_upgrades) {
-      bonus += 15; // +15 points for handling security incidents well
+    // Post-incident recovery bonus (handled security incidents well)
+    if (this.hasPostIncidentRecovery(findings)) {
+      bonus += 15;
     }
     
-    // Institutional backing bonus
-    if (findings.financial_data?.found && findings.financial_data?.data?.institutional_investors) {
-      bonus += 10; // +10 points for institutional backing
+    // Institutional backing bonus (strong investor support)
+    if (this.hasInstitutionalBacking(findings)) {
+      bonus += 10;
     }
     
     // Comprehensive documentation bonus
-    if (findings.whitepaper?.found && findings.whitepaper?.dataPoints > 30) {
-      bonus += 5; // +5 points for extensive documentation
+    if (this.hasComprehensiveDocumentation(findings)) {
+      bonus += 10;
     }
     
-    // GitHub activity bonus
-    if (findings.github_activity?.found && findings.github_activity?.data?.repositoryCount > 10) {
-      bonus += 5; // +5 points for active development
+    // Active development bonus (GitHub activity, regular updates)
+    if (this.hasActiveDevelopment(findings)) {
+      bonus += 10;
     }
     
-    return Math.min(baseScore + bonus, 100); // Cap at 100
+    // Community strength bonus (large, engaged community)
+    if (this.hasStrongCommunity(findings)) {
+      bonus += 5;
+    }
+    
+    // Cap the bonus to prevent scores over 100
+    const maxBonus = 100 - baseScore;
+    return Math.min(bonus, maxBonus);
+  }
+
+  private hasMultiYearOperation(findings: ResearchFindings): boolean {
+    // Check for indicators of long-term operation
+    const hasEstablishedData = findings.onchain_data?.found || findings.financial_data?.found;
+    const hasHistoricalData = findings.community_health?.found || findings.product_data?.found;
+    
+    return hasEstablishedData && hasHistoricalData;
+  }
+
+  private hasPostIncidentRecovery(findings: ResearchFindings): boolean {
+    // Check for indicators of post-incident recovery
+    const hasSecurityAudit = findings.security_audits?.found;
+    const hasTeamInfo = findings.team_info?.found;
+    const hasDocumentation = findings.documentation?.found;
+    
+    // Projects that have security audits and comprehensive documentation
+    // after incidents show good recovery practices
+    return hasSecurityAudit && hasTeamInfo && hasDocumentation;
+  }
+
+  private hasInstitutionalBacking(findings: ResearchFindings): boolean {
+    // Check for institutional backing indicators
+    const hasFinancialData = findings.financial_data?.found;
+    const hasTeamInfo = findings.team_info?.found;
+    
+    // Projects with detailed financial data and team information
+    // often indicate institutional backing
+    return hasFinancialData && hasTeamInfo;
+  }
+
+  private hasComprehensiveDocumentation(findings: ResearchFindings): boolean {
+    // Check for comprehensive documentation
+    const hasWhitepaper = findings.whitepaper?.found;
+    const hasDocumentation = findings.documentation?.found;
+    const hasTeamInfo = findings.team_info?.found;
+    
+    return hasWhitepaper && hasDocumentation && hasTeamInfo;
+  }
+
+  private hasActiveDevelopment(findings: ResearchFindings): boolean {
+    // Check for active development indicators
+    const hasOnchainData = findings.onchain_data?.found;
+    const hasProductData = findings.product_data?.found;
+    const hasCommunityHealth = findings.community_health?.found;
+    
+    return hasOnchainData && hasProductData && hasCommunityHealth;
+  }
+
+  private hasStrongCommunity(findings: ResearchFindings): boolean {
+    // Check for strong community indicators
+    const hasCommunityHealth = findings.community_health?.found;
+    const hasProductData = findings.product_data?.found;
+    
+    return hasCommunityHealth && hasProductData;
   }
 
   // Enhanced data coverage calculation for established projects
   private calculateDataCoverage(findings: ResearchFindings, isEstablishedProject: boolean = false): number {
     let coverageScore = 0;
-    let maxPossibleScore = 0;
-
+    let totalWeight = 0;
+    
+    // Use established project weights if applicable
+    const weights: { [key: string]: number } = isEstablishedProject ? this.ESTABLISHED_PROJECT_WEIGHTS : 
+      Object.fromEntries(this.DATA_SOURCES.map(s => [s.name, s.weight]));
+    
     for (const source of this.DATA_SOURCES) {
-      maxPossibleScore += source.weight;
-      
       const finding = findings[source.name];
+      const weight = weights[source.name] || source.weight;
+      
       if (finding?.found) {
-        let qualityMultiplier = 1.0;
+        // Base score for finding the source
+        coverageScore += weight * 0.6;
         
-        switch (finding.quality) {
-          case 'high': qualityMultiplier = 1.0; break;
-          case 'medium': qualityMultiplier = 0.7; break;
-          case 'low': qualityMultiplier = 0.4; break;
-        }
-
-        // Bonus for having many data points
-        const dataPointBonus = Math.min(finding.dataPoints / 10, 1.2);
-        
-        // Enhanced weight for established projects
-        let sourceWeight = source.weight;
-        if (isEstablishedProject && source.name in this.ESTABLISHED_PROJECT_WEIGHTS) {
-          sourceWeight = (this.ESTABLISHED_PROJECT_WEIGHTS as any)[source.name] || source.weight;
+        // Quality bonus
+        if (finding.quality === 'high') {
+          coverageScore += weight * 0.3;
+        } else if (finding.quality === 'medium') {
+          coverageScore += weight * 0.2;
         }
         
-        coverageScore += sourceWeight * qualityMultiplier * dataPointBonus;
+        // Data points bonus (more data = higher score)
+        const dataPointBonus = Math.min(finding.dataPoints / 10, 0.1); // Max 10% bonus
+        coverageScore += weight * dataPointBonus;
+      }
+      
+      totalWeight += weight;
+    }
+    
+    if (totalWeight === 0) return 0;
+    
+    // Normalize to 40 points max (40% of total score)
+    const normalizedScore = (coverageScore / totalWeight) * 40;
+    
+    // Additional bonus for established projects with comprehensive data
+    if (isEstablishedProject) {
+      const officialSourceCount = Object.values(findings).filter(f => 
+        f?.found && f.quality === 'high'
+      ).length;
+      
+      if (officialSourceCount >= 4) {
+        return Math.min(normalizedScore + 5, 40); // +5 bonus for comprehensive official sources
       }
     }
-
-    // Normalize to 40 points max (40% of total score)
-    return Math.min((coverageScore / maxPossibleScore) * 40, 40);
+    
+    return Math.min(normalizedScore, 40);
   }
 
   // Helper method to check if research should proceed to AI analysis

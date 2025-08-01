@@ -68,8 +68,9 @@ interface RetryConfig {
 // NEW: Universal source discovery patterns for ALL projects
 const UNIVERSAL_SOURCE_PATTERNS = {
   
-  // Official documentation patterns
+  // Official documentation patterns - Enhanced for better coverage
   documentation: [
+    // Basic patterns
     '{project}.com',
     'docs.{project}.com', 
     '{project}.org',
@@ -89,7 +90,48 @@ const UNIVERSAL_SOURCE_PATTERNS = {
     '{project}.com/tokenomics',
     '{project}.com/economics',
     '{project}.com/governance',
-    '{project}.com/technical'
+    '{project}.com/technical',
+    // Enhanced patterns for gaming projects
+    '{project}.com/whitepaper.pdf',
+    '{project}.com/whitepaper/',
+    '{project}.com/white-paper',
+    '{project}.com/white-paper.pdf',
+    '{project}.com/litepaper',
+    '{project}.com/litepaper.pdf',
+    '{project}.com/tokenomics.pdf',
+    '{project}.com/economics.pdf',
+    '{project}.com/governance.pdf',
+    // Subdomain variations
+    'whitepaper.{project}.com',
+    'docs.{project}.com',
+    'documentation.{project}.com',
+    'technical.{project}.com',
+    'developer.{project}.com',
+    'developers.{project}.com',
+    // Common gaming project patterns
+    '{project}.game/whitepaper',
+    '{project}.game/docs',
+    '{project}.game/documentation',
+    '{project}.app/whitepaper',
+    '{project}.app/docs',
+    '{project}.app/documentation',
+    // Web3 specific patterns
+    '{project}.finance/whitepaper',
+    '{project}.finance/docs',
+    '{project}.protocol/whitepaper',
+    '{project}.protocol/docs',
+    '{project}.dao/whitepaper',
+    '{project}.dao/docs',
+    // Alternative domains
+    '{project}.net',
+    '{project}.co',
+    '{project}.io',
+    '{project}.app',
+    '{project}.xyz',
+    '{project}.game',
+    '{project}.finance',
+    '{project}.protocol',
+    '{project}.dao'
   ],
   
   // Developer resources
@@ -483,10 +525,10 @@ class AIResearchOrchestrator {
     };
     
     this.retryConfig = {
-      maxRetries: 3,
-      baseDelay: 1000,
-      maxDelay: 10000,
-      backoffMultiplier: 2,
+      maxRetries: 1,
+      baseDelay: 200,
+      maxDelay: 1000,
+      backoffMultiplier: 1.2,
       ...options?.retryConfig
     };
   }
@@ -853,7 +895,7 @@ Consider:
       community: []
     };
     
-    // Stage 1: Official sources (highest priority)
+    // Stage 1: Official sources (highest priority) with enhanced crawling
     console.log(`📋 Stage 1: Discovering official sources for ${projectName}`);
     const officialSources = await this.discoverOfficialSources(projectName, aliases);
     discoveredSources.documentation = officialSources.documentation || [];
@@ -871,53 +913,454 @@ Consider:
     discoveredSources.funding = ecosystemSources.funding || [];
     discoveredSources.community = ecosystemSources.community || [];
     
+    // NEW: Stage 4: Fallback web search if no docs/whitepaper found
+    if (discoveredSources.documentation.length === 0) {
+      console.log(`🔍 Stage 4: Fallback web search for ${projectName} documentation`);
+      const webSearchResults = await this.fallbackWebSearch(projectName, aliases);
+      discoveredSources.documentation = webSearchResults.documentation || [];
+      discoveredSources.company = [...discoveredSources.company, ...(webSearchResults.company || [])];
+    }
+    
     console.log(`✅ Universal source discovery completed for ${projectName}:`, discoveredSources);
     return discoveredSources;
   }
   
   private async discoverOfficialSources(projectName: string, aliases: string[]): Promise<any> {
+    console.log(`\n🔍 STARTING OFFICIAL SOURCE DISCOVERY FOR: ${projectName}`);
+    console.log(`📝 Aliases: ${aliases.join(', ')}`);
+    
     const sources: any = { documentation: [], company: [] };
     
-    // Generate URL patterns for all aliases
+    // NEW: AI-guided discovery first
+    console.log(`\n🤖 PHASE 1: AI-guided discovery for ${projectName}`);
+    const aiDiscoveredSources = await this.discoverSourcesWithAI(projectName, aliases);
+    sources.documentation = [...sources.documentation, ...(aiDiscoveredSources.documentation || [])];
+    sources.company = [...sources.company, ...(aiDiscoveredSources.company || [])];
+    console.log(`✅ AI discovery completed. Found ${sources.documentation.length} docs, ${sources.company.length} company sources`);
+    
+    // Pattern-based discovery as fallback
+    console.log(`\n🔍 PHASE 2: Pattern-based discovery for ${projectName}`);
     const allNames = [projectName, ...aliases];
+    console.log(`🔤 Testing names: ${allNames.join(', ')}`);
     
     for (const name of allNames.slice(0, 5)) { // Limit to first 5 aliases
       const normalizedName = name.toLowerCase().replace(/\s+/g, '');
+      console.log(`\n📋 Testing normalized name: "${normalizedName}"`);
       
-             // Test documentation patterns
-       for (const pattern of UNIVERSAL_SOURCE_PATTERNS.documentation) {
-         const url = pattern.replace(/{project}/g, normalizedName);
-         try {
-           const res = await fetch(`https://${url}`, { 
-             method: 'HEAD'
-           });
-           if (res.ok) {
-             sources.documentation.push(`https://${url}`);
-             console.log(`✅ Found documentation: https://${url}`);
-           }
-         } catch (e) {
-           // Continue to next pattern
-         }
-       }
+      // Test documentation patterns
+      console.log(`📚 Testing ${UNIVERSAL_SOURCE_PATTERNS.documentation.length} documentation patterns...`);
+      for (const pattern of UNIVERSAL_SOURCE_PATTERNS.documentation) {
+        const url = pattern.replace(/{project}/g, normalizedName);
+        console.log(`  🔗 Testing: ${url}`);
+        try {
+          const res = await this.executeWithRetry(
+            () => fetch(`https://${url}`, { method: 'HEAD', signal: AbortSignal.timeout(3000) }),
+            `HEAD request for ${url}`
+          );
+          if (res.ok) {
+            sources.documentation.push(`https://${url}`);
+            console.log(`    ✅ FOUND: https://${url}`);
+          } else {
+            console.log(`    ❌ HTTP ${res.status}: https://${url}`);
+          }
+        } catch (e) {
+          console.log(`    ❌ ERROR: https://${url} - ${(e as Error).message}`);
+        }
+      }
       
-             // Test company patterns
-       for (const pattern of UNIVERSAL_SOURCE_PATTERNS.company) {
-         const url = pattern.replace(/{project}/g, normalizedName).replace(/{company}/g, normalizedName);
-         try {
-           const res = await fetch(`https://${url}`, { 
-             method: 'HEAD'
-           });
-           if (res.ok) {
-             sources.company.push(`https://${url}`);
-             console.log(`✅ Found company info: https://${url}`);
-           }
-         } catch (e) {
-           // Continue to next pattern
-         }
-       }
+      // Test company patterns
+      console.log(`🏢 Testing ${UNIVERSAL_SOURCE_PATTERNS.company.length} company patterns...`);
+      for (const pattern of UNIVERSAL_SOURCE_PATTERNS.company) {
+        const url = pattern.replace(/{project}/g, normalizedName).replace(/{company}/g, normalizedName);
+        console.log(`  🔗 Testing: ${url}`);
+        try {
+          const res = await this.executeWithRetry(
+            () => fetch(`https://${url}`, { method: 'HEAD', signal: AbortSignal.timeout(3000) }),
+            `HEAD request for ${url}`
+          );
+          if (res.ok) {
+            sources.company.push(`https://${url}`);
+            console.log(`    ✅ FOUND: https://${url}`);
+          } else {
+            console.log(`    ❌ HTTP ${res.status}: https://${url}`);
+          }
+        } catch (e) {
+          console.log(`    ❌ ERROR: https://${url} - ${(e as Error).message}`);
+        }
+      }
     }
     
+    // Enhanced crawling - for each discovered homepage, crawl for more links
+    console.log(`\n🕷️ PHASE 3: Crawling discovered pages for additional links`);
+    const pagesToCrawl = [...sources.company, ...sources.documentation];
+    console.log(`🕷️ Pages to crawl: ${pagesToCrawl.length}`);
+    
+    for (const pageUrl of pagesToCrawl.slice(0, 3)) { // Limit crawling to first 3 pages
+      console.log(`  🕷️ Crawling: ${pageUrl}`);
+      try {
+        const additionalLinks = await this.crawlPageForLinks(pageUrl, projectName, aliases);
+        const newDocs = additionalLinks.documentation || [];
+        const newCompany = additionalLinks.company || [];
+        sources.documentation = [...sources.documentation, ...newDocs];
+        sources.company = [...sources.company, ...newCompany];
+        console.log(`    ✅ Crawled ${pageUrl}: +${newDocs.length} docs, +${newCompany.length} company`);
+      } catch (e) {
+        console.log(`    ❌ Failed to crawl ${pageUrl}: ${(e as Error).message}`);
+      }
+    }
+    
+    // Remove duplicates and log final results
+    const originalDocCount = sources.documentation.length;
+    const originalCompanyCount = sources.company.length;
+    sources.documentation = [...new Set(sources.documentation)];
+    sources.company = [...new Set(sources.company)];
+    const finalDocCount = sources.documentation.length;
+    const finalCompanyCount = sources.company.length;
+    
+    console.log(`\n📊 FINAL DISCOVERY RESULTS FOR ${projectName}:`);
+    console.log(`  📚 Documentation sources: ${finalDocCount} (was ${originalDocCount})`);
+    console.log(`  🏢 Company sources: ${finalCompanyCount} (was ${originalCompanyCount})`);
+    console.log(`  📚 Documentation URLs: ${sources.documentation.join(', ')}`);
+    console.log(`  🏢 Company URLs: ${sources.company.join(', ')}`);
+    console.log(`🔍 OFFICIAL SOURCE DISCOVERY COMPLETED\n`);
+    
     return sources;
+  }
+  
+  // NEW: AI-guided source discovery
+  private async discoverSourcesWithAI(projectName: string, aliases: string[]): Promise<any> {
+    console.log(`\n🤖 STARTING AI-GUIDED DISCOVERY FOR: ${projectName}`);
+    console.log(`📝 AI will search for: ${aliases.join(', ')}`);
+    
+    const sources: any = { documentation: [], company: [] };
+    
+    try {
+      const prompt = `You are an expert at finding official documentation and company information for blockchain and gaming projects.
+
+Project: ${projectName}
+Aliases: ${aliases.join(', ')}
+
+Please find the official URLs for this project. Focus on:
+1. Official whitepaper/documentation URLs
+2. Official company/team information URLs
+3. Token information and blockchain details
+4. Security audit reports
+5. Technical documentation
+
+For each URL you find, verify it's accessible and official. Return only working, official URLs.
+
+Format your response as JSON:
+{
+  "documentation": ["url1", "url2"],
+  "company": ["url1", "url2"],
+  "reasoning": "explanation of what you found"
+}
+
+Be thorough but only include verified, official sources.`;
+
+      console.log(`🤖 Sending prompt to Claude...`);
+      
+      // Add timeout to the AI API call
+      const response = await this.executeWithRetry(
+        () => this.anthropic.messages.create({
+          model: 'claude-3-sonnet-20240229',
+          max_tokens: 1000,
+          temperature: 0.1,
+          messages: [{ role: 'user', content: prompt }]
+        }),
+        `AI-guided discovery for ${projectName}`
+      );
+
+      const aiResponse = response.content[0].type === 'text' ? response.content[0].text : '';
+      console.log(`🤖 Claude response received (${aiResponse.length} characters)`);
+      console.log(`🤖 Raw AI response: ${aiResponse.substring(0, 500)}${aiResponse.length > 500 ? '...' : ''}`);
+      
+      try {
+        const parsedResponse = JSON.parse(aiResponse);
+        console.log(`✅ Successfully parsed AI response as JSON`);
+        
+        if (parsedResponse.documentation) {
+          console.log(`📚 AI found ${parsedResponse.documentation.length} documentation URLs to verify`);
+          // Verify each URL is accessible with shorter timeout
+          for (const url of parsedResponse.documentation.slice(0, 3)) { // Limit to first 3 URLs
+            console.log(`  🔍 Verifying documentation URL: ${url}`);
+            try {
+              const res = await this.executeWithRetry(
+                () => fetch(url, { method: 'HEAD', signal: AbortSignal.timeout(3000) }),
+                `Verifying AI-discovered documentation URL: ${url}`
+              );
+              if (res.ok) {
+                sources.documentation.push(url);
+                console.log(`    ✅ VERIFIED: ${url}`);
+              } else {
+                console.log(`    ❌ HTTP ${res.status}: ${url}`);
+              }
+            } catch (e) {
+              console.log(`    ❌ ERROR: ${url} - ${(e as Error).message}`);
+            }
+          }
+        } else {
+          console.log(`❌ No documentation URLs found in AI response`);
+        }
+        
+        if (parsedResponse.company) {
+          console.log(`🏢 AI found ${parsedResponse.company.length} company URLs to verify`);
+          // Verify each URL is accessible with shorter timeout
+          for (const url of parsedResponse.company.slice(0, 3)) { // Limit to first 3 URLs
+            console.log(`  🔍 Verifying company URL: ${url}`);
+            try {
+              const res = await this.executeWithRetry(
+                () => fetch(url, { method: 'HEAD', signal: AbortSignal.timeout(3000) }),
+                `Verifying AI-discovered company URL: ${url}`
+              );
+              if (res.ok) {
+                sources.company.push(url);
+                console.log(`    ✅ VERIFIED: ${url}`);
+              } else {
+                console.log(`    ❌ HTTP ${res.status}: ${url}`);
+              }
+            } catch (e) {
+              console.log(`    ❌ ERROR: ${url} - ${(e as Error).message}`);
+            }
+          }
+        } else {
+          console.log(`❌ No company URLs found in AI response`);
+        }
+        
+        console.log(`🤖 AI discovery reasoning: ${parsedResponse.reasoning || 'No reasoning provided'}`);
+      } catch (parseError) {
+        console.log(`❌ Failed to parse AI response as JSON: ${parseError}`);
+        console.log(`❌ Raw response that failed to parse: ${aiResponse}`);
+      }
+    } catch (e) {
+      console.log(`❌ AI-guided discovery failed: ${(e as Error).message}`);
+    }
+    
+    console.log(`🤖 AI-GUIDED DISCOVERY COMPLETED: ${sources.documentation.length} docs, ${sources.company.length} company sources\n`);
+    return sources;
+  }
+
+  // Enhanced page crawling to find doc/whitepaper links
+  private async crawlPageForLinks(pageUrl: string, projectName: string, aliases: string[]): Promise<any> {
+    const foundLinks: any = { documentation: [], company: [] };
+    
+    try {
+      const res = await this.executeWithRetry(
+        () => fetch(pageUrl, { signal: AbortSignal.timeout(5000) }),
+        `Fetching ${pageUrl} for crawling`
+      );
+      
+      if (res.ok) {
+        const html = await res.text();
+        const $ = require('cheerio').load(html);
+        
+        // Find all links
+        const links = $('a[href]').map((i: number, el: any) => $(el).attr('href')).get();
+        
+        // Enhanced link detection for documentation and company info
+        for (const link of links) {
+          if (!link || typeof link !== 'string') continue;
+          
+          const fullUrl = link.startsWith('http') ? link : new URL(link, pageUrl).href;
+          const linkText = $(`a[href="${link}"]`).text().toLowerCase();
+          const linkHref = $(`a[href="${link}"]`).attr('href')?.toLowerCase() || '';
+          
+          // Enhanced documentation detection
+          const docKeywords = [
+            'whitepaper', 'white-paper', 'litepaper', 'lite-paper',
+            'docs', 'documentation', 'technical', 'developer',
+            'tokenomics', 'economics', 'governance', 'architecture',
+            'api', 'sdk', 'integration', 'guide', 'manual'
+          ];
+          
+          const isDocLink = docKeywords.some(keyword => 
+            linkText.includes(keyword) || 
+            linkHref.includes(keyword) ||
+            fullUrl.includes(keyword)
+          ) || UNIVERSAL_SOURCE_PATTERNS.documentation.some(pattern => {
+            const patternUrl = pattern.replace(/{project}/g, projectName.toLowerCase().replace(/\s+/g, ''));
+            return fullUrl.includes(patternUrl);
+          });
+          
+          // Enhanced company info detection
+          const companyKeywords = [
+            'about', 'team', 'company', 'founders', 'leadership',
+            'careers', 'contact', 'press', 'news', 'blog',
+            'medium', 'linkedin', 'twitter', 'discord', 'telegram'
+          ];
+          
+          const isCompanyLink = companyKeywords.some(keyword => 
+            linkText.includes(keyword) || 
+            linkHref.includes(keyword) ||
+            fullUrl.includes(keyword)
+          ) || UNIVERSAL_SOURCE_PATTERNS.company.some(pattern => {
+            const patternUrl = pattern.replace(/{project}/g, projectName.toLowerCase().replace(/\s+/g, '')).replace(/{company}/g, projectName.toLowerCase().replace(/\s+/g, ''));
+            return fullUrl.includes(patternUrl);
+          });
+          
+          if (isDocLink) {
+            try {
+              const linkRes = await this.executeWithRetry(
+                () => fetch(fullUrl, { method: 'HEAD', signal: AbortSignal.timeout(3000) }),
+                `Checking discovered documentation link ${fullUrl}`
+              );
+              if (linkRes.ok) {
+                foundLinks.documentation.push(fullUrl);
+                console.log(`✅ Found documentation via crawling: ${fullUrl}`);
+              }
+            } catch (e) {
+              console.log(`❌ Failed to check discovered documentation link ${fullUrl}: ${(e as Error).message}`);
+            }
+          }
+          
+          if (isCompanyLink) {
+            try {
+              const linkRes = await this.executeWithRetry(
+                () => fetch(fullUrl, { method: 'HEAD', signal: AbortSignal.timeout(3000) }),
+                `Checking discovered company link ${fullUrl}`
+              );
+              if (linkRes.ok) {
+                foundLinks.company.push(fullUrl);
+                console.log(`✅ Found company info via crawling: ${fullUrl}`);
+              }
+            } catch (e) {
+              console.log(`❌ Failed to check discovered company link ${fullUrl}: ${(e as Error).message}`);
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.log(`❌ Failed to crawl page ${pageUrl}: ${(e as Error).message}`);
+    }
+    
+    return foundLinks;
+  }
+  
+  // NEW: Fallback web search when pattern-based discovery fails
+  private async fallbackWebSearch(projectName: string, aliases: string[]): Promise<any> {
+    const searchResults: any = { documentation: [], company: [] };
+    
+    if (!process.env.SERP_API_KEY) {
+      console.log(`⚠️ No SERP_API_KEY available for fallback web search`);
+      return searchResults;
+    }
+    
+    const searchTerms = [
+      // Primary searches
+      `${projectName} whitepaper`,
+      `${projectName} documentation`,
+      `${projectName} docs`,
+      `${projectName} official website`,
+      `${projectName} tokenomics`,
+      `${projectName} white paper`,
+      `${projectName} lite paper`,
+      `${projectName} technical documentation`,
+      `${projectName} developer docs`,
+      `${projectName} API documentation`,
+      // Gaming-specific searches
+      `${projectName} game whitepaper`,
+      `${projectName} gaming documentation`,
+      `${projectName} blockchain game`,
+      `${projectName} web3 game`,
+      // Token and blockchain searches
+      `${projectName} token`,
+      `${projectName} blockchain`,
+      `${projectName} smart contract`,
+      `${projectName} token contract`,
+      // Company and team searches
+      `${projectName} team`,
+      `${projectName} founders`,
+      `${projectName} company`,
+      `${projectName} about`,
+      `${projectName} official`
+    ];
+    
+    // Add alias-specific searches
+    for (const alias of aliases.slice(0, 3)) {
+      searchTerms.push(`${alias} whitepaper`);
+      searchTerms.push(`${alias} documentation`);
+      searchTerms.push(`${alias} official website`);
+      searchTerms.push(`${alias} tokenomics`);
+      searchTerms.push(`${alias} team`);
+    }
+    
+    for (const term of searchTerms.slice(0, 5)) {
+      try {
+        console.log(`🔍 Web searching for: ${term}`);
+        const serpRes = await this.executeWithRetry(
+          () => fetch(`https://serpapi.com/search.json?q=${encodeURIComponent(term)}&api_key=${process.env.SERP_API_KEY}`),
+          `SerpAPI search for ${term}`
+        );
+        
+        if (serpRes.ok) {
+          const serpJson = await serpRes.json();
+          const results = (serpJson.organic_results || []).slice(0, 3);
+          
+          for (const result of results) {
+            if (result.link) {
+              try {
+                const linkRes = await this.executeWithRetry(
+                  () => fetch(result.link, { method: 'HEAD' }),
+                  `Checking web search result ${result.link}`
+                );
+                if (linkRes.ok) {
+                  // Enhanced classification of search results
+                  const title = result.title.toLowerCase();
+                  const snippet = result.snippet.toLowerCase();
+                  const url = result.link.toLowerCase();
+                  
+                  // Documentation keywords
+                  const docKeywords = [
+                    'whitepaper', 'white paper', 'litepaper', 'lite paper',
+                    'docs', 'documentation', 'technical', 'developer',
+                    'tokenomics', 'economics', 'governance', 'architecture',
+                    'api', 'sdk', 'integration', 'guide', 'manual',
+                    'technical documentation', 'developer docs'
+                  ];
+                  
+                  // Company/team keywords
+                  const companyKeywords = [
+                    'about', 'team', 'company', 'founders', 'leadership',
+                    'careers', 'contact', 'press', 'news', 'blog',
+                    'medium', 'linkedin', 'twitter', 'discord', 'telegram'
+                  ];
+                  
+                  const isDoc = docKeywords.some(keyword => 
+                    title.includes(keyword) || 
+                    snippet.includes(keyword) ||
+                    url.includes(keyword)
+                  );
+                  
+                  const isCompany = companyKeywords.some(keyword => 
+                    title.includes(keyword) || 
+                    snippet.includes(keyword) ||
+                    url.includes(keyword)
+                  );
+                  
+                  if (isDoc) {
+                    searchResults.documentation.push(result.link);
+                    console.log(`✅ Found documentation via web search: ${result.link}`);
+                  } else if (isCompany) {
+                    searchResults.company.push(result.link);
+                    console.log(`✅ Found company info via web search: ${result.link}`);
+                  } else {
+                    // Default to company if unclear
+                    searchResults.company.push(result.link);
+                    console.log(`✅ Found potential company info via web search: ${result.link}`);
+                  }
+                }
+              } catch (e) {
+                console.log(`❌ Failed to check web search result ${result.link}: ${(e as Error).message}`);
+              }
+            }
+          }
+        }
+      } catch (e) {
+        console.log(`❌ Web search failed for ${term}: ${(e as Error).message}`);
+      }
+    }
+    
+    return searchResults;
   }
   
   private async discoverTechnicalSources(projectName: string, aliases: string[]): Promise<any> {
@@ -928,37 +1371,39 @@ Consider:
     for (const name of allNames.slice(0, 3)) {
       const normalizedName = name.toLowerCase().replace(/\s+/g, '');
       
-             // Test technical patterns
-       for (const pattern of UNIVERSAL_SOURCE_PATTERNS.technical) {
-         const url = pattern.replace(/{project}/g, normalizedName).replace(/{company}/g, normalizedName);
-         try {
-           const res = await fetch(`https://${url}`, { 
-             method: 'HEAD'
-           });
-           if (res.ok) {
-             sources.technical.push(`https://${url}`);
-             console.log(`✅ Found technical source: https://${url}`);
-           }
-         } catch (e) {
-           // Continue to next pattern
-         }
-       }
-       
-       // Test security patterns
-       for (const pattern of UNIVERSAL_SOURCE_PATTERNS.security) {
-         const url = pattern.replace(/{project}/g, normalizedName);
-         try {
-           const res = await fetch(`https://${url}`, { 
-             method: 'HEAD'
-           });
-           if (res.ok) {
-             sources.security.push(`https://${url}`);
-             console.log(`✅ Found security source: https://${url}`);
-           }
-         } catch (e) {
-           // Continue to next pattern
-         }
-       }
+      // Test technical patterns
+      for (const pattern of UNIVERSAL_SOURCE_PATTERNS.technical) {
+        const url = pattern.replace(/{project}/g, normalizedName).replace(/{company}/g, normalizedName);
+        try {
+          const res = await this.executeWithRetry(
+            () => fetch(`https://${url}`, { method: 'HEAD' }),
+            `HEAD request for technical source ${url}`
+          );
+          if (res.ok) {
+            sources.technical.push(`https://${url}`);
+            console.log(`✅ Found technical source: https://${url}`);
+          }
+        } catch (e) {
+          console.log(`❌ Failed to check technical source ${url}: ${(e as Error).message}`);
+        }
+      }
+      
+      // Test security patterns
+      for (const pattern of UNIVERSAL_SOURCE_PATTERNS.security) {
+        const url = pattern.replace(/{project}/g, normalizedName);
+        try {
+          const res = await this.executeWithRetry(
+            () => fetch(`https://${url}`, { method: 'HEAD' }),
+            `HEAD request for security source ${url}`
+          );
+          if (res.ok) {
+            sources.security.push(`https://${url}`);
+            console.log(`✅ Found security source: https://${url}`);
+          }
+        } catch (e) {
+          console.log(`❌ Failed to check security source ${url}: ${(e as Error).message}`);
+        }
+      }
     }
     
     return sources;
@@ -972,37 +1417,39 @@ Consider:
     for (const name of allNames.slice(0, 3)) {
       const normalizedName = name.toLowerCase().replace(/\s+/g, '');
       
-             // Test funding patterns
-       for (const pattern of UNIVERSAL_SOURCE_PATTERNS.funding) {
-         const url = pattern.replace(/{project}/g, normalizedName).replace(/{company}/g, normalizedName);
-         try {
-           const res = await fetch(`https://${url}`, { 
-             method: 'HEAD'
-           });
-           if (res.ok) {
-             sources.funding.push(`https://${url}`);
-             console.log(`✅ Found funding source: https://${url}`);
-           }
-         } catch (e) {
-           // Continue to next pattern
-         }
-       }
-       
-       // Test community patterns
-       for (const pattern of UNIVERSAL_SOURCE_PATTERNS.community) {
-         const url = pattern.replace(/{project}/g, normalizedName);
-         try {
-           const res = await fetch(`https://${url}`, { 
-             method: 'HEAD'
-           });
-           if (res.ok) {
-             sources.community.push(`https://${url}`);
-             console.log(`✅ Found community source: https://${url}`);
-           }
-         } catch (e) {
-           // Continue to next pattern
-         }
-       }
+      // Test funding patterns
+      for (const pattern of UNIVERSAL_SOURCE_PATTERNS.funding) {
+        const url = pattern.replace(/{project}/g, normalizedName).replace(/{company}/g, normalizedName);
+        try {
+          const res = await this.executeWithRetry(
+            () => fetch(`https://${url}`, { method: 'HEAD' }),
+            `HEAD request for funding source ${url}`
+          );
+          if (res.ok) {
+            sources.funding.push(`https://${url}`);
+            console.log(`✅ Found funding source: https://${url}`);
+          }
+        } catch (e) {
+          console.log(`❌ Failed to check funding source ${url}: ${(e as Error).message}`);
+        }
+      }
+      
+      // Test community patterns
+      for (const pattern of UNIVERSAL_SOURCE_PATTERNS.community) {
+        const url = pattern.replace(/{project}/g, normalizedName);
+        try {
+          const res = await this.executeWithRetry(
+            () => fetch(`https://${url}`, { method: 'HEAD' }),
+            `HEAD request for community source ${url}`
+          );
+          if (res.ok) {
+            sources.community.push(`https://${url}`);
+            console.log(`✅ Found community source: https://${url}`);
+          }
+        } catch (e) {
+          console.log(`❌ Failed to check community source ${url}: ${(e as Error).message}`);
+        }
+      }
     }
     
     return sources;
@@ -1015,13 +1462,18 @@ Consider:
       securityAudits: {},
       fundingData: {},
       technicalMetrics: {},
-      tokenomicsData: {}
+      tokenomicsData: {},
+      tokenInfo: {}, // NEW: Token and chain information
+      chainInfo: {}  // NEW: Blockchain/network information
     };
     
     // Extract team information from company sources
     for (const companyUrl of sources.company || []) {
       try {
-        const res = await fetch(companyUrl);
+        const res = await this.executeWithRetry(
+          () => fetch(companyUrl),
+          `Fetching company data from ${companyUrl}`
+        );
         if (res.ok) {
           const html = await res.text();
           const teamData = this.extractDataFromText(html, UNIVERSAL_EXTRACTION_PATTERNS.teamVerification);
@@ -1030,14 +1482,17 @@ Consider:
           }
         }
       } catch (e) {
-        console.log(`❌ Failed to extract team data from ${companyUrl}`);
+        console.log(`❌ Failed to extract team data from ${companyUrl}: ${(e as Error).message}`);
       }
     }
     
     // Extract security audit information
     for (const securityUrl of sources.security || []) {
       try {
-        const res = await fetch(securityUrl);
+        const res = await this.executeWithRetry(
+          () => fetch(securityUrl),
+          `Fetching security data from ${securityUrl}`
+        );
         if (res.ok) {
           const html = await res.text();
           const auditData = this.extractDataFromText(html, UNIVERSAL_EXTRACTION_PATTERNS.securityAudits);
@@ -1046,14 +1501,17 @@ Consider:
           }
         }
       } catch (e) {
-        console.log(`❌ Failed to extract security data from ${securityUrl}`);
+        console.log(`❌ Failed to extract security data from ${securityUrl}: ${(e as Error).message}`);
       }
     }
     
     // Extract funding information
     for (const fundingUrl of sources.funding || []) {
       try {
-        const res = await fetch(fundingUrl);
+        const res = await this.executeWithRetry(
+          () => fetch(fundingUrl),
+          `Fetching funding data from ${fundingUrl}`
+        );
         if (res.ok) {
           const html = await res.text();
           const fundingData = this.extractDataFromText(html, UNIVERSAL_EXTRACTION_PATTERNS.fundingData);
@@ -1062,14 +1520,17 @@ Consider:
           }
         }
       } catch (e) {
-        console.log(`❌ Failed to extract funding data from ${fundingUrl}`);
+        console.log(`❌ Failed to extract funding data from ${fundingUrl}: ${(e as Error).message}`);
       }
     }
     
     // Extract technical metrics
     for (const technicalUrl of sources.technical || []) {
       try {
-        const res = await fetch(technicalUrl);
+        const res = await this.executeWithRetry(
+          () => fetch(technicalUrl),
+          `Fetching technical data from ${technicalUrl}`
+        );
         if (res.ok) {
           const html = await res.text();
           const technicalData = this.extractDataFromText(html, UNIVERSAL_EXTRACTION_PATTERNS.technicalMetrics);
@@ -1078,27 +1539,178 @@ Consider:
           }
         }
       } catch (e) {
-        console.log(`❌ Failed to extract technical data from ${technicalUrl}`);
+        console.log(`❌ Failed to extract technical data from ${technicalUrl}: ${(e as Error).message}`);
       }
     }
     
-    // Extract tokenomics from documentation
+    // NEW: Enhanced tokenomics and token/chain extraction from documentation
     for (const docUrl of sources.documentation || []) {
       try {
-        const res = await fetch(docUrl);
-        if (res.ok) {
-          const html = await res.text();
-          const tokenomicsData = this.extractDataFromText(html, UNIVERSAL_EXTRACTION_PATTERNS.tokenomicsData);
-          if (Object.keys(tokenomicsData).length > 0) {
-            extractedData.tokenomicsData = { ...extractedData.tokenomicsData, ...tokenomicsData };
-          }
+        console.log(`📄 Extracting data from documentation: ${docUrl}`);
+        const extractedDocData = await this.extractFromDocumentation(docUrl, projectName);
+        
+        if (extractedDocData.tokenomics && Object.keys(extractedDocData.tokenomics).length > 0) {
+          extractedData.tokenomicsData = { ...extractedData.tokenomicsData, ...extractedDocData.tokenomics };
+        }
+        
+        if (extractedDocData.tokenInfo && Object.keys(extractedDocData.tokenInfo).length > 0) {
+          extractedData.tokenInfo = { ...extractedData.tokenInfo, ...extractedDocData.tokenInfo };
+        }
+        
+        if (extractedDocData.chainInfo && Object.keys(extractedDocData.chainInfo).length > 0) {
+          extractedData.chainInfo = { ...extractedData.chainInfo, ...extractedDocData.chainInfo };
         }
       } catch (e) {
-        console.log(`❌ Failed to extract tokenomics from ${docUrl}`);
+        console.log(`❌ Failed to extract from documentation ${docUrl}: ${(e as Error).message}`);
       }
     }
     
     return extractedData;
+  }
+  
+  // NEW: Enhanced documentation extraction with PDF/HTML parsing
+  private async extractFromDocumentation(docUrl: string, projectName: string): Promise<any> {
+    const extractedData: any = {
+      tokenomics: {},
+      tokenInfo: {},
+      chainInfo: {}
+    };
+    
+    try {
+      const res = await this.executeWithRetry(
+        () => fetch(docUrl),
+        `Fetching documentation from ${docUrl}`
+      );
+      
+      if (res.ok) {
+        const contentType = res.headers.get('content-type') || '';
+        let text = '';
+        
+        if (contentType.includes('pdf')) {
+          // Handle PDF
+          const buffer = await res.arrayBuffer();
+          const pdfParse = require('pdf-parse');
+          const pdfData = await pdfParse(Buffer.from(buffer));
+          text = pdfData.text;
+          console.log(`📄 Parsed PDF with ${text.length} characters`);
+        } else {
+          // Handle HTML
+          text = await res.text();
+          console.log(`📄 Parsed HTML with ${text.length} characters`);
+        }
+        
+        // Extract tokenomics using universal patterns
+        const tokenomicsData = this.extractDataFromText(text, UNIVERSAL_EXTRACTION_PATTERNS.tokenomicsData);
+        if (Object.keys(tokenomicsData).length > 0) {
+          extractedData.tokenomics = tokenomicsData;
+        }
+        
+        // NEW: Extract token and chain information
+        const tokenChainData = this.extractTokenAndChainInfo(text, projectName);
+        if (Object.keys(tokenChainData.tokenInfo).length > 0) {
+          extractedData.tokenInfo = tokenChainData.tokenInfo;
+        }
+        if (Object.keys(tokenChainData.chainInfo).length > 0) {
+          extractedData.chainInfo = tokenChainData.chainInfo;
+        }
+      }
+    } catch (e) {
+      console.log(`❌ Failed to extract from documentation ${docUrl}: ${(e as Error).message}`);
+    }
+    
+    return extractedData;
+  }
+  
+  // NEW: Extract token and chain information from text
+  private extractTokenAndChainInfo(text: string, projectName: string): any {
+    const tokenInfo: any = {};
+    const chainInfo: any = {};
+    
+    // Token name patterns
+    const tokenPatterns = [
+      /token\s*(?:name|symbol|ticker)?\s*[:\-]\s*([A-Z]{2,10})/gi,
+      /symbol\s*[:\-]\s*([A-Z]{2,10})/gi,
+      /ticker\s*[:\-]\s*([A-Z]{2,10})/gi,
+      /([A-Z]{2,10})\s*token/gi,
+      /([A-Z]{2,10})\s*coin/gi
+    ];
+    
+    for (const pattern of tokenPatterns) {
+      const matches = text.match(pattern);
+      if (matches && matches.length > 0) {
+        for (const match of matches) {
+          const tokenSymbol = match.replace(/[^A-Z]/g, '');
+          if (tokenSymbol.length >= 2 && tokenSymbol.length <= 10) {
+            tokenInfo.symbol = tokenSymbol;
+            console.log(`✅ Found token symbol: ${tokenSymbol}`);
+            break;
+          }
+        }
+        if (tokenInfo.symbol) break;
+      }
+    }
+    
+    // Chain/network patterns
+    const chainPatterns = [
+      /(ethereum|eth|ethereum\s*mainnet)/gi,
+      /(binance\s*smart\s*chain|bsc)/gi,
+      /(polygon|matic)/gi,
+      /(avalanche|avax)/gi,
+      /(solana|sol)/gi,
+      /(ronin|ronin\s*network)/gi,
+      /(arbitrum|arb)/gi,
+      /(optimism|op)/gi,
+      /(base)/gi,
+      /(polygon\s*zkevm)/gi
+    ];
+    
+    for (const pattern of chainPatterns) {
+      const matches = text.match(pattern);
+      if (matches && matches.length > 0) {
+        const chainName = matches[0].toLowerCase();
+        chainInfo.network = chainName;
+        console.log(`✅ Found blockchain network: ${chainName}`);
+        break;
+      }
+    }
+    
+    // Contract address patterns
+    const contractPatterns = [
+      /0x[a-fA-F0-9]{40}/g, // Ethereum-style addresses
+      /[A-Za-z0-9]{32,44}/g // Other blockchain addresses
+    ];
+    
+    for (const pattern of contractPatterns) {
+      const matches = text.match(pattern);
+      if (matches && matches.length > 0) {
+        // Validate it's likely a contract address
+        const address = matches[0];
+        if (address.length >= 32 && address.length <= 44) {
+          tokenInfo.contractAddress = address;
+          console.log(`✅ Found contract address: ${address}`);
+          break;
+        }
+      }
+    }
+    
+    // Total supply patterns
+    const supplyPatterns = [
+      /total\s*supply\s*[:\-]\s*([0-9,]+)/gi,
+      /max\s*supply\s*[:\-]\s*([0-9,]+)/gi,
+      /supply\s*[:\-]\s*([0-9,]+)/gi
+    ];
+    
+    for (const pattern of supplyPatterns) {
+      const matches = text.match(pattern);
+      if (matches && matches.length > 0) {
+        const supply = matches[1].replace(/,/g, '');
+        tokenInfo.totalSupply = supply;
+        console.log(`✅ Found total supply: ${supply}`);
+        break;
+      }
+    }
+    
+    return { tokenInfo, chainInfo };
   }
   
   // NEW: Dynamic scoring adjustment for established projects
@@ -1549,18 +2161,89 @@ export async function conductAIOrchestratedResearch(
   const orchestrator = new AIResearchOrchestrator(anthropicApiKey);
   const findings: ResearchFindings = {};
   
+  console.log(`🚀 Starting AI-orchestrated research for: ${projectName}`);
+  
   // NEW: Check for cached data first
   const updateCheck = await orchestrator.checkForUpdates(projectName);
   console.log(`Update check for ${projectName}:`, updateCheck);
   
   // Phase 1: Get AI research strategy
+  console.log(`📋 Phase 1: Generating research plan for ${projectName}`);
   const researchPlan = await orchestrator.generateResearchPlan(projectName, basicInfo);
+  console.log(`✅ Research plan generated with ${researchPlan.prioritySources.length} priority sources`);
   
   const startTime = Date.now();
   let shouldContinue = true;
   let adaptiveState: AdaptiveResearchState | null = null;
   
+  // NEW: Phase 1.5: Universal source discovery before AI-guided collection
+  console.log(`🔍 Phase 1.5: Universal source discovery for ${projectName}`);
+  const discoveredSources = await orchestrator['discoverUniversalSources'](projectName, researchPlan.searchAliases);
+  
+  // Extract data from discovered sources
+  if (Object.values(discoveredSources).some((sources: any) => Array.isArray(sources) && sources.length > 0)) {
+    console.log(`📄 Extracting data from discovered sources for ${projectName}`);
+    const extractedData = await orchestrator['extractDataFromSources'](discoveredSources, projectName);
+    
+    // Map extracted data to findings
+    if (extractedData.tokenInfo && Object.keys(extractedData.tokenInfo).length > 0) {
+      findings.token_info = {
+        found: true,
+        data: extractedData.tokenInfo,
+        quality: 'high' as const,
+        timestamp: new Date(),
+        dataPoints: Object.keys(extractedData.tokenInfo).length
+      };
+      console.log(`✅ Found token info:`, extractedData.tokenInfo);
+    }
+    
+    if (extractedData.chainInfo && Object.keys(extractedData.chainInfo).length > 0) {
+      findings.onchain_data = {
+        found: true,
+        data: { ...findings.onchain_data?.data, ...extractedData.chainInfo },
+        quality: 'high' as const,
+        timestamp: new Date(),
+        dataPoints: (findings.onchain_data?.dataPoints || 0) + Object.keys(extractedData.chainInfo).length
+      };
+      console.log(`✅ Found chain info:`, extractedData.chainInfo);
+    }
+    
+    if (extractedData.tokenomicsData && Object.keys(extractedData.tokenomicsData).length > 0) {
+      findings.financial_data = {
+        found: true,
+        data: { ...findings.financial_data?.data, ...extractedData.tokenomicsData },
+        quality: 'high' as const,
+        timestamp: new Date(),
+        dataPoints: (findings.financial_data?.dataPoints || 0) + Object.keys(extractedData.tokenomicsData).length
+      };
+      console.log(`✅ Found tokenomics data:`, extractedData.tokenomicsData);
+    }
+    
+    if (extractedData.teamInfo && Object.keys(extractedData.teamInfo).length > 0) {
+      findings.team_info = {
+        found: true,
+        data: { ...findings.team_info?.data, ...extractedData.teamInfo },
+        quality: 'medium' as const,
+        timestamp: new Date(),
+        dataPoints: (findings.team_info?.dataPoints || 0) + Object.keys(extractedData.teamInfo).length
+      };
+      console.log(`✅ Found team info:`, extractedData.teamInfo);
+    }
+    
+    if (extractedData.securityAudits && Object.keys(extractedData.securityAudits).length > 0) {
+      findings.security_audit = {
+        found: true,
+        data: { ...findings.security_audit?.data, ...extractedData.securityAudits },
+        quality: 'high' as const,
+        timestamp: new Date(),
+        dataPoints: (findings.security_audit?.dataPoints || 0) + Object.keys(extractedData.securityAudits).length
+      };
+      console.log(`✅ Found security audit data:`, extractedData.securityAudits);
+    }
+  }
+  
   // Phase 2: Execute research with AI adaptation and caching
+  console.log(`📊 Phase 2: AI-guided data collection for ${projectName}`);
   for (const prioritySource of researchPlan.prioritySources) {
     if (!shouldContinue) break;
     
@@ -1571,10 +2254,11 @@ export async function conductAIOrchestratedResearch(
     let sourceData;
     
     if (cachedData) {
-      console.log(`Using cached data for ${prioritySource.source}`);
+      console.log(`📦 Using cached data for ${prioritySource.source}`);
       sourceData = cachedData;
     } else {
       // Collect data from this source using REAL data collection functions with retry
+      console.log(`🔍 Collecting data for ${prioritySource.source}`);
       sourceData = await orchestrator['executeWithRetry'](
         () => collectFromSourceWithRealFunctions(
           prioritySource.source, 
@@ -1590,6 +2274,7 @@ export async function conductAIOrchestratedResearch(
       if (sourceData.found) {
         const confidence = sourceData.quality === 'high' ? 85 : sourceData.quality === 'medium' ? 70 : 50;
         orchestrator['setCachedData'](projectName, prioritySource.source, sourceData, confidence);
+        console.log(`💾 Cached data for ${prioritySource.source} with confidence ${confidence}`);
       }
     }
     
@@ -1598,12 +2283,13 @@ export async function conductAIOrchestratedResearch(
     // NEW: Check confidence threshold before continuing
     const thresholdCheck = orchestrator.shouldPassToSecondAI(findings);
     if (!thresholdCheck.shouldPass && Object.keys(findings).length >= 3) {
-      console.log(`Confidence threshold not met: ${thresholdCheck.reason}`);
+      console.log(`⚠️ Confidence threshold not met: ${thresholdCheck.reason}`);
       console.log(`Missing for threshold: ${thresholdCheck.missingForThreshold.join(', ')}`);
     }
     
     // Every 2 sources, check with AI if we should continue
     if (Object.keys(findings).length % 2 === 0) {
+      console.log(`🤖 Adapting research strategy after ${Object.keys(findings).length} sources`);
       adaptiveState = await orchestrator.adaptResearchStrategy(
         researchPlan, 
         findings, 
@@ -1613,16 +2299,23 @@ export async function conductAIOrchestratedResearch(
       shouldContinue = adaptiveState.shouldContinue;
       
       if (!shouldContinue) {
+        console.log(`🛑 Research stopped by AI adaptation`);
         break;
       }
     }
   }
   
   // Phase 3: Final completeness check with confidence threshold
+  console.log(`📋 Phase 3: Assessing research completeness for ${projectName}`);
   const completeness = await orchestrator.assessResearchCompleteness(researchPlan, findings);
   const thresholdCheck = orchestrator.shouldPassToSecondAI(findings);
   
+  console.log(`📊 Final assessment - Confidence: ${thresholdCheck.confidenceScore}%, Complete: ${completeness.isComplete}`);
+  console.log(`📋 Gaps identified: ${completeness.gaps.length}`);
+  console.log(`💡 Recommendations: ${completeness.recommendations.length}`);
+  
   if (!completeness.isComplete || !thresholdCheck.shouldPass) {
+    console.log(`❌ Research incomplete or below threshold`);
     return {
       success: false,
       reason: thresholdCheck.shouldPass 
@@ -1631,21 +2324,25 @@ export async function conductAIOrchestratedResearch(
       gaps: completeness.gaps,
       recommendations: completeness.recommendations,
       researchPlan,
-      findings
+      findings,
+      discoveredSources // NEW: Include discovered sources for debugging
     };
   }
   
+  console.log(`✅ Research completed successfully for ${projectName}`);
   return {
     success: true,
     findings,
     researchPlan,
     completeness,
     adaptiveState,
-    meta: {
-      timeSpent: Math.floor((Date.now() - startTime) / 60000),
-      sourcesCollected: Object.keys(findings).filter(k => findings[k]?.found).length,
-      aiConfidence: completeness.confidence
-    }
+    discoveredSources, // NEW: Include discovered sources
+          meta: {
+        timeSpent: Math.floor((Date.now() - startTime) / 60000),
+        sourcesCollected: Object.keys(findings).filter(k => findings[k]?.found).length,
+        aiConfidence: completeness.confidence,
+        universalSourcesFound: Object.values(discoveredSources).reduce((sum: number, sources: any) => sum + (Array.isArray(sources) ? sources.length : 0), 0)
+      }
   };
 }
 

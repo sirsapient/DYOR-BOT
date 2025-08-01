@@ -824,53 +824,7 @@ function App() {
       }}>
         
         {/* Quick Search Buttons */}
-        <div style={{ 
-          display: 'flex', 
-          gap: '8px', 
-          marginBottom: '8px',
-          flexWrap: 'wrap',
-          justifyContent: 'center'
-        }}>
-          <button
-            type="button"
-            onClick={() => {
-              setProjectName('Axie Infinity');
-              setSelectedNetwork('ronin');
-              setRoninContractAddress('0x97a9107c1793bc407d6f527b77e7fff4d812bece');
-            }}
-            style={{
-              padding: '6px 12px',
-              borderRadius: '4px',
-              border: '1px solid #4a90e2',
-              backgroundColor: '#f0f8ff',
-              color: '#4a90e2',
-              fontSize: '14px',
-              cursor: 'pointer'
-            }}
-          >
-            🔍 Axie Infinity (Ronin)
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setProjectName('Axie Infinity');
-              setSelectedNetwork('auto');
-              setContractAddress('');
-              setRoninContractAddress('0x97a9107c1793bc407d6f527b77e7fff4d812bece');
-            }}
-            style={{
-              padding: '6px 12px',
-              borderRadius: '4px',
-              border: '1px solid #28a745',
-              backgroundColor: '#f8fff8',
-              color: '#28a745',
-              fontSize: '14px',
-              cursor: 'pointer'
-            }}
-          >
-            🔍 Axie Infinity (Auto)
-          </button>
-        </div>
+
         <div style={{ 
           display: 'flex', 
           alignItems: 'center', 
@@ -911,143 +865,7 @@ function App() {
           </button>
         </div>
 
-        {/* Network Selection */}
-        <div style={{ 
-          marginBottom: '12px',
-          width: '100%',
-          maxWidth: 500
-        }}>
-          <label style={{ 
-            display: 'block', 
-            marginBottom: '4px', 
-            fontSize: '14px', 
-            fontWeight: 500,
-            textAlign: 'left'
-          }}>
-            Network (Optional):
-          </label>
-          <div style={{ 
-            display: 'flex', 
-            gap: '8px', 
-            alignItems: 'center',
-            flexWrap: 'wrap'
-          }}>
-            <select
-              value={selectedNetwork}
-              onChange={e => setSelectedNetwork(e.target.value as 'auto' | 'ethereum' | 'ronin' | 'avalanche')}
-              style={{ 
-                padding: '6px 8px', 
-                borderRadius: '4px', 
-                border: '1px solid #ddd',
-                fontSize: '14px'
-              }}
-            >
-              <option value="auto">Auto-detect</option>
-              <option value="ethereum">Ethereum</option>
-              <option value="ronin">Ronin Network</option>
-              <option value="avalanche">Avalanche Network</option>
-            </select>
-            
-            {selectedNetwork === 'ethereum' && (
-              <input
-                type="text"
-                value={contractAddress}
-                onChange={e => setContractAddress(e.target.value)}
-                placeholder="Ethereum contract address (0x...)"
-                style={{ 
-                  flex: 1, 
-                  padding: '6px 8px', 
-                  borderRadius: '4px', 
-                  border: '1px solid #ddd',
-                  fontSize: '14px'
-                }}
-              />
-            )}
-            
-            {selectedNetwork === 'ronin' && (
-              <input
-                type="text"
-                value={roninContractAddress}
-                onChange={e => setRoninContractAddress(e.target.value)}
-                placeholder="Ronin contract address (0x...)"
-                style={{ 
-                  flex: 1, 
-                  padding: '6px 8px', 
-                  borderRadius: '4px', 
-                  border: '1px solid #ddd',
-                  fontSize: '14px'
-                }}
-              />
-            )}
-            
-            {selectedNetwork === 'avalanche' && (
-              <input
-                type="text"
-                value={avalancheContractAddress}
-                onChange={e => setAvalancheContractAddress(e.target.value)}
-                placeholder="Avalanche contract address (0x...)"
-                style={{ 
-                  flex: 1, 
-                  padding: '6px 8px', 
-                  borderRadius: '4px', 
-                  border: '1px solid #ddd',
-                  fontSize: '14px'
-                }}
-              />
-            )}
-            
-            {selectedNetwork === 'auto' && (
-              <div style={{ 
-                display: 'flex', 
-                gap: '8px', 
-                flex: 1,
-                flexWrap: 'wrap'
-              }}>
-                <input
-                  type="text"
-                  value={contractAddress}
-                  onChange={e => setContractAddress(e.target.value)}
-                  placeholder="Ethereum contract (optional)"
-                  style={{ 
-                    flex: 1, 
-                    padding: '6px 8px', 
-                    borderRadius: '4px', 
-                    border: '1px solid #ddd',
-                    fontSize: '14px',
-                    minWidth: '200px'
-                  }}
-                />
-                <input
-                  type="text"
-                  value={roninContractAddress}
-                  onChange={e => setRoninContractAddress(e.target.value)}
-                  placeholder="Ronin contract (optional)"
-                  style={{ 
-                    flex: 1, 
-                    padding: '6px 8px', 
-                    borderRadius: '4px', 
-                    border: '1px solid #ddd',
-                    fontSize: '14px',
-                    minWidth: '200px'
-                  }}
-                />
-                <input
-                  type="text"
-                  value={avalancheContractAddress}
-                  onChange={e => setAvalancheContractAddress(e.target.value)}
-                  placeholder="Avalanche contract (optional)"
-                  style={{ 
-                    flex: 1, 
-                    padding: '6px 8px', 
-                    borderRadius: '4px', 
-                    border: '1px solid #ddd',
-                    fontSize: '14px',
-                    minWidth: '200px'
-                  }}
-                />
-              </div>
-            )}
-          </div>
+
 
           {/* NEW: Enhanced Research Options */}
           <div style={{ marginTop: 16 }}>
@@ -1083,7 +901,6 @@ function App() {
               />
             </div>
           )}
-        </div>
       </form>
       <div style={{
         background: '#f5f5f5',
