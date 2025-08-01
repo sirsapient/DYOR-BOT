@@ -1237,7 +1237,7 @@ app.get('/api/cache-status', async (req: any, res: any) => {
 
 // Traditional research method (fallback)
 async function performTraditionalResearch(req: any, res: any) {
-  const { projectName, tokenSymbol, contractAddress, roninContractAddress, avalancheContractAddress } = req.body;
+  const { projectName, tokenSymbol, contractAddress, roninContractAddress, avalancheContractAddress, selectedNetwork } = req.body;
   
   // --- Alias collection logic ---
   let aliases = [projectName];
@@ -1248,6 +1248,11 @@ async function performTraditionalResearch(req: any, res: any) {
   const sourcesUsed = [];
   let cgData = null, igdbData = null, steamData = null, discordData = null, etherscanData = null, solscanData = null, snowtraceData = null, youtubeData = null, aiSummary = null, nftData = null, preLaunch = false, devTimeYears = null, fundingType = 'unknown', tokenomics = {}, steamReviewSummary = '', githubRepo = null, githubStats = null, steamChartsSummary = '', redditSummary = '', openseaSummary = '', magicEdenSummary = '', crunchbaseSummary = '', duneSummary = '', securitySummary = '', reviewSummary = '', linkedinSummary = '', glassdoorSummary = '', twitterSummary = '', blogSummary = '', telegramSummary = '';
   let roninTokenInfo = null;
+
+  // Determine which networks to query based on selectedNetwork
+  const shouldQueryEthereum = !selectedNetwork || selectedNetwork === 'auto' || selectedNetwork === 'ethereum';
+  const shouldQueryRonin = !selectedNetwork || selectedNetwork === 'auto' || selectedNetwork === 'ronin';
+  const shouldQueryAvalanche = !selectedNetwork || selectedNetwork === 'auto' || selectedNetwork === 'avalanche';
 
   // Enhanced CoinGecko fetch
   try {
@@ -1532,16 +1537,17 @@ async function performTraditionalResearch(req: any, res: any) {
   }
 
   // --- Etherscan data fetch ---
-  let ethAddress = null;
-  if (contractAddress) {
-    ethAddress = contractAddress;
-  } else if (cgData && cgData.contracts && cgData.contracts.ethereum) {
-    ethAddress = cgData.contracts.ethereum;
-  } else if (cgData && cgData.platforms && cgData.platforms.ethereum) {
-    ethAddress = cgData.platforms.ethereum;
-  }
+  if (shouldQueryEthereum) {
+    let ethAddress = null;
+    if (contractAddress) {
+      ethAddress = contractAddress;
+    } else if (cgData && cgData.contracts && cgData.contracts.ethereum) {
+      ethAddress = cgData.contracts.ethereum;
+    } else if (cgData && cgData.platforms && cgData.platforms.ethereum) {
+      ethAddress = cgData.platforms.ethereum;
+    }
 
-  if (ethAddress && process.env.ETHERSCAN_API_KEY) {
+    if (ethAddress && process.env.ETHERSCAN_API_KEY) {
     try {
       const etherscanRes = await fetch(`https://api.etherscan.io/api?module=contract&action=getabi&address=${ethAddress}&apikey=${process.env.ETHERSCAN_API_KEY}`);
       if (etherscanRes.ok) {
@@ -1554,6 +1560,7 @@ async function performTraditionalResearch(req: any, res: any) {
     } catch (e) {
       etherscanData = { error: 'Etherscan fetch failed' };
     }
+  }
   }
 
   // --- Solscan data fetch ---
@@ -1578,14 +1585,15 @@ async function performTraditionalResearch(req: any, res: any) {
   }
 
   // --- Snowtrace (Avalanche) data fetch ---
-  let avaxAddress = null;
-  if (avalancheContractAddress) {
-    avaxAddress = avalancheContractAddress;
-  } else if (cgData && cgData.platforms && cgData.platforms.avalanche) {
-    avaxAddress = cgData.platforms.avalanche;
-  }
+  if (shouldQueryAvalanche) {
+    let avaxAddress = null;
+    if (avalancheContractAddress) {
+      avaxAddress = avalancheContractAddress;
+    } else if (cgData && cgData.platforms && cgData.platforms.avalanche) {
+      avaxAddress = cgData.platforms.avalanche;
+    }
 
-  if (avaxAddress) {
+    if (avaxAddress) {
     try {
       // Fetch Avalanche token data using Snowtrace API
       const snowtraceRes = await fetch(`https://api.snowtrace.io/api?module=contract&action=getabi&address=${avaxAddress}&apikey=${process.env.SNOWTRACE_API_KEY || ''}`);
@@ -1612,16 +1620,18 @@ async function performTraditionalResearch(req: any, res: any) {
       snowtraceData = { error: 'Snowtrace fetch failed' };
     }
   }
-
-  // --- Ronin Network data fetch ---
-  let roninAddress = null;
-  if (roninContractAddress) {
-    roninAddress = roninContractAddress;
-  } else if (cgData && cgData.platforms && cgData.platforms.ronin) {
-    roninAddress = cgData.platforms.ronin;
   }
 
-  if (roninAddress) {
+  // --- Ronin Network data fetch ---
+  if (shouldQueryRonin) {
+    let roninAddress = null;
+    if (roninContractAddress) {
+      roninAddress = roninContractAddress;
+    } else if (cgData && cgData.platforms && cgData.platforms.ronin) {
+      roninAddress = cgData.platforms.ronin;
+    }
+
+    if (roninAddress) {
     try {
 
       
@@ -1646,6 +1656,7 @@ async function performTraditionalResearch(req: any, res: any) {
 
       roninTokenInfo = { error: 'Ronin fetch failed' };
     }
+  }
   }
 
   // --- YouTube data fetch ---

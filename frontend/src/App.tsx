@@ -259,6 +259,481 @@ function DataSourcesGrid({ research }: { research: ProjectResearch }) {
   );
 }
 
+// Analysis Card Component
+function AnalysisCard({ 
+  title, 
+  icon, 
+  color, 
+  summary, 
+  children, 
+  dataPoints = 0,
+  status = 'available'
+}: { 
+  title: string; 
+  icon: string; 
+  color: string; 
+  summary: string; 
+  children: React.ReactNode; 
+  dataPoints?: number;
+  status?: 'available' | 'limited' | 'not-found';
+}) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  
+  const getStatusColor = () => {
+    switch (status) {
+      case 'available': return color;
+      case 'limited': return '#ffc107';
+      case 'not-found': return '#6c757d';
+      default: return color;
+    }
+  };
+  
+  const getStatusText = () => {
+    switch (status) {
+      case 'available': return `${dataPoints} data points`;
+      case 'limited': return `${dataPoints} data points - Limited`;
+      case 'not-found': return 'Not found';
+      default: return `${dataPoints} data points`;
+    }
+  };
+  
+  return (
+    <div style={{
+      border: `2px solid ${getStatusColor()}40`,
+      borderRadius: '12px',
+      backgroundColor: status === 'not-found' ? '#f8f9fa' : '#fff',
+      overflow: 'hidden',
+      transition: 'all 0.3s ease',
+      boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+      cursor: 'pointer'
+    }}
+    onClick={() => setIsExpanded(!isExpanded)}
+    onMouseEnter={(e) => {
+      e.currentTarget.style.transform = 'translateY(-2px)';
+      e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.15)';
+    }}
+    onMouseLeave={(e) => {
+      e.currentTarget.style.transform = 'translateY(0)';
+      e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
+    }}
+    >
+      <div style={{
+        padding: '16px',
+        textAlign: 'center'
+      }}>
+        <div style={{ fontSize: '24px', marginBottom: '8px' }}>{icon}</div>
+        <div style={{ 
+          fontWeight: '600', 
+          fontSize: '14px', 
+          color: status === 'not-found' ? '#6c757d' : '#333',
+          marginBottom: '4px'
+        }}>
+          {title}
+        </div>
+        <div style={{ 
+          fontSize: '12px', 
+          color: getStatusColor(),
+          fontWeight: '500',
+          marginBottom: '8px'
+        }}>
+          {getStatusText()}
+        </div>
+        <div style={{
+          fontSize: '12px',
+          color: '#6c757d',
+          lineHeight: '1.4',
+          maxHeight: '40px',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          display: '-webkit-box',
+          WebkitLineClamp: 2,
+          WebkitBoxOrient: 'vertical'
+        }}>
+          {summary}
+        </div>
+      </div>
+      
+      {isExpanded && (
+        <div style={{
+          borderTop: `1px solid ${getStatusColor()}20`,
+          backgroundColor: '#fafbfc',
+          padding: '16px'
+        }}>
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Analysis Grid Component
+function AnalysisGrid({ research }: { research: ProjectResearch }) {
+  const analysisSections = [
+    {
+      title: 'AI Analysis Summary',
+      icon: '🤖',
+      color: '#6f42c1',
+      status: research.aiSummary ? ('available' as const) : ('not-found' as const),
+      dataPoints: research.aiSummary ? 1 : 0,
+      summary: research.aiSummary ? 
+        research.aiSummary.substring(0, 100) + (research.aiSummary.length > 100 ? '...' : '') : 
+        'No AI analysis available',
+      content: research.aiSummary && (
+        <div className="markdown-content">
+          <ReactMarkdown>{research.aiSummary}</ReactMarkdown>
+        </div>
+      )
+    },
+    {
+      title: 'Key Findings',
+      icon: '🔍',
+      color: '#28a745',
+      status: (research.keyFindings.positives.length > 0 || 
+               research.keyFindings.negatives.length > 0 || 
+               research.keyFindings.redFlags.length > 0) ? ('available' as const) : ('not-found' as const),
+      dataPoints: research.keyFindings.positives.length + 
+                  research.keyFindings.negatives.length + 
+                  research.keyFindings.redFlags.length,
+      summary: `Positive: ${research.keyFindings.positives.length}, Negative: ${research.keyFindings.negatives.length}, Red Flags: ${research.keyFindings.redFlags.length}`,
+      content: (research.keyFindings.positives.length > 0 || 
+                research.keyFindings.negatives.length > 0 || 
+                research.keyFindings.redFlags.length > 0) && (
+        <div style={{ display: 'grid', gap: '16px' }}>
+          {research.keyFindings.positives.length > 0 && (
+            <div style={{
+              padding: '16px',
+              backgroundColor: '#d4edda',
+              border: '1px solid #c3e6cb',
+              borderRadius: '8px'
+            }}>
+              <h5 style={{ color: '#155724', margin: '0 0 12px 0' }}>✅ Positive Aspects</h5>
+              <ul style={{ margin: 0, paddingLeft: '20px', color: '#155724' }}>
+                {research.keyFindings.positives.map((p, i) => <li key={i}>{p}</li>)}
+              </ul>
+            </div>
+          )}
+          
+          {research.keyFindings.negatives.length > 0 && (
+            <div style={{
+              padding: '16px',
+              backgroundColor: '#fff3cd',
+              border: '1px solid #ffeaa7',
+              borderRadius: '8px'
+            }}>
+              <h5 style={{ color: '#856404', margin: '0 0 12px 0' }}>⚠️ Negative Aspects</h5>
+              <ul style={{ margin: 0, paddingLeft: '20px', color: '#856404' }}>
+                {research.keyFindings.negatives.map((n, i) => <li key={i}>{n}</li>)}
+              </ul>
+            </div>
+          )}
+          
+          {research.keyFindings.redFlags.length > 0 && (
+            <div style={{
+              padding: '16px',
+              backgroundColor: '#f8d7da',
+              border: '1px solid #f5c6cb',
+              borderRadius: '8px'
+            }}>
+              <h5 style={{ color: '#721c24', margin: '0 0 12px 0' }}>🚨 Red Flags</h5>
+              <ul style={{ margin: 0, paddingLeft: '20px', color: '#721c24' }}>
+                {research.keyFindings.redFlags.map((r, i) => <li key={i}>{r}</li>)}
+              </ul>
+            </div>
+          )}
+        </div>
+      )
+    },
+    {
+      title: 'Financial Data',
+      icon: '💰',
+      color: '#28a745',
+      status: research.financialData ? ('available' as const) : ('not-found' as const),
+      dataPoints: research.financialData ? 
+        (research.financialData.marketCap ? 1 : 0) + 
+        (research.financialData.roninTokenInfo ? 1 : 0) + 
+        (research.financialData.avalancheTokenInfo ? 1 : 0) : 0,
+      summary: research.financialData ? 
+        `Market Cap: ${research.financialData.marketCap ? '$' + research.financialData.marketCap.toLocaleString() : 'N/A'}` : 
+        'No financial data available',
+      content: research.financialData && (
+        <div style={{ display: 'grid', gap: '16px' }}>
+          {research.financialData.marketCap && (
+            <div style={{
+              padding: '16px',
+              backgroundColor: '#f8f9fa',
+              border: '1px solid #e9ecef',
+              borderRadius: '8px'
+            }}>
+              <strong>Market Cap:</strong> ${research.financialData.marketCap.toLocaleString()}
+            </div>
+          )}
+          
+          {research.financialData.roninTokenInfo && (
+            <div style={{
+              padding: '16px',
+              backgroundColor: '#f0f8ff',
+              border: '1px solid #4a90e2',
+              borderRadius: '8px'
+            }}>
+              <h5 style={{ color: '#4a90e2', margin: '0 0 12px 0' }}>🌐 Ronin Network Data</h5>
+              {research.financialData.roninTokenInfo.symbol && (
+                <p><strong>Token Symbol:</strong> {research.financialData.roninTokenInfo.symbol}</p>
+              )}
+              {research.financialData.roninTokenInfo.totalSupply && (
+                <p><strong>Total Supply:</strong> {parseInt(research.financialData.roninTokenInfo.totalSupply, 16).toLocaleString()}</p>
+              )}
+              {research.financialData.roninTokenInfo.contractAddress && (
+                <p><strong>Contract:</strong> <code style={{ fontSize: '12px' }}>{research.financialData.roninTokenInfo.contractAddress}</code></p>
+              )}
+              {research.financialData.roninTokenInfo.transactionHistory && (
+                <p><strong>Transactions:</strong> {research.financialData.roninTokenInfo.transactionHistory.transactionCount?.toLocaleString() || 'N/A'}</p>
+              )}
+            </div>
+          )}
+          
+          {research.financialData.avalancheTokenInfo && (
+            <div style={{
+              padding: '16px',
+              backgroundColor: '#f0f0ff',
+              border: '1px solid #e91e63',
+              borderRadius: '8px'
+            }}>
+              <h5 style={{ color: '#e91e63', margin: '0 0 12px 0' }}>❄️ Avalanche Network Data</h5>
+              {research.financialData.avalancheTokenInfo.symbol && (
+                <p><strong>Token Symbol:</strong> {research.financialData.avalancheTokenInfo.symbol}</p>
+              )}
+              {research.financialData.avalancheTokenInfo.tokenInfo && (
+                <>
+                  {research.financialData.avalancheTokenInfo.tokenInfo.tokenName && (
+                    <p><strong>Token Name:</strong> {research.financialData.avalancheTokenInfo.tokenInfo.tokenName}</p>
+                  )}
+                  {research.financialData.avalancheTokenInfo.tokenInfo.tokenSymbol && (
+                    <p><strong>Token Symbol:</strong> {research.financialData.avalancheTokenInfo.tokenInfo.tokenSymbol}</p>
+                  )}
+                  {research.financialData.avalancheTokenInfo.tokenInfo.totalSupply && (
+                    <p><strong>Total Supply:</strong> {parseInt(research.financialData.avalancheTokenInfo.tokenInfo.totalSupply, 16).toLocaleString()}</p>
+                  )}
+                  {research.financialData.avalancheTokenInfo.tokenInfo.decimals && (
+                    <p><strong>Decimals:</strong> {research.financialData.avalancheTokenInfo.tokenInfo.decimals}</p>
+                  )}
+                </>
+              )}
+              {research.financialData.avalancheTokenInfo.contractAddress && (
+                <p><strong>Contract:</strong> <code style={{ fontSize: '12px' }}>{research.financialData.avalancheTokenInfo.contractAddress}</code></p>
+              )}
+            </div>
+          )}
+        </div>
+      )
+    },
+    {
+      title: 'Team Analysis',
+      icon: '👥',
+      color: '#fd7e14',
+      status: research.teamAnalysis ? ('available' as const) : ('not-found' as const),
+      dataPoints: research.teamAnalysis ? 
+        (research.teamAnalysis.studioAssessment ? 1 : 0) + 
+        (research.teamAnalysis.linkedinSummary ? 1 : 0) + 
+        (research.teamAnalysis.glassdoorSummary ? 1 : 0) : 0,
+      summary: research.teamAnalysis ? 
+        `Studio: ${research.teamAnalysis.studioAssessment ? 'Yes' : 'No'}, LinkedIn: ${research.teamAnalysis.linkedinSummary ? 'Yes' : 'No'}, Reviews: ${research.teamAnalysis.glassdoorSummary ? 'Yes' : 'No'}` : 
+        'No team analysis available',
+      content: research.teamAnalysis && (
+        <div style={{ display: 'grid', gap: '16px' }}>
+          {research.teamAnalysis.studioAssessment && research.teamAnalysis.studioAssessment.length > 0 && (
+            <div style={{
+              padding: '16px',
+              backgroundColor: '#f8f9fa',
+              border: '1px solid #e9ecef',
+              borderRadius: '8px'
+            }}>
+              <h5 style={{ color: '#2c5aa0', margin: '0 0 12px 0' }}>🏢 Studio Background</h5>
+              <ul style={{ margin: 0, paddingLeft: '20px' }}>
+                {research.teamAnalysis.studioAssessment.map((studio: any, i: number) => (
+                  <li key={i}>
+                    <strong>{studio.companyName}</strong>: 
+                    {studio.isDeveloper ? ' Developer' : ''}
+                    {studio.isPublisher ? ' Publisher' : ''}
+                    {studio.firstProjectDate && studio.firstProjectDate !== 'N/A' ? 
+                      ` | First project: ${studio.firstProjectDate}` : ''}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {research.teamAnalysis.linkedinSummary && (
+            <div style={{
+              padding: '16px',
+              backgroundColor: '#f8f9fa',
+              border: '1px solid #e9ecef',
+              borderRadius: '8px'
+            }}>
+              <h5 style={{ color: '#2c5aa0', margin: '0 0 12px 0' }}>💼 LinkedIn Insights</h5>
+              <p style={{ margin: 0 }}>{research.teamAnalysis.linkedinSummary}</p>
+            </div>
+          )}
+          {research.teamAnalysis.glassdoorSummary && (
+            <div style={{
+              padding: '16px',
+              backgroundColor: '#f8f9fa',
+              border: '1px solid #e9ecef',
+              borderRadius: '8px'
+            }}>
+              <h5 style={{ color: '#2c5aa0', margin: '0 0 12px 0' }}>🏢 Company Reviews</h5>
+              <p style={{ margin: 0 }}>{research.teamAnalysis.glassdoorSummary}</p>
+            </div>
+          )}
+        </div>
+      )
+    },
+    {
+      title: 'Technical Assessment',
+      icon: '🔧',
+      color: '#6c757d',
+      status: research.technicalAssessment ? ('available' as const) : ('not-found' as const),
+      dataPoints: research.technicalAssessment ? 
+        (research.technicalAssessment.securitySummary ? 1 : 0) + 
+        (research.technicalAssessment.reviewSummary ? 1 : 0) + 
+        (research.technicalAssessment.githubRepo ? 1 : 0) : 0,
+      summary: research.technicalAssessment ? 
+        `Security: ${research.technicalAssessment.securitySummary ? 'Yes' : 'No'}, Reviews: ${research.technicalAssessment.reviewSummary ? 'Yes' : 'No'}, GitHub: ${research.technicalAssessment.githubRepo ? 'Yes' : 'No'}` : 
+        'No technical assessment available',
+      content: research.technicalAssessment && (
+        <div style={{ display: 'grid', gap: '16px' }}>
+          {research.technicalAssessment.securitySummary && (
+            <div style={{
+              padding: '16px',
+              backgroundColor: '#f8f9fa',
+              border: '1px solid #e9ecef',
+              borderRadius: '8px'
+            }}>
+              <h5 style={{ color: '#2c5aa0', margin: '0 0 12px 0' }}>🔒 Security Analysis</h5>
+              <p style={{ margin: 0 }}>{research.technicalAssessment.securitySummary}</p>
+            </div>
+          )}
+          {research.technicalAssessment.reviewSummary && (
+            <div style={{
+              padding: '16px',
+              backgroundColor: '#f8f9fa',
+              border: '1px solid #e9ecef',
+              borderRadius: '8px'
+            }}>
+              <h5 style={{ color: '#2c5aa0', margin: '0 0 12px 0' }}>📊 Review Scores</h5>
+              <p style={{ margin: 0 }}>{research.technicalAssessment.reviewSummary}</p>
+            </div>
+          )}
+          {research.technicalAssessment.githubRepo && (
+            <div style={{
+              padding: '16px',
+              backgroundColor: '#f8f9fa',
+              border: '1px solid #e9ecef',
+              borderRadius: '8px'
+            }}>
+              <h5 style={{ color: '#2c5aa0', margin: '0 0 12px 0' }}>💻 GitHub Activity</h5>
+              <p style={{ margin: 0 }}>
+                <strong>Repository:</strong> {research.technicalAssessment.githubRepo}
+                {research.technicalAssessment.githubStats && (
+                  <span> | <strong>Stats:</strong> {research.technicalAssessment.githubStats}</span>
+                )}
+              </p>
+            </div>
+          )}
+        </div>
+      )
+    },
+    {
+      title: 'Community Health',
+      icon: '👥',
+      color: '#20c997',
+      status: research.communityHealth ? ('available' as const) : ('not-found' as const),
+      dataPoints: research.communityHealth ? 
+        (research.communityHealth.twitterSummary ? 1 : 0) + 
+        (research.communityHealth.steamReviewSummary ? 1 : 0) + 
+        (research.communityHealth.discordData ? 1 : 0) + 
+        (research.communityHealth.redditSummary ? 1 : 0) : 0,
+      summary: research.communityHealth ? 
+        `Twitter: ${research.communityHealth.twitterSummary ? 'Yes' : 'No'}, Steam: ${research.communityHealth.steamReviewSummary ? 'Yes' : 'No'}, Discord: ${research.communityHealth.discordData ? 'Yes' : 'No'}, Reddit: ${research.communityHealth.redditSummary ? 'Yes' : 'No'}` : 
+        'No community health data available',
+      content: research.communityHealth && (
+        <div style={{ display: 'grid', gap: '16px' }}>
+          {research.communityHealth.twitterSummary && (
+            <div style={{
+              padding: '16px',
+              backgroundColor: '#f8f9fa',
+              border: '1px solid #e9ecef',
+              borderRadius: '8px'
+            }}>
+              <h5 style={{ color: '#2c5aa0', margin: '0 0 12px 0' }}>🐦 Twitter Activity</h5>
+              <p style={{ margin: 0 }}>{research.communityHealth.twitterSummary}</p>
+            </div>
+          )}
+          {research.communityHealth.steamReviewSummary && (
+            <div style={{
+              padding: '16px',
+              backgroundColor: '#f8f9fa',
+              border: '1px solid #e9ecef',
+              borderRadius: '8px'
+            }}>
+              <h5 style={{ color: '#2c5aa0', margin: '0 0 12px 0' }}>🎮 Steam Reviews</h5>
+              <p style={{ margin: 0 }}>{research.communityHealth.steamReviewSummary}</p>
+            </div>
+          )}
+          {research.communityHealth.discordData && research.communityHealth.discordData.server_name && (
+            <div style={{
+              padding: '16px',
+              backgroundColor: '#f8f9fa',
+              border: '1px solid #e9ecef',
+              borderRadius: '8px'
+            }}>
+              <h5 style={{ color: '#2c5aa0', margin: '0 0 12px 0' }}>💬 Discord Community</h5>
+              <p style={{ margin: 0 }}>
+                <strong>Server:</strong> {research.communityHealth.discordData.server_name}
+                {research.communityHealth.discordData.member_count && (
+                  <span> | <strong>Members:</strong> {research.communityHealth.discordData.member_count.toLocaleString()}</span>
+                )}
+              </p>
+            </div>
+          )}
+          {research.communityHealth.redditSummary && (
+            <div style={{
+              padding: '16px',
+              backgroundColor: '#f8f9fa',
+              border: '1px solid #e9ecef',
+              borderRadius: '8px'
+            }}>
+              <h5 style={{ color: '#2c5aa0', margin: '0 0 12px 0' }}>📱 Reddit Community</h5>
+              <p style={{ margin: 0 }}>{research.communityHealth.redditSummary}</p>
+            </div>
+          )}
+        </div>
+      )
+    }
+  ];
+  
+  return (
+    <div style={{
+      display: 'grid',
+      gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+      gap: '16px',
+      marginBottom: '24px'
+    }}>
+      {analysisSections.map((section, index) => (
+        <AnalysisCard
+          key={index}
+          title={section.title}
+          icon={section.icon}
+          color={section.color}
+          summary={section.summary}
+          dataPoints={section.dataPoints}
+          status={section.status}
+        >
+          {section.content}
+        </AnalysisCard>
+      ))}
+    </div>
+  );
+}
+
 function App() {
   const [projectName, setProjectName] = useState('');
   const [research, setResearch] = useState<ProjectResearch | null>(null);
@@ -281,7 +756,10 @@ function App() {
       const endpoint = useEnhancedResearch ? '/api/research-enhanced' : '/api/research';
       const fullUrl = `${apiUrl}${endpoint}`;
       
-      const requestBody: any = { projectName };
+      const requestBody: any = { 
+        projectName,
+        selectedNetwork // Send the selected network to the backend
+      };
       
       // Add network-specific contract addresses
       if (selectedNetwork === 'ethereum' && contractAddress) {
@@ -688,295 +1166,8 @@ function App() {
           {/* Data Sources Grid */}
           <DataSourcesGrid research={research} />
 
-          {/* AI Analysis Summary */}
-          {research.aiSummary && !research.aiSummary.startsWith('Anthropic:') && (
-            <ExpandableSection title="AI Analysis Summary" icon="🤖" color="#6f42c1">
-              <div className="markdown-content">
-                <ReactMarkdown>{research.aiSummary}</ReactMarkdown>
-              </div>
-            </ExpandableSection>
-          )}
-
-          {/* Key Findings */}
-          {(research.keyFindings.positives.length > 0 || 
-            research.keyFindings.negatives.length > 0 || 
-            research.keyFindings.redFlags.length > 0) && (
-            <ExpandableSection title="Key Findings" icon="🔍" color="#28a745">
-              <div style={{ display: 'grid', gap: '16px' }}>
-                {research.keyFindings.positives.length > 0 && (
-                  <div style={{
-                    padding: '16px',
-                    backgroundColor: '#d4edda',
-                    border: '1px solid #c3e6cb',
-                    borderRadius: '8px'
-                  }}>
-                    <h5 style={{ color: '#155724', margin: '0 0 12px 0' }}>✅ Positive Aspects</h5>
-                    <ul style={{ margin: 0, paddingLeft: '20px', color: '#155724' }}>
-                      {research.keyFindings.positives.map((p, i) => <li key={i}>{p}</li>)}
-                    </ul>
-                  </div>
-                )}
-                
-                {research.keyFindings.negatives.length > 0 && (
-                  <div style={{
-                    padding: '16px',
-                    backgroundColor: '#fff3cd',
-                    border: '1px solid #ffeaa7',
-                    borderRadius: '8px'
-                  }}>
-                    <h5 style={{ color: '#856404', margin: '0 0 12px 0' }}>⚠️ Negative Aspects</h5>
-                    <ul style={{ margin: 0, paddingLeft: '20px', color: '#856404' }}>
-                      {research.keyFindings.negatives.map((n, i) => <li key={i}>{n}</li>)}
-                    </ul>
-                  </div>
-                )}
-                
-                {research.keyFindings.redFlags.length > 0 && (
-                  <div style={{
-                    padding: '16px',
-                    backgroundColor: '#f8d7da',
-                    border: '1px solid #f5c6cb',
-                    borderRadius: '8px'
-                  }}>
-                    <h5 style={{ color: '#721c24', margin: '0 0 12px 0' }}>🚨 Red Flags</h5>
-                    <ul style={{ margin: 0, paddingLeft: '20px', color: '#721c24' }}>
-                      {research.keyFindings.redFlags.map((r, i) => <li key={i}>{r}</li>)}
-                    </ul>
-                  </div>
-                )}
-              </div>
-            </ExpandableSection>
-          )}
-
-          {/* Financial Data */}
-          {research.financialData && (
-            <ExpandableSection title="Financial Data" icon="💰" color="#28a745">
-              <div style={{ display: 'grid', gap: '16px' }}>
-                {research.financialData.marketCap && (
-                  <div style={{
-                    padding: '16px',
-                    backgroundColor: '#f8f9fa',
-                    border: '1px solid #e9ecef',
-                    borderRadius: '8px'
-                  }}>
-                    <strong>Market Cap:</strong> ${research.financialData.marketCap.toLocaleString()}
-                  </div>
-                )}
-                
-                {/* Ronin Network Data */}
-                {research.financialData.roninTokenInfo && (
-                  <div style={{
-                    padding: '16px',
-                    backgroundColor: '#f0f8ff',
-                    border: '1px solid #4a90e2',
-                    borderRadius: '8px'
-                  }}>
-                    <h5 style={{ color: '#4a90e2', margin: '0 0 12px 0' }}>🌐 Ronin Network Data</h5>
-                    {research.financialData.roninTokenInfo.symbol && (
-                      <p><strong>Token Symbol:</strong> {research.financialData.roninTokenInfo.symbol}</p>
-                    )}
-                    {research.financialData.roninTokenInfo.totalSupply && (
-                      <p><strong>Total Supply:</strong> {parseInt(research.financialData.roninTokenInfo.totalSupply, 16).toLocaleString()}</p>
-                    )}
-                    {research.financialData.roninTokenInfo.contractAddress && (
-                      <p><strong>Contract:</strong> <code style={{ fontSize: '12px' }}>{research.financialData.roninTokenInfo.contractAddress}</code></p>
-                    )}
-                    {research.financialData.roninTokenInfo.transactionHistory && (
-                      <p><strong>Transactions:</strong> {research.financialData.roninTokenInfo.transactionHistory.transactionCount?.toLocaleString() || 'N/A'}</p>
-                    )}
-                  </div>
-                )}
-                
-                {/* Avalanche Network Data */}
-                {research.financialData.avalancheTokenInfo && (
-                  <div style={{
-                    padding: '16px',
-                    backgroundColor: '#f0f0ff',
-                    border: '1px solid #e91e63',
-                    borderRadius: '8px'
-                  }}>
-                    <h5 style={{ color: '#e91e63', margin: '0 0 12px 0' }}>❄️ Avalanche Network Data</h5>
-                    {research.financialData.avalancheTokenInfo.symbol && (
-                      <p><strong>Token Symbol:</strong> {research.financialData.avalancheTokenInfo.symbol}</p>
-                    )}
-                    {research.financialData.avalancheTokenInfo.tokenInfo && (
-                      <>
-                        {research.financialData.avalancheTokenInfo.tokenInfo.tokenName && (
-                          <p><strong>Token Name:</strong> {research.financialData.avalancheTokenInfo.tokenInfo.tokenName}</p>
-                        )}
-                        {research.financialData.avalancheTokenInfo.tokenInfo.tokenSymbol && (
-                          <p><strong>Token Symbol:</strong> {research.financialData.avalancheTokenInfo.tokenInfo.tokenSymbol}</p>
-                        )}
-                        {research.financialData.avalancheTokenInfo.tokenInfo.totalSupply && (
-                          <p><strong>Total Supply:</strong> {parseInt(research.financialData.avalancheTokenInfo.tokenInfo.totalSupply, 16).toLocaleString()}</p>
-                        )}
-                        {research.financialData.avalancheTokenInfo.tokenInfo.decimals && (
-                          <p><strong>Decimals:</strong> {research.financialData.avalancheTokenInfo.tokenInfo.decimals}</p>
-                        )}
-                      </>
-                    )}
-                    {research.financialData.avalancheTokenInfo.contractAddress && (
-                      <p><strong>Contract:</strong> <code style={{ fontSize: '12px' }}>{research.financialData.avalancheTokenInfo.contractAddress}</code></p>
-                    )}
-                  </div>
-                )}
-              </div>
-            </ExpandableSection>
-          )}
-
-          {/* Team Analysis */}
-          {research.teamAnalysis && (
-            <ExpandableSection title="Team Analysis" icon="👥" color="#fd7e14">
-              <div style={{ display: 'grid', gap: '16px' }}>
-                {research.teamAnalysis.studioAssessment && research.teamAnalysis.studioAssessment.length > 0 && (
-                  <div style={{
-                    padding: '16px',
-                    backgroundColor: '#f8f9fa',
-                    border: '1px solid #e9ecef',
-                    borderRadius: '8px'
-                  }}>
-                    <h5 style={{ color: '#2c5aa0', margin: '0 0 12px 0' }}>🏢 Studio Background</h5>
-                    <ul style={{ margin: 0, paddingLeft: '20px' }}>
-                      {research.teamAnalysis.studioAssessment.map((studio: any, i: number) => (
-                        <li key={i}>
-                          <strong>{studio.companyName}</strong>: 
-                          {studio.isDeveloper ? ' Developer' : ''}
-                          {studio.isPublisher ? ' Publisher' : ''}
-                          {studio.firstProjectDate && studio.firstProjectDate !== 'N/A' ? 
-                            ` | First project: ${studio.firstProjectDate}` : ''}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-                {research.teamAnalysis.linkedinSummary && (
-                  <div style={{
-                    padding: '16px',
-                    backgroundColor: '#f8f9fa',
-                    border: '1px solid #e9ecef',
-                    borderRadius: '8px'
-                  }}>
-                    <h5 style={{ color: '#2c5aa0', margin: '0 0 12px 0' }}>💼 LinkedIn Insights</h5>
-                    <p style={{ margin: 0 }}>{research.teamAnalysis.linkedinSummary}</p>
-                  </div>
-                )}
-                {research.teamAnalysis.glassdoorSummary && (
-                  <div style={{
-                    padding: '16px',
-                    backgroundColor: '#f8f9fa',
-                    border: '1px solid #e9ecef',
-                    borderRadius: '8px'
-                  }}>
-                    <h5 style={{ color: '#2c5aa0', margin: '0 0 12px 0' }}>🏢 Company Reviews</h5>
-                    <p style={{ margin: 0 }}>{research.teamAnalysis.glassdoorSummary}</p>
-                  </div>
-                )}
-              </div>
-            </ExpandableSection>
-          )}
-
-          {/* Technical Assessment */}
-          {research.technicalAssessment && (
-            <ExpandableSection title="Technical Assessment" icon="🔧" color="#6c757d">
-              <div style={{ display: 'grid', gap: '16px' }}>
-                {research.technicalAssessment.securitySummary && (
-                  <div style={{
-                    padding: '16px',
-                    backgroundColor: '#f8f9fa',
-                    border: '1px solid #e9ecef',
-                    borderRadius: '8px'
-                  }}>
-                    <h5 style={{ color: '#2c5aa0', margin: '0 0 12px 0' }}>🔒 Security Analysis</h5>
-                    <p style={{ margin: 0 }}>{research.technicalAssessment.securitySummary}</p>
-                  </div>
-                )}
-                {research.technicalAssessment.reviewSummary && (
-                  <div style={{
-                    padding: '16px',
-                    backgroundColor: '#f8f9fa',
-                    border: '1px solid #e9ecef',
-                    borderRadius: '8px'
-                  }}>
-                    <h5 style={{ color: '#2c5aa0', margin: '0 0 12px 0' }}>📊 Review Scores</h5>
-                    <p style={{ margin: 0 }}>{research.technicalAssessment.reviewSummary}</p>
-                  </div>
-                )}
-                {research.technicalAssessment.githubRepo && (
-                  <div style={{
-                    padding: '16px',
-                    backgroundColor: '#f8f9fa',
-                    border: '1px solid #e9ecef',
-                    borderRadius: '8px'
-                  }}>
-                    <h5 style={{ color: '#2c5aa0', margin: '0 0 12px 0' }}>💻 GitHub Activity</h5>
-                    <p style={{ margin: 0 }}>
-                      <strong>Repository:</strong> {research.technicalAssessment.githubRepo}
-                      {research.technicalAssessment.githubStats && (
-                        <span> | <strong>Stats:</strong> {research.technicalAssessment.githubStats}</span>
-                      )}
-                    </p>
-                  </div>
-                )}
-              </div>
-            </ExpandableSection>
-          )}
-
-          {/* Community Health */}
-          {research.communityHealth && (
-            <ExpandableSection title="Community Health" icon="👥" color="#20c997">
-              <div style={{ display: 'grid', gap: '16px' }}>
-                {research.communityHealth.twitterSummary && (
-                  <div style={{
-                    padding: '16px',
-                    backgroundColor: '#f8f9fa',
-                    border: '1px solid #e9ecef',
-                    borderRadius: '8px'
-                  }}>
-                    <h5 style={{ color: '#2c5aa0', margin: '0 0 12px 0' }}>🐦 Twitter Activity</h5>
-                    <p style={{ margin: 0 }}>{research.communityHealth.twitterSummary}</p>
-                  </div>
-                )}
-                {research.communityHealth.steamReviewSummary && (
-                  <div style={{
-                    padding: '16px',
-                    backgroundColor: '#f8f9fa',
-                    border: '1px solid #e9ecef',
-                    borderRadius: '8px'
-                  }}>
-                    <h5 style={{ color: '#2c5aa0', margin: '0 0 12px 0' }}>🎮 Steam Reviews</h5>
-                    <p style={{ margin: 0 }}>{research.communityHealth.steamReviewSummary}</p>
-                  </div>
-                )}
-                {research.communityHealth.discordData && research.communityHealth.discordData.server_name && (
-                  <div style={{
-                    padding: '16px',
-                    backgroundColor: '#f8f9fa',
-                    border: '1px solid #e9ecef',
-                    borderRadius: '8px'
-                  }}>
-                    <h5 style={{ color: '#2c5aa0', margin: '0 0 12px 0' }}>💬 Discord Community</h5>
-                    <p style={{ margin: 0 }}>
-                      <strong>Server:</strong> {research.communityHealth.discordData.server_name}
-                      {research.communityHealth.discordData.member_count && (
-                        <span> | <strong>Members:</strong> {research.communityHealth.discordData.member_count.toLocaleString()}</span>
-                      )}
-                    </p>
-                  </div>
-                )}
-                {research.communityHealth.redditSummary && (
-                  <div style={{
-                    padding: '16px',
-                    backgroundColor: '#f8f9fa',
-                    border: '1px solid #e9ecef',
-                    borderRadius: '8px'
-                  }}>
-                    <h5 style={{ color: '#2c5aa0', margin: '0 0 12px 0' }}>📱 Reddit Community</h5>
-                    <p style={{ margin: 0 }}>{research.communityHealth.redditSummary}</p>
-                  </div>
-                )}
-              </div>
-            </ExpandableSection>
-          )}
+          {/* Analysis Grid */}
+          <AnalysisGrid research={research} />
 
           {/* Social Links */}
           <SocialLinks research={research} />
