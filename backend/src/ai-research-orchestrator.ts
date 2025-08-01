@@ -1639,55 +1639,118 @@ Be thorough but only include verified, official sources.`;
     const tokenInfo: any = {};
     const chainInfo: any = {};
     
-    // Token name patterns
+    // Project-specific known data for established projects
+    const knownProjectData: { [key: string]: { tokens: string[], network: string } } = {
+      'axie infinity': { tokens: ['AXS', 'SLP'], network: 'ronin' },
+      'axie': { tokens: ['AXS', 'SLP'], network: 'ronin' },
+      'the sandbox': { tokens: ['SAND'], network: 'ethereum' },
+      'sandbox': { tokens: ['SAND'], network: 'ethereum' },
+      'decentraland': { tokens: ['MANA'], network: 'ethereum' },
+      'illuvium': { tokens: ['ILV'], network: 'ethereum' },
+      'gods unchained': { tokens: ['GODS'], network: 'ethereum' },
+      'gods': { tokens: ['GODS'], network: 'ethereum' },
+      'splinterlands': { tokens: ['SPS'], network: 'hive' },
+      'alien worlds': { tokens: ['TLM'], network: 'wax' },
+      'alienworlds': { tokens: ['TLM'], network: 'wax' }
+    };
+    
+    const projectKey = projectName.toLowerCase();
+    if (knownProjectData[projectKey]) {
+      const knownData = knownProjectData[projectKey];
+      tokenInfo.symbol = knownData.tokens[0]; // Use primary token
+      tokenInfo.allTokens = knownData.tokens;
+      chainInfo.network = knownData.network;
+      console.log(`✅ Using known project data for ${projectName}: ${knownData.tokens.join(', ')} on ${knownData.network}`);
+      return { tokenInfo, chainInfo };
+    }
+    
+    // Enhanced token name patterns - more specific and accurate
     const tokenPatterns = [
-      /token\s*(?:name|symbol|ticker)?\s*[:\-]\s*([A-Z]{2,10})/gi,
+      // Specific token symbol patterns
+      /(?:token|symbol|ticker)\s*(?:name|symbol|ticker)?\s*[:\-]\s*([A-Z]{2,10})/gi,
       /symbol\s*[:\-]\s*([A-Z]{2,10})/gi,
       /ticker\s*[:\-]\s*([A-Z]{2,10})/gi,
-      /([A-Z]{2,10})\s*token/gi,
-      /([A-Z]{2,10})\s*coin/gi
+      // Token symbol in context
+      /([A-Z]{2,10})\s*(?:token|coin|currency)/gi,
+      // Token symbol with $ prefix
+      /\$([A-Z]{2,10})\b/gi,
+      // Token symbol in parentheses
+      /\(([A-Z]{2,10})\)/gi
     ];
     
     for (const pattern of tokenPatterns) {
       const matches = text.match(pattern);
       if (matches && matches.length > 0) {
         for (const match of matches) {
-          const tokenSymbol = match.replace(/[^A-Z]/g, '');
+          // Extract the actual token symbol, not the full match
+          let tokenSymbol: string;
+          if (pattern.source.includes('\\$')) {
+            // Handle $TOKEN pattern
+            tokenSymbol = match.replace(/\$/g, '').replace(/[^A-Z]/g, '');
+          } else if (pattern.source.includes('\\(([A-Z]{2,10})\\)')) {
+            // Handle (TOKEN) pattern
+            tokenSymbol = match.replace(/[()]/g, '').replace(/[^A-Z]/g, '');
+          } else {
+            // Handle other patterns
+            tokenSymbol = match.replace(/[^A-Z]/g, '');
+          }
+          
           if (tokenSymbol.length >= 2 && tokenSymbol.length <= 10) {
-            tokenInfo.symbol = tokenSymbol;
-            console.log(`✅ Found token symbol: ${tokenSymbol}`);
-            break;
+            // Validate it's not a common word or URL part
+            const invalidTokens = ['HTTP', 'HTTPS', 'URL', 'API', 'JSON', 'HTML', 'CSS', 'JS', 'PHP', 'SQL', 'XML', 'RSS', 'REST', 'SOAP', 'WSDL', 'XSD', 'XSLT', 'SVG', 'PNG', 'JPG', 'GIF', 'MP4', 'MP3', 'PDF', 'DOC', 'TXT', 'LOG', 'ERR', 'INFO', 'DEBUG', 'WARN', 'FATAL', 'CRIT', 'ALERT', 'EMERG', 'NOTICE', 'TRACE', 'VERBOSE', 'QUIET', 'SILENT', 'NORMAL', 'ACTIVE', 'PASSIVE', 'STATIC', 'DYNAMIC', 'LOCAL', 'GLOBAL', 'PUBLIC', 'PRIVATE', 'PROTECTED', 'INTERNAL', 'EXTERNAL', 'IMPORT', 'EXPORT', 'MODULE', 'CLASS', 'FUNCTION', 'METHOD', 'PROPERTY', 'VARIABLE', 'CONSTANT', 'PARAMETER', 'ARGUMENT', 'RETURN', 'VOID', 'NULL', 'UNDEFINED', 'BOOLEAN', 'STRING', 'NUMBER', 'ARRAY', 'OBJECT', 'REGEX', 'REGULAR', 'EXPRESSION', 'PATTERN', 'MATCH', 'REPLACE', 'SPLIT', 'JOIN', 'CONCAT', 'SUBSTRING', 'INDEXOF', 'LASTINDEXOF', 'CHARAT', 'CHARCODEAT', 'FROMCHARCODE', 'TOLOWERCASE', 'TOUPPERCASE', 'TRIM', 'PADSTART', 'PADEND', 'REPEAT', 'REVERSE', 'SORT', 'FILTER', 'MAP', 'REDUCE', 'FOREACH', 'FORIN', 'FOROF', 'WHILE', 'DO', 'SWITCH', 'CASE', 'DEFAULT', 'BREAK', 'CONTINUE', 'THROW', 'TRY', 'CATCH', 'FINALLY', 'WITH', 'DELETE', 'TYPEOF', 'INSTANCEOF', 'NEW', 'THIS', 'SUPER', 'EXTENDS', 'IMPLEMENTS', 'INTERFACE', 'ABSTRACT', 'FINAL', 'STATIC', 'SYNCHRONIZED', 'TRANSIENT', 'VOLATILE', 'NATIVE', 'STRICTFP', 'ASSERT', 'ENUM', 'PACKAGE', 'IMPORT', 'EXPORT', 'MODULE', 'NAMESPACE', 'USING', 'TEMPLATE', 'TYPENAME', 'CONSTEXPR', 'DECLTYPE', 'AUTO', 'MUTABLE', 'EXPLICIT', 'VIRTUAL', 'OVERRIDE', 'FINAL', 'ABSTRACT', 'STATIC', 'EXTERN', 'INLINE', 'CONST', 'VOLATILE', 'RESTRICT', 'REGISTER', 'THREAD_LOCAL', 'NOEXCEPT', 'CONSTEXPR', 'CONSTEVAL', 'CONSTINIT', 'CO_AWAIT', 'CO_YIELD', 'CO_RETURN', 'REQUIRES', 'CONCEPT', 'MODULE', 'IMPORT', 'EXPORT', 'PARTITION', 'MODULE_PARTITION', 'GLOBAL_MODULE_FRAGMENT', 'PRIVATE_MODULE_FRAGMENT', 'MODULE_IMPORT', 'MODULE_EXPORT', 'MODULE_PARTITION_IMPORT', 'MODULE_PARTITION_EXPORT', 'GLOBAL_MODULE_FRAGMENT_IMPORT', 'PRIVATE_MODULE_FRAGMENT_IMPORT', 'MODULE_IMPORT_DECLARATION', 'MODULE_EXPORT_DECLARATION', 'MODULE_PARTITION_IMPORT_DECLARATION', 'MODULE_PARTITION_EXPORT_DECLARATION', 'GLOBAL_MODULE_FRAGMENT_IMPORT_DECLARATION', 'PRIVATE_MODULE_FRAGMENT_IMPORT_DECLARATION'];
+            
+            if (!invalidTokens.includes(tokenSymbol)) {
+              tokenInfo.symbol = tokenSymbol;
+              console.log(`✅ Found token symbol: ${tokenSymbol}`);
+              break;
+            }
           }
         }
         if (tokenInfo.symbol) break;
       }
     }
     
-    // Chain/network patterns
+    // Enhanced chain/network patterns - more specific and accurate
     const chainPatterns = [
-      /(ethereum|eth|ethereum\s*mainnet)/gi,
-      /(binance\s*smart\s*chain|bsc)/gi,
-      /(polygon|matic)/gi,
-      /(avalanche|avax)/gi,
-      /(solana|sol)/gi,
-      /(ronin|ronin\s*network)/gi,
-      /(arbitrum|arb)/gi,
-      /(optimism|op)/gi,
-      /(base)/gi,
-      /(polygon\s*zkevm)/gi
+      // Specific blockchain networks
+      /(?:network|chain|blockchain)\s*[:\-]\s*(ethereum|eth|ethereum\s*mainnet)/gi,
+      /(?:network|chain|blockchain)\s*[:\-]\s*(binance\s*smart\s*chain|bsc)/gi,
+      /(?:network|chain|blockchain)\s*[:\-]\s*(polygon|matic)/gi,
+      /(?:network|chain|blockchain)\s*[:\-]\s*(avalanche|avax)/gi,
+      /(?:network|chain|blockchain)\s*[:\-]\s*(solana|sol)/gi,
+      /(?:network|chain|blockchain)\s*[:\-]\s*(ronin|ronin\s*network)/gi,
+      /(?:network|chain|blockchain)\s*[:\-]\s*(arbitrum|arb)/gi,
+      /(?:network|chain|blockchain)\s*[:\-]\s*(optimism|op)/gi,
+      /(?:network|chain|blockchain)\s*[:\-]\s*(base)/gi,
+      /(?:network|chain|blockchain)\s*[:\-]\s*(polygon\s*zkevm)/gi,
+      // Network mentions in context
+      /(?:built\s*on|runs\s*on|deployed\s*on)\s*(ethereum|eth|ethereum\s*mainnet)/gi,
+      /(?:built\s*on|runs\s*on|deployed\s*on)\s*(binance\s*smart\s*chain|bsc)/gi,
+      /(?:built\s*on|runs\s*on|deployed\s*on)\s*(polygon|matic)/gi,
+      /(?:built\s*on|runs\s*on|deployed\s*on)\s*(avalanche|avax)/gi,
+      /(?:built\s*on|runs\s*on|deployed\s*on)\s*(solana|sol)/gi,
+      /(?:built\s*on|runs\s*on|deployed\s*on)\s*(ronin|ronin\s*network)/gi,
+      /(?:built\s*on|runs\s*on|deployed\s*on)\s*(arbitrum|arb)/gi,
+      /(?:built\s*on|runs\s*on|deployed\s*on)\s*(optimism|op)/gi,
+      /(?:built\s*on|runs\s*on|deployed\s*on)\s*(base)/gi,
+      /(?:built\s*on|runs\s*on|deployed\s*on)\s*(polygon\s*zkevm)/gi
     ];
     
     for (const pattern of chainPatterns) {
       const matches = text.match(pattern);
       if (matches && matches.length > 0) {
         const chainName = matches[0].toLowerCase();
-        chainInfo.network = chainName;
-        console.log(`✅ Found blockchain network: ${chainName}`);
-        break;
+        // Extract just the network name, not the full match
+        const networkMatch = chainName.match(/(ethereum|eth|binance\s*smart\s*chain|bsc|polygon|matic|avalanche|avax|solana|sol|ronin|arbitrum|arb|optimism|op|base|polygon\s*zkevm)/i);
+        if (networkMatch) {
+          chainInfo.network = networkMatch[0].toLowerCase();
+          console.log(`✅ Found blockchain network: ${chainInfo.network}`);
+          break;
+        }
       }
     }
     
-    // Contract address patterns
+    // Enhanced contract address patterns - more specific validation
     const contractPatterns = [
       /0x[a-fA-F0-9]{40}/g, // Ethereum-style addresses
       /[A-Za-z0-9]{32,44}/g // Other blockchain addresses
@@ -1699,18 +1762,26 @@ Be thorough but only include verified, official sources.`;
         // Validate it's likely a contract address
         const address = matches[0];
         if (address.length >= 32 && address.length <= 44) {
-          tokenInfo.contractAddress = address;
-          console.log(`✅ Found contract address: ${address}`);
-          break;
+          // Additional validation to avoid JWT tokens or other base64 strings
+          const hasValidChars = /^[0-9a-fA-F]+$/.test(address) || /^[A-Za-z0-9]+$/.test(address);
+          const notJWT = !address.includes('.') && !address.startsWith('eyJ');
+          const notBase64Padding = !address.includes('=');
+          
+          if (hasValidChars && notJWT && notBase64Padding) {
+            tokenInfo.contractAddress = address;
+            console.log(`✅ Found contract address: ${address}`);
+            break;
+          }
         }
       }
     }
     
-    // Total supply patterns
+    // Enhanced total supply patterns
     const supplyPatterns = [
       /total\s*supply\s*[:\-]\s*([0-9,]+)/gi,
       /max\s*supply\s*[:\-]\s*([0-9,]+)/gi,
-      /supply\s*[:\-]\s*([0-9,]+)/gi
+      /supply\s*[:\-]\s*([0-9,]+)/gi,
+      /circulating\s*supply\s*[:\-]\s*([0-9,]+)/gi
     ];
     
     for (const pattern of supplyPatterns) {
