@@ -872,6 +872,12 @@ Consider:
   private identifyInformationGaps(plan: ResearchPlan, findings: ResearchFindings): string[] {
     const gaps: string[] = [];
     
+    // Safety check to ensure plan and successCriteria exist
+    if (!plan || !plan.successCriteria || !plan.successCriteria.criticalDataPoints) {
+      console.warn('identifyInformationGaps: Invalid plan structure, returning empty gaps');
+      return gaps;
+    }
+    
     plan.successCriteria.criticalDataPoints.forEach(dataPoint => {
       const found = Object.values(findings).some(f => 
         (f as any)?.found && (f as any)?.data && JSON.stringify((f as any).data).includes(dataPoint)
@@ -2134,7 +2140,24 @@ Be thorough but only include verified, official sources.`;
     // Identify what's missing to reach threshold
     const missingForThreshold: string[] = [];
     if (confidenceScore < this.confidenceThresholds.minimumForAnalysis) {
-      const missingSources = this.identifyInformationGaps({} as ResearchPlan, findings);
+      // Use a fallback plan with default critical data points to avoid undefined errors
+      const fallbackPlan: ResearchPlan = {
+        projectClassification: {
+          type: 'unknown',
+          confidence: 0,
+          reasoning: 'Fallback plan for gap analysis'
+        },
+        prioritySources: [],
+        riskAreas: [],
+        searchAliases: [],
+        estimatedResearchTime: 0,
+        successCriteria: {
+          minimumSources: 0,
+          criticalDataPoints: ['team_verified', 'tokenomics_clear', 'community_active', 'security_audited', 'funding_verified'],
+          redFlagChecks: []
+        }
+      };
+      const missingSources = this.identifyInformationGaps(fallbackPlan, findings);
       missingForThreshold.push(...missingSources);
     }
     
@@ -2240,14 +2263,15 @@ export async function conductAIOrchestratedResearch(
   
   console.log(`🚀 Starting AI-orchestrated research for: ${projectName}`);
   
-  // NEW: Check for cached data first
-  const updateCheck = await orchestrator.checkForUpdates(projectName);
-  console.log(`Update check for ${projectName}:`, updateCheck);
-  
-  // Phase 1: Get AI research strategy
-  console.log(`📋 Phase 1: Generating research plan for ${projectName}`);
-  const researchPlan = await orchestrator.generateResearchPlan(projectName, basicInfo);
-  console.log(`✅ Research plan generated with ${researchPlan.prioritySources.length} priority sources`);
+  try {
+    // NEW: Check for cached data first
+    const updateCheck = await orchestrator.checkForUpdates(projectName);
+    console.log(`Update check for ${projectName}:`, updateCheck);
+    
+    // Phase 1: Get AI research strategy
+    console.log(`📋 Phase 1: Generating research plan for ${projectName}`);
+    const researchPlan = await orchestrator.generateResearchPlan(projectName, basicInfo);
+    console.log(`✅ Research plan generated with ${researchPlan.prioritySources.length} priority sources`);
   
   const startTime = Date.now();
   let shouldContinue = true;
@@ -2407,20 +2431,50 @@ export async function conductAIOrchestratedResearch(
   }
   
   console.log(`✅ Research completed successfully for ${projectName}`);
-  return {
-    success: true,
-    findings,
-    researchPlan,
-    completeness,
-    adaptiveState,
-    discoveredSources, // NEW: Include discovered sources
-          meta: {
-        timeSpent: Math.floor((Date.now() - startTime) / 60000),
-        sourcesCollected: Object.keys(findings).filter(k => findings[k]?.found).length,
-        aiConfidence: completeness.confidence,
-        universalSourcesFound: Object.values(discoveredSources).reduce((sum: number, sources: any) => sum + (Array.isArray(sources) ? sources.length : 0), 0)
-      }
-  };
+        return {
+        success: true,
+        findings,
+        researchPlan,
+        completeness,
+        adaptiveState,
+        discoveredSources, // NEW: Include discovered sources
+        meta: {
+          timeSpent: Math.floor((Date.now() - startTime) / 60000),
+          sourcesCollected: Object.keys(findings).filter(k => findings[k]?.found).length,
+          aiConfidence: completeness.confidence,
+          universalSourcesFound: Object.values(discoveredSources).reduce((sum: number, sources: any) => sum + (Array.isArray(sources) ? sources.length : 0), 0)
+        }
+      };
+    } catch (error) {
+      console.error(`❌ Error in AI-orchestrated research:`, error);
+      console.error(`🔍 Error details:`, error instanceof Error ? error.message : 'Unknown error');
+      console.error(`🔍 Error stack:`, error instanceof Error ? error.stack : 'No stack trace');
+      
+      // Provide fallback response to prevent "No data found" error
+      console.log(`🛡️ Providing fallback response for ${projectName} to prevent "No data found" error`);
+      return {
+        success: false,
+        reason: error instanceof Error ? error.message : 'Unknown error occurred during research',
+        findings: {},
+        researchPlan: null,
+        completeness: {
+          isComplete: false,
+          confidence: 0,
+          gaps: ['research_failed'],
+          recommendations: ['Try again later or check project name']
+        },
+        adaptiveState: null,
+        discoveredSources: {},
+        meta: {
+          timeSpent: 0,
+          sourcesCollected: 0,
+          aiConfidence: 0,
+          universalSourcesFound: 0,
+          error: true
+        }
+      };
+    }
+  }
 }
 
 // Helper function - integrate with your existing source collection
