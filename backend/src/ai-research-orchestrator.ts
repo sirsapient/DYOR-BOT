@@ -2249,6 +2249,382 @@ Be thorough but only include verified, official sources.`;
     
     return cleanedCount;
   }
+
+  // NEW: Lightweight token discovery (as proposed in architecture)
+  private async discoverTokensLightweight(projectName: string): Promise<TokenDiscoveryResult> {
+    console.log(`🔍 Starting lightweight token discovery for: ${projectName}`);
+    
+    try {
+      // Stage 1: Lightweight AI call for token identification
+      const tokenPrompt = `Given game project '${projectName}', what are the associated token symbols? 
+      
+      Return ONLY a JSON array of token symbols (e.g., ["AXS", "SLP"]) or ["none"] if no tokens found.
+      Do not include explanations or additional text.
+      
+      Examples:
+      - "Axie Infinity" → ["AXS", "SLP"]
+      - "The Sandbox" → ["SAND"] 
+      - "Decentraland" → ["MANA"]
+      - "Traditional Game" → ["none"]`;
+      
+      const response = await this.executeWithRetry(
+        () => this.anthropic.messages.create({
+          model: 'claude-3-sonnet-20240229',
+          max_tokens: 100,
+          temperature: 0.1,
+          messages: [{ role: 'user', content: tokenPrompt }]
+        }),
+        `Lightweight token discovery for ${projectName}`
+      );
+      
+      const aiResponse = response.content[0].type === 'text' ? response.content[0].text : '';
+      console.log(`🤖 Token discovery AI response: ${aiResponse}`);
+      
+      // Parse AI response
+      let tokens: string[] = [];
+      try {
+        const parsed = JSON.parse(aiResponse);
+        tokens = Array.isArray(parsed) ? parsed : [];
+        console.log(`✅ AI discovered tokens: ${tokens.join(', ')}`);
+      } catch (parseError) {
+        console.log(`❌ Failed to parse AI token response: ${parseError}`);
+        tokens = [];
+      }
+      
+      // Stage 2: Fallback to CoinGecko if AI fails
+      let fallbackUsed = false;
+      if (tokens.length === 0 || (tokens.length === 1 && tokens[0] === 'none')) {
+        console.log(`🔄 AI found no tokens, trying CoinGecko fallback`);
+        const coinGeckoTokens = await this.discoverTokensFromCoinGecko(projectName);
+        if (coinGeckoTokens.length > 0) {
+          tokens = coinGeckoTokens;
+          fallbackUsed = true;
+          console.log(`✅ CoinGecko fallback found tokens: ${tokens.join(', ')}`);
+        }
+      }
+      
+      // Stage 3: Build/maintain lookup table (in-memory for now)
+      this.updateTokenLookupTable(projectName, tokens);
+      
+      const confidence = tokens.length > 0 ? 85 : 30;
+      const reasoning = fallbackUsed 
+        ? 'Tokens discovered via CoinGecko fallback'
+        : tokens.length > 0 
+          ? 'Tokens discovered via AI analysis'
+          : 'No tokens found for this project';
+      
+      return {
+        tokens,
+        confidence,
+        reasoning,
+        fallbackUsed
+      };
+      
+    } catch (error) {
+      console.log(`❌ Lightweight token discovery failed: ${(error as Error).message}`);
+      return {
+        tokens: [],
+        confidence: 0,
+        reasoning: 'Token discovery failed',
+        fallbackUsed: false
+      };
+    }
+  }
+  
+  // NEW: CoinGecko fallback for token discovery
+  private async discoverTokensFromCoinGecko(projectName: string): Promise<string[]> {
+    try {
+      const response = await this.executeWithRetry(
+        () => fetch('https://api.coingecko.com/api/v3/coins/list'),
+        `CoinGecko token discovery for ${projectName}`
+      );
+      
+      if (response.ok) {
+        const coins: any[] = await response.json();
+        const normalizedName = projectName.toLowerCase();
+        
+        // Search for exact matches first
+        let matches = coins.filter((coin: any) => 
+          coin.name.toLowerCase() === normalizedName ||
+          coin.symbol.toLowerCase() === normalizedName
+        );
+        
+        // If no exact matches, try partial matches
+        if (matches.length === 0) {
+          matches = coins.filter((coin: any) => 
+            coin.name.toLowerCase().includes(normalizedName) ||
+            coin.symbol.toLowerCase().includes(normalizedName)
+          );
+        }
+        
+        const tokens = matches.map((coin: any) => coin.symbol.toUpperCase());
+        console.log(`🔍 CoinGecko found ${tokens.length} potential tokens for ${projectName}`);
+        return tokens;
+      }
+    } catch (error) {
+      console.log(`❌ CoinGecko token discovery failed: ${(error as Error).message}`);
+    }
+    
+    return [];
+  }
+  
+  // NEW: Token lookup table management
+  private tokenLookupTable: Map<string, string[]> = new Map();
+  
+  private updateTokenLookupTable(projectName: string, tokens: string[]): void {
+    const key = projectName.toLowerCase();
+    if (tokens.length > 0) {
+      this.tokenLookupTable.set(key, tokens);
+      console.log(`💾 Updated token lookup table for ${projectName}: ${tokens.join(', ')}`);
+    }
+  }
+  
+  private getCachedTokens(projectName: string): string[] {
+    const key = projectName.toLowerCase();
+    return this.tokenLookupTable.get(key) || [];
+  }
+
+  // NEW: Enhanced multi-stage whitepaper discovery (as proposed in architecture)
+  private async discoverWhitepapersEnhanced(projectName: string, aliases: string[]): Promise<string[]> {
+    console.log(`📄 Starting enhanced whitepaper discovery for: ${projectName}`);
+    
+    const discoveredUrls: string[] = [];
+    const allNames = [projectName, ...aliases];
+    
+    // Stage 1: Direct pattern matching
+    console.log(`🔍 Stage 1: Direct pattern matching`);
+    for (const name of allNames.slice(0, 3)) {
+      const normalizedName = name.toLowerCase().replace(/\s+/g, '');
+      
+      for (const pattern of ENHANCED_WHITEPAPER_PATTERNS.stage1_direct) {
+        const url = pattern.replace(/{project}/g, normalizedName);
+        try {
+          const res = await this.executeWithRetry(
+            () => fetch(`https://${url}`, { method: 'HEAD', signal: AbortSignal.timeout(3000) }),
+            `Direct pattern test for ${url}`
+          );
+          if (res.ok) {
+            discoveredUrls.push(`https://${url}`);
+            console.log(`✅ Found via direct pattern: https://${url}`);
+          }
+        } catch (e) {
+          // Continue to next pattern
+        }
+      }
+    }
+    
+    // Stage 2: Targeted web search (if SERP API available)
+    if (process.env.SERP_API_KEY && discoveredUrls.length === 0) {
+      console.log(`🔍 Stage 2: Targeted web search`);
+      const searchResults = await this.performTargetedWebSearch(projectName, aliases);
+      discoveredUrls.push(...searchResults);
+    }
+    
+    // Stage 3: Web scraping from discovered homepages
+    if (discoveredUrls.length === 0) {
+      console.log(`🔍 Stage 3: Web scraping from homepages`);
+      const scrapingResults = await this.scrapeHomepagesForDocs(projectName, aliases);
+      discoveredUrls.push(...scrapingResults);
+    }
+    
+    // Stage 4: AI-assisted discovery (fallback)
+    if (discoveredUrls.length === 0) {
+      console.log(`🔍 Stage 4: AI-assisted discovery`);
+      const aiResults = await this.discoverDocsWithAI(projectName, aliases);
+      discoveredUrls.push(...aiResults);
+    }
+    
+    // Remove duplicates and verify URLs
+    const uniqueUrls = [...new Set(discoveredUrls)];
+    const verifiedUrls: string[] = [];
+    
+    for (const url of uniqueUrls.slice(0, 5)) { // Limit verification to first 5 URLs
+      try {
+        const res = await this.executeWithRetry(
+          () => fetch(url, { method: 'HEAD', signal: AbortSignal.timeout(3000) }),
+          `Verifying discovered URL ${url}`
+        );
+        if (res.ok) {
+          verifiedUrls.push(url);
+          console.log(`✅ Verified documentation URL: ${url}`);
+        }
+      } catch (e) {
+        console.log(`❌ Failed to verify URL ${url}: ${(e as Error).message}`);
+      }
+    }
+    
+    console.log(`📄 Enhanced whitepaper discovery completed: ${verifiedUrls.length} URLs found`);
+    return verifiedUrls;
+  }
+  
+  // NEW: Targeted web search for documentation
+  private async performTargetedWebSearch(projectName: string, aliases: string[]): Promise<string[]> {
+    const discoveredUrls: string[] = [];
+    
+    if (!process.env.SERP_API_KEY) {
+      console.log(`⚠️ No SERP_API_KEY available for targeted web search`);
+      return discoveredUrls;
+    }
+    
+    const searchTerms = ENHANCED_WHITEPAPER_PATTERNS.stage2_search_terms.map(term => 
+      term.replace(/{project_name}/g, projectName)
+    );
+    
+    for (const term of searchTerms.slice(0, 3)) { // Limit to first 3 search terms
+      try {
+        console.log(`🔍 Web searching for: ${term}`);
+        const serpRes = await this.executeWithRetry(
+          () => fetch(`https://serpapi.com/search.json?q=${encodeURIComponent(term)}&api_key=${process.env.SERP_API_KEY}`),
+          `SerpAPI search for ${term}`
+        );
+        
+        if (serpRes.ok) {
+          const serpJson = await serpRes.json();
+          const results = (serpJson.organic_results || []).slice(0, 3);
+          
+          for (const result of results) {
+            if (result.link) {
+              try {
+                const linkRes = await this.executeWithRetry(
+                  () => fetch(result.link, { method: 'HEAD' }),
+                  `Checking web search result ${result.link}`
+                );
+                if (linkRes.ok) {
+                  discoveredUrls.push(result.link);
+                  console.log(`✅ Found via web search: ${result.link}`);
+                }
+              } catch (e) {
+                console.log(`❌ Failed to check web search result ${result.link}: ${(e as Error).message}`);
+              }
+            }
+          }
+        }
+      } catch (e) {
+        console.log(`❌ Web search failed for ${term}: ${(e as Error).message}`);
+      }
+    }
+    
+    return discoveredUrls;
+  }
+  
+  // NEW: Scrape homepages for documentation links
+  private async scrapeHomepagesForDocs(projectName: string, aliases: string[]): Promise<string[]> {
+    const discoveredUrls: string[] = [];
+    const allNames = [projectName, ...aliases];
+    
+    for (const name of allNames.slice(0, 2)) {
+      const normalizedName = name.toLowerCase().replace(/\s+/g, '');
+      const homepageUrl = `https://${normalizedName}.com`;
+      
+      try {
+        console.log(`🕷️ Scraping homepage: ${homepageUrl}`);
+        const res = await this.executeWithRetry(
+          () => fetch(homepageUrl, { signal: AbortSignal.timeout(5000) }),
+          `Fetching homepage ${homepageUrl}`
+        );
+        
+        if (res.ok) {
+          const html = await res.text();
+          const $ = require('cheerio').load(html);
+          
+          // Find all links
+          const links = $('a[href]').map((i: number, el: any) => $(el).attr('href')).get();
+          
+          for (const link of links) {
+            if (!link || typeof link !== 'string') continue;
+            
+            const fullUrl = link.startsWith('http') ? link : new URL(link, homepageUrl).href;
+            const linkText = $(`a[href="${link}"]`).text().toLowerCase();
+            const linkHref = $(`a[href="${link}"]`).attr('href')?.toLowerCase() || '';
+            
+            // Check if link matches documentation keywords
+            const isDocLink = ENHANCED_WHITEPAPER_PATTERNS.stage3_scraping_keywords.some(keyword => 
+              linkText.includes(keyword) || 
+              linkHref.includes(keyword) ||
+              fullUrl.includes(keyword)
+            );
+            
+            if (isDocLink) {
+              try {
+                const linkRes = await this.executeWithRetry(
+                  () => fetch(fullUrl, { method: 'HEAD', signal: AbortSignal.timeout(3000) }),
+                  `Checking scraped documentation link ${fullUrl}`
+                );
+                if (linkRes.ok) {
+                  discoveredUrls.push(fullUrl);
+                  console.log(`✅ Found via scraping: ${fullUrl}`);
+                }
+              } catch (e) {
+                console.log(`❌ Failed to check scraped link ${fullUrl}: ${(e as Error).message}`);
+              }
+            }
+          }
+        }
+      } catch (e) {
+        console.log(`❌ Failed to scrape homepage ${homepageUrl}: ${(e as Error).message}`);
+      }
+    }
+    
+    return discoveredUrls;
+  }
+  
+  // NEW: AI-assisted documentation discovery
+  private async discoverDocsWithAI(projectName: string, aliases: string[]): Promise<string[]> {
+    const discoveredUrls: string[] = [];
+    
+    try {
+      const prompt = `Search for official documentation links for ${projectName}. 
+      
+      Look for:
+      1. Official website navigation menus
+      2. Social media bio links  
+      3. CoinGecko/CMC profile links
+      4. GitHub repository links
+      
+      Return any whitepaper, litepaper, or tokenomics document URLs found.
+      
+      Format response as JSON array of URLs only, or empty array if none found.`;
+      
+      const response = await this.executeWithRetry(
+        () => this.anthropic.messages.create({
+          model: 'claude-3-sonnet-20240229',
+          max_tokens: 500,
+          temperature: 0.1,
+          messages: [{ role: 'user', content: prompt }]
+        }),
+        `AI-assisted documentation discovery for ${projectName}`
+      );
+      
+      const aiResponse = response.content[0].type === 'text' ? response.content[0].text : '';
+      
+      try {
+        const parsed = JSON.parse(aiResponse);
+        const urls = Array.isArray(parsed) ? parsed : [];
+        
+        // Verify AI-discovered URLs
+        for (const url of urls.slice(0, 3)) {
+          try {
+            const res = await this.executeWithRetry(
+              () => fetch(url, { method: 'HEAD', signal: AbortSignal.timeout(3000) }),
+              `Verifying AI-discovered URL ${url}`
+            );
+            if (res.ok) {
+              discoveredUrls.push(url);
+              console.log(`✅ Found via AI discovery: ${url}`);
+            }
+          } catch (e) {
+            console.log(`❌ Failed to verify AI-discovered URL ${url}: ${(e as Error).message}`);
+          }
+        }
+      } catch (parseError) {
+        console.log(`❌ Failed to parse AI documentation response: ${parseError}`);
+      }
+    } catch (error) {
+      console.log(`❌ AI-assisted documentation discovery failed: ${(error as Error).message}`);
+    }
+    
+    return discoveredUrls;
+  }
 }
 
 // Main orchestrated research function
@@ -2264,6 +2640,16 @@ export async function conductAIOrchestratedResearch(
   console.log(`🚀 Starting AI-orchestrated research for: ${projectName}`);
   
   try {
+    // NEW: Phase 0: Lightweight token discovery (as proposed in architecture)
+    console.log(`🔍 Phase 0: Lightweight token discovery for ${projectName}`);
+    const tokenDiscovery = await orchestrator['discoverTokensLightweight'](projectName);
+    console.log(`✅ Token discovery completed: ${tokenDiscovery.tokens.join(', ')} (confidence: ${tokenDiscovery.confidence}%)`);
+    
+    // NEW: Phase 0.5: Enhanced whitepaper discovery (as proposed in architecture)
+    console.log(`📄 Phase 0.5: Enhanced whitepaper discovery for ${projectName}`);
+    const discoveredWhitepapers = await orchestrator['discoverWhitepapersEnhanced'](projectName, basicInfo?.aliases || []);
+    console.log(`✅ Enhanced whitepaper discovery completed: ${discoveredWhitepapers.length} URLs found`);
+    
     // NEW: Check for cached data first
     const updateCheck = await orchestrator.checkForUpdates(projectName);
     console.log(`Update check for ${projectName}:`, updateCheck);
@@ -2280,6 +2666,37 @@ export async function conductAIOrchestratedResearch(
   // NEW: Phase 1.5: Universal source discovery before AI-guided collection
   console.log(`🔍 Phase 1.5: Universal source discovery for ${projectName}`);
   const discoveredSources = await orchestrator['discoverUniversalSources'](projectName, researchPlan.searchAliases);
+  
+  // NEW: Phase 1.6: Extract data from discovered whitepapers
+  if (discoveredWhitepapers.length > 0) {
+    console.log(`📄 Phase 1.6: Extracting data from discovered whitepapers for ${projectName}`);
+    for (const whitepaperUrl of discoveredWhitepapers.slice(0, 2)) { // Limit to first 2 whitepapers
+      try {
+        const extractedDocData = await orchestrator['extractFromDocumentation'](whitepaperUrl, projectName);
+        
+        if (extractedDocData.tokenomics && Object.keys(extractedDocData.tokenomics).length > 0) {
+          findings.whitepaper = {
+            found: true,
+            data: { 
+              url: whitepaperUrl,
+              tokenomics: extractedDocData.tokenomics,
+              tokenInfo: extractedDocData.tokenInfo,
+              chainInfo: extractedDocData.chainInfo
+            },
+            quality: 'high' as const,
+            timestamp: new Date(),
+            dataPoints: Object.keys(extractedDocData.tokenomics).length + 
+                       (extractedDocData.tokenInfo ? Object.keys(extractedDocData.tokenInfo).length : 0) +
+                       (extractedDocData.chainInfo ? Object.keys(extractedDocData.chainInfo).length : 0)
+          };
+          console.log(`✅ Extracted data from whitepaper: ${whitepaperUrl}`);
+          break; // Use first successful whitepaper
+        }
+      } catch (e) {
+        console.log(`❌ Failed to extract from whitepaper ${whitepaperUrl}: ${(e as Error).message}`);
+      }
+    }
+  }
   
   // Extract data from discovered sources
   if (Object.values(discoveredSources).some((sources: any) => Array.isArray(sources) && sources.length > 0)) {
@@ -2343,8 +2760,24 @@ export async function conductAIOrchestratedResearch(
     }
   }
   
+  // NEW: Phase 2: Conditional API routing based on token discovery (as proposed in architecture)
+  console.log(`📊 Phase 2: Conditional API routing for ${projectName}`);
+  
+  // Always call: CoinGecko, YouTube, IGDB APIs
+  const alwaysCallApis = ['coingecko', 'youtube', 'igdb'];
+  
+  // Conditional blockchain APIs: only call if tokens found
+  const conditionalApis: string[] = [];
+  if (tokenDiscovery.tokens.length > 0) {
+    console.log(`🔗 Tokens found (${tokenDiscovery.tokens.join(', ')}), enabling blockchain APIs`);
+    // Chain priority: ETH → SOL → AVAX → Ronin (as proposed)
+    conditionalApis.push('ethereum', 'solana', 'avalanche', 'ronin');
+  } else {
+    console.log(`⚠️ No tokens found, skipping blockchain APIs`);
+  }
+  
   // Phase 2: Execute research with AI adaptation and caching
-  console.log(`📊 Phase 2: AI-guided data collection for ${projectName}`);
+  console.log(`📊 Phase 2.5: AI-guided data collection for ${projectName}`);
   for (const prioritySource of researchPlan.prioritySources) {
     if (!shouldContinue) break;
     
@@ -2426,7 +2859,9 @@ export async function conductAIOrchestratedResearch(
       recommendations: completeness.recommendations,
       researchPlan,
       findings,
-      discoveredSources // NEW: Include discovered sources for debugging
+      discoveredSources, // NEW: Include discovered sources for debugging
+      tokenDiscovery, // NEW: Include token discovery results
+      discoveredWhitepapers // NEW: Include whitepaper discovery results
     };
   }
   
@@ -2438,11 +2873,15 @@ export async function conductAIOrchestratedResearch(
         completeness,
         adaptiveState,
         discoveredSources, // NEW: Include discovered sources
+        tokenDiscovery, // NEW: Include token discovery results
+        discoveredWhitepapers, // NEW: Include whitepaper discovery results
         meta: {
           timeSpent: Math.floor((Date.now() - startTime) / 60000),
           sourcesCollected: Object.keys(findings).filter(k => findings[k]?.found).length,
           aiConfidence: completeness.confidence,
-          universalSourcesFound: Object.values(discoveredSources).reduce((sum: number, sources: any) => sum + (Array.isArray(sources) ? sources.length : 0), 0)
+          universalSourcesFound: Object.values(discoveredSources).reduce((sum: number, sources: any) => sum + (Array.isArray(sources) ? sources.length : 0), 0),
+          tokensDiscovered: tokenDiscovery.tokens.length,
+          whitepapersFound: discoveredWhitepapers.length
         }
       };
     } catch (error) {
@@ -2465,11 +2904,15 @@ export async function conductAIOrchestratedResearch(
         },
         adaptiveState: null,
         discoveredSources: {},
+        tokenDiscovery: { tokens: [], confidence: 0, reasoning: 'Discovery failed', fallbackUsed: false },
+        discoveredWhitepapers: [],
         meta: {
           timeSpent: 0,
           sourcesCollected: 0,
           aiConfidence: 0,
           universalSourcesFound: 0,
+          tokensDiscovered: 0,
+          whitepapersFound: 0,
           error: true
         }
       };
@@ -2631,3 +3074,53 @@ async function collectFromSourceWithRealFunctions(
 }
 
 export { AIResearchOrchestrator, AdaptiveResearchState, BasicProjectInfo }; 
+
+// NEW: Lightweight token discovery system (as proposed)
+interface TokenDiscoveryResult {
+  tokens: string[];
+  confidence: number;
+  reasoning: string;
+  fallbackUsed: boolean;
+}
+
+// NEW: Enhanced whitepaper discovery patterns (as proposed)
+const ENHANCED_WHITEPAPER_PATTERNS = {
+  stage1_direct: [
+    // Direct pattern matching
+    '{project}/whitepaper',
+    '{project}/whitepaper.pdf', 
+    'docs.{project}.com',
+    '{project}.gitbook.io',
+    'github.com/{org}/{project}/blob/main/whitepaper.pdf',
+    '{project}.com/whitepaper',
+    '{project}.com/whitepaper.pdf',
+    '{project}.com/white-paper',
+    '{project}.com/white-paper.pdf',
+    '{project}.com/litepaper',
+    '{project}.com/litepaper.pdf',
+    '{project}.com/tokenomics.pdf',
+    '{project}.com/economics.pdf',
+    '{project}.com/governance.pdf'
+  ],
+  
+  stage2_search_terms: [
+    // Targeted web search terms
+    '{project_name} whitepaper filetype:pdf',
+    '{project_name} litepaper site:gitbook.io',
+    '{project_name} tokenomics document',
+    'site:github.com {project_name} whitepaper',
+    '{project_name} technical documentation',
+    '{project_name} developer docs',
+    '{project_name} API documentation',
+    '{project_name} white paper',
+    '{project_name} lite paper'
+  ],
+  
+  stage3_scraping_keywords: [
+    // Web scraping keywords
+    'whitepaper', 'white-paper', 'litepaper', 'lite-paper',
+    'docs', 'documentation', 'technical', 'developer',
+    'tokenomics', 'economics', 'governance', 'architecture',
+    'api', 'sdk', 'integration', 'guide', 'manual'
+  ]
+};
