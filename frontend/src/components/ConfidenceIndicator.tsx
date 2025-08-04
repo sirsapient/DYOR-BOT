@@ -69,44 +69,74 @@ export const ConfidenceIndicator: React.FC<ConfidenceIndicatorProps> = ({
 
   const getConfidenceColor = (level: string) => {
     const colors: Record<string, React.CSSProperties> = {
-      'very_high': { color: '#059669', backgroundColor: '#f0fdf4', borderColor: '#bbf7d0' },
-      'high': { color: '#10b981', backgroundColor: '#f0fdf4', borderColor: '#bbf7d0' },
-      'medium': { color: '#d97706', backgroundColor: '#fffbeb', borderColor: '#fed7aa' },
-      'low': { color: '#ea580c', backgroundColor: '#fff7ed', borderColor: '#fed7aa' },
-      'very_low': { color: '#dc2626', backgroundColor: '#fef2f2', borderColor: '#fecaca' }
+      'very_high': { color: '#00ff41', backgroundColor: '#111', borderColor: '#00ff41' },
+      'high': { color: '#00ff41', backgroundColor: '#111', borderColor: '#00ff41' },
+      'medium': { color: '#ffaa00', backgroundColor: '#111', borderColor: '#ffaa00' },
+      'low': { color: '#ff6600', backgroundColor: '#111', borderColor: '#ff6600' },
+      'very_low': { color: '#ff00ff', backgroundColor: '#111', borderColor: '#ff00ff' }
     };
     return colors[level] || colors.medium;
   };
 
   const getScoreBarColor = (score: number) => {
-    if (score >= 80) return '#10b981';
-    if (score >= 60) return '#eab308';
-    if (score >= 40) return '#f97316';
-    return '#ef4444';
+    if (score >= 80) return '#00ff41';
+    if (score >= 60) return '#ffaa00';
+    if (score >= 40) return '#ff6600';
+    return '#ff00ff';
   };
 
   return (
-    <div style={{ backgroundColor: 'white', borderRadius: '8px', border: '1px solid #e5e7eb', padding: '16px', marginBottom: '24px' }}>
+    <div style={{ 
+      backgroundColor: '#111', 
+      borderRadius: '8px', 
+      border: '2px solid #00ff41', 
+      padding: '16px', 
+      marginBottom: '24px',
+      color: '#00ff41',
+      fontFamily: 'Share Tech Mono, monospace'
+    }}>
       {/* Main Confidence Display */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <div style={{ 
             padding: '8px 12px', 
-            borderRadius: '9999px', 
+            borderRadius: '4px', 
             fontSize: '14px', 
-            fontWeight: '500', 
-            border: '1px solid',
+            fontWeight: 'bold', 
+            border: '2px solid',
+            textTransform: 'uppercase',
+            letterSpacing: '1px',
             ...getConfidenceColor(confidence.overall.level)
           }}>
             Grade {confidence.overall.grade}
           </div>
-          <div style={{ fontSize: '18px', fontWeight: '600', color: '#111827' }}>
+          <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#00ff41', textTransform: 'uppercase' }}>
             {confidence.overall.score}% Confidence
           </div>
         </div>
         <button
           onClick={() => setExpanded(!expanded)}
-          style={{ color: '#6b7280', fontSize: '14px', fontWeight: '500', cursor: 'pointer' }}
+          style={{ 
+            color: '#00ff41', 
+            fontSize: '14px', 
+            fontWeight: 'bold', 
+            cursor: 'pointer',
+            background: 'none',
+            border: '2px solid #00ff41',
+            padding: '8px 16px',
+            borderRadius: '4px',
+            textTransform: 'uppercase',
+            letterSpacing: '1px',
+            transition: 'all 0.3s ease'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = '#00ff41';
+            e.currentTarget.style.color = '#000';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = 'transparent';
+            e.currentTarget.style.color = '#00ff41';
+          }}
         >
           {expanded ? 'Hide Details' : 'Show Details'}
         </button>
@@ -114,45 +144,42 @@ export const ConfidenceIndicator: React.FC<ConfidenceIndicatorProps> = ({
 
       {/* Score Bar */}
       <div style={{ marginBottom: '16px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: '#4b5563', marginBottom: '4px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: '#00ff41', marginBottom: '4px', textTransform: 'uppercase' }}>
           <span>Research Quality</span>
           <span>{confidence.overall.score}/100</span>
         </div>
-        <div style={{ width: '100%', backgroundColor: '#e5e7eb', borderRadius: '9999px', height: '8px' }}>
+        <div style={{ width: '100%', backgroundColor: '#333', borderRadius: '4px', height: '8px', border: '1px solid #00ff41' }}>
           <div 
             style={{ 
               height: '8px', 
-              borderRadius: '9999px', 
+              borderRadius: '4px', 
               transition: 'all 0.5s',
               backgroundColor: getScoreBarColor(confidence.overall.score),
-              width: `${confidence.overall.score}%` 
+              width: `${confidence.overall.score}%`,
+              boxShadow: `0 0 10px ${getScoreBarColor(confidence.overall.score)}`
             }}
           />
         </div>
       </div>
 
       {/* Description */}
-      <p style={{ color: '#374151', marginBottom: '16px' }}>{confidence.overall.description}</p>
+      <p style={{ color: '#00ff41', marginBottom: '16px', fontSize: '14px' }}>{confidence.overall.description}</p>
 
       {/* User Guidance */}
       {confidence.userGuidance && (
         <div style={{ 
           padding: '12px', 
           borderRadius: '8px', 
-          border: '1px solid',
-          ...(confidence.userGuidance.trustLevel === 'high' ? 
-            { backgroundColor: '#f0fdf4', borderColor: '#bbf7d0' } :
-            confidence.userGuidance.trustLevel === 'medium' ? 
-            { backgroundColor: '#fffbeb', borderColor: '#fed7aa' } :
-            { backgroundColor: '#fef2f2', borderColor: '#fecaca' }
-          )
+          border: '2px solid #00ff41',
+          backgroundColor: '#111',
+          marginBottom: '16px'
         }}>
           <div style={{ fontSize: '14px' }}>
-            <div style={{ fontWeight: '500', color: '#111827', marginBottom: '4px' }}>
+            <div style={{ fontWeight: 'bold', color: '#00ff41', marginBottom: '4px', textTransform: 'uppercase' }}>
               Recommended Use: {confidence.userGuidance.useCase || 'General research'}
             </div>
             {confidence.userGuidance.warnings && confidence.userGuidance.warnings.length > 0 && (
-              <div style={{ color: '#b45309' }}>
+              <div style={{ color: '#ff00ff', fontSize: '12px' }}>
                 ⚠️ {confidence.userGuidance.warnings.join(', ')}
               </div>
             )}
@@ -165,7 +192,7 @@ export const ConfidenceIndicator: React.FC<ConfidenceIndicatorProps> = ({
         <div style={{ marginTop: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {/* Data Sources Grid */}
           <div>
-            <h4 style={{ fontWeight: '500', color: '#111827', marginBottom: '12px' }}>Data Sources</h4>
+            <h4 style={{ fontWeight: 'bold', color: '#00ff41', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '1px' }}>Data Sources</h4>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
               {confidence.sourceDetails.map((source) => (
                 <SourceCard key={source.name} source={source} />
@@ -195,16 +222,16 @@ export const ConfidenceIndicator: React.FC<ConfidenceIndicatorProps> = ({
           {/* Strengths and Limitations */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '16px' }}>
             <div>
-              <h5 style={{ fontWeight: '500', color: '#059669', marginBottom: '8px' }}>✅ Strengths</h5>
-              <ul style={{ fontSize: '14px', color: '#4b5563', listStyle: 'none', padding: 0 }}>
+              <h5 style={{ fontWeight: 'bold', color: '#00ff41', marginBottom: '8px', textTransform: 'uppercase' }}>✅ Strengths</h5>
+              <ul style={{ fontSize: '14px', color: '#00ff41', listStyle: 'none', padding: 0 }}>
                 {confidence.strengths.map((strength, idx) => (
                   <li key={idx} style={{ marginBottom: '4px' }}>• {strength}</li>
                 ))}
               </ul>
             </div>
             <div>
-              <h5 style={{ fontWeight: '500', color: '#ea580c', marginBottom: '8px' }}>⚠️ Limitations</h5>
-              <ul style={{ fontSize: '14px', color: '#4b5563', listStyle: 'none', padding: 0 }}>
+              <h5 style={{ fontWeight: 'bold', color: '#ff00ff', marginBottom: '8px', textTransform: 'uppercase' }}>⚠️ Limitations</h5>
+              <ul style={{ fontSize: '14px', color: '#ff00ff', listStyle: 'none', padding: 0 }}>
                 {confidence.limitations.map((limitation, idx) => (
                   <li key={idx} style={{ marginBottom: '4px' }}>• {limitation}</li>
                 ))}
@@ -215,8 +242,8 @@ export const ConfidenceIndicator: React.FC<ConfidenceIndicatorProps> = ({
           {/* Additional Research Suggestions */}
           {confidence.userGuidance && confidence.userGuidance.additionalResearch && confidence.userGuidance.additionalResearch.length > 0 && (
             <div>
-              <h5 style={{ fontWeight: '500', color: '#2563eb', marginBottom: '8px' }}>🔍 Suggested Additional Research</h5>
-              <ul style={{ fontSize: '14px', color: '#4b5563', listStyle: 'none', padding: 0 }}>
+              <h5 style={{ fontWeight: 'bold', color: '#00ff41', marginBottom: '8px', textTransform: 'uppercase' }}>🔍 Suggested Additional Research</h5>
+              <ul style={{ fontSize: '14px', color: '#00ff41', listStyle: 'none', padding: 0 }}>
                 {confidence.userGuidance.additionalResearch.map((suggestion, idx) => (
                   <li key={idx} style={{ marginBottom: '4px' }}>• {suggestion}</li>
                 ))}
@@ -231,31 +258,32 @@ export const ConfidenceIndicator: React.FC<ConfidenceIndicatorProps> = ({
 
 const SourceCard: React.FC<{ source: SourceConfidence }> = ({ source }) => {
   const getStatusColor = (): React.CSSProperties => {
-    if (!source.found) return { backgroundColor: '#f3f4f6', borderColor: '#d1d5db' };
-    if (source.quality === 'high') return { backgroundColor: '#dcfce7', borderColor: '#86efac' };
-    if (source.quality === 'medium') return { backgroundColor: '#fef3c7', borderColor: '#fcd34d' };
-    return { backgroundColor: '#fee2e2', borderColor: '#fca5a5' };
+    if (!source.found) return { backgroundColor: '#111', borderColor: '#666', color: '#666' };
+    if (source.quality === 'high') return { backgroundColor: '#111', borderColor: '#00ff41', color: '#00ff41' };
+    if (source.quality === 'medium') return { backgroundColor: '#111', borderColor: '#ffaa00', color: '#ffaa00' };
+    return { backgroundColor: '#111', borderColor: '#ff00ff', color: '#ff00ff' };
   };
 
   return (
     <div style={{ 
       padding: '12px', 
       borderRadius: '8px', 
-      border: '1px solid', 
+      border: '2px solid', 
       textAlign: 'center',
+      fontFamily: 'Share Tech Mono, monospace',
       ...getStatusColor()
     }}>
       <div style={{ fontSize: '18px', marginBottom: '4px' }}>{source.icon}</div>
-      <div style={{ fontSize: '12px', fontWeight: '500', color: '#111827', marginBottom: '4px' }}>{source.displayName}</div>
+      <div style={{ fontSize: '12px', fontWeight: 'bold', marginBottom: '4px', textTransform: 'uppercase' }}>{source.displayName}</div>
       {source.found ? (
-        <div style={{ fontSize: '12px', color: '#4b5563' }}>
+        <div style={{ fontSize: '12px' }}>
           {source.dataPoints} data points
           {source.issues && source.issues.length > 0 && (
-            <div style={{ color: '#dc2626', marginTop: '4px' }}>{source.issues[0]}</div>
+            <div style={{ color: '#ff00ff', marginTop: '4px' }}>{source.issues[0]}</div>
           )}
         </div>
       ) : (
-        <div style={{ fontSize: '12px', color: '#6b7280' }}>Not found</div>
+        <div style={{ fontSize: '12px', color: '#666' }}>Not found</div>
       )}
     </div>
   );
@@ -264,9 +292,16 @@ const SourceCard: React.FC<{ source: SourceConfidence }> = ({ source }) => {
 const MetricCard: React.FC<{ title: string; score: number; detail: string }> = ({ 
   title, score, detail 
 }) => (
-  <div style={{ backgroundColor: '#f9fafb', padding: '12px', borderRadius: '8px' }}>
-    <div style={{ fontSize: '14px', fontWeight: '500', color: '#111827', marginBottom: '4px' }}>{title}</div>
-    <div style={{ fontSize: '18px', fontWeight: '700', color: '#111827' }}>{score}%</div>
-    <div style={{ fontSize: '12px', color: '#4b5563' }}>{detail}</div>
+  <div style={{ 
+    backgroundColor: '#111', 
+    padding: '12px', 
+    borderRadius: '8px', 
+    border: '2px solid #00ff41',
+    color: '#00ff41',
+    fontFamily: 'Share Tech Mono, monospace'
+  }}>
+    <div style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '4px', textTransform: 'uppercase' }}>{title}</div>
+    <div style={{ fontSize: '18px', fontWeight: 'bold' }}>{score}%</div>
+    <div style={{ fontSize: '12px' }}>{detail}</div>
   </div>
 ); 
