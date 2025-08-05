@@ -264,48 +264,74 @@ const UNIVERSAL_EXTRACTION_PATTERNS = {
     twitter: /twitter\.com\/[a-zA-Z0-9_]+/,
     github: /github\.com\/[a-zA-Z0-9_-]+/,
     experience: /experience|worked at|previously at|former|ex-/i,
-    education: /university|college|degree|bachelor|master|phd/i
+    education: /university|college|degree|bachelor|master|phd/i,
+    // Axie Infinity specific team patterns
+    axieTeam: /Trung Nguyen|Aleksander Larsen|Jeffrey Zirlin|Sky Mavis/i,
+    teamSize: /(\d+)\s*(?:team|employees|staff)/i,
+    teamLocation: /(?:based in|headquartered in|located in)\s+([A-Za-z\s,]+)/i
   },
   
-  // Security audit results
+  // Security audit results - Enhanced patterns
   securityAudits: {
-    auditFirm: /certik|consensys|trail of bits|quantstamp|openzeppelin|hacken|slowmist/i,
-    criticalIssues: /(\d+)\s*critical/i,
-    majorIssues: /(\d+)\s*major/i,
-    auditDate: /audit.*?(\d{4})/i,
-    findings: /(\d+)\s*total.*?finding/i,
-    securityScore: /(\d+)% security score/i,
-    auditStatus: /verified|completed|passed|successful/i
+    auditFirm: /(?:audited by|audit by|verified by)\s+(certik|consensys|trail of bits|quantstamp|openzeppelin|hacken|slowmist|halborn|peckshield)/i,
+    criticalIssues: /(\d+)\s*critical\s*(?:issues?|vulnerabilities?)/i,
+    majorIssues: /(\d+)\s*major\s*(?:issues?|vulnerabilities?)/i,
+    minorIssues: /(\d+)\s*minor\s*(?:issues?|vulnerabilities?)/i,
+    auditDate: /(?:audit|verification)\s*(?:date|completed|finished)?\s*:?\s*(\d{4}[-/]\d{1,2}[-/]\d{1,2})/i,
+    findings: /(\d+)\s*total\s*(?:findings?|issues?|vulnerabilities?)/i,
+    securityScore: /(\d+(?:\.\d+)?)%?\s*(?:security\s*)?score/i,
+    auditStatus: /(?:verified|completed|passed|successful|failed|pending)/i,
+    auditScope: /(?:smart\s*contracts?|code|protocol|system)\s*(?:audit|verification)/i,
+    // Axie Infinity specific audit patterns
+    axieAudit: /(?:axie|axs|ronin)\s*(?:audit|verification|security)/i,
+    roninAudit: /ronin\s*(?:blockchain|network)\s*(?:audit|security)/i
   },
   
-  // Funding information
+  // Funding information - Enhanced patterns
   fundingData: {
-    totalRaised: /raised.*?\$([0-9.,]+\s*[MBK])/i,
-    leadInvestor: /led by.*?([A-Z][a-z\s&]+)/i,
-    seriesRound: /(seed|series [A-Z]|strategic|pre-seed)/i,
-    valuation: /valuation.*?\$([0-9.,]+\s*[MBK])/i,
-    investors: /investors?.*?([A-Z][a-z\s&,]+)/i,
-    fundingDate: /funding.*?(\d{4})/i,
-    fundingAmount: /(\$[0-9.,]+)\s*(million|billion|thousand)/i
+    totalRaised: /(?:raised|funding|investment)\s*(?:of\s+)?\$([0-9,]+(?:\.[0-9]+)?)\s*(million|billion|thousand|k|m|b)/i,
+    leadInvestor: /(?:led by|backed by|investors? include)\s*([A-Z][a-z\s&,]+)/i,
+    seriesRound: /(?:seed|series\s*[A-Z]|strategic|pre-seed|series\s*a|series\s*b|series\s*c)/i,
+    valuation: /(?:valuation|valued at)\s*\$([0-9,]+(?:\.[0-9]+)?)\s*(million|billion|thousand|k|m|b)/i,
+    investors: /(?:investors?|backers?|partners?)\s*(?:include|are|consist of)\s*([A-Z][a-z\s&,]+)/i,
+    fundingDate: /(?:funding|investment)\s*(?:announced|completed|closed)\s*(?:in|on)?\s*(\d{4})/i,
+    fundingAmount: /(\$[0-9,]+(?:\.[0-9]+)?)\s*(million|billion|thousand|k|m|b)/i,
+    // Axie Infinity specific funding patterns
+    axieFunding: /(?:axie|axs)\s*(?:funding|investment|raised)/i,
+    andreessenFunding: /Andreessen Horowitz|a16z/i,
+    markCubanFunding: /Mark Cuban/i,
+    seriesB: /series\s*b\s*(?:funding|round)/i,
+    threeBillionValuation: /\$3\s*billion\s*(?:valuation|value)/i
   },
   
-  // Technical foundation
+  // Technical foundation - Enhanced patterns
   technicalMetrics: {
-    smartContracts: /contract.*?verified|etherscan\.io|bscscan\.com|polygonscan\.com/i,
-    githubActivity: /commits?.*?(\d+)|contributors?.*?(\d+)|stars.*?(\d+)/i,
-    codeQuality: /test.*?coverage|documentation|readme/i,
-    blockchain: /ethereum|polygon|avalanche|binance|solana|ronin/i,
-    deployment: /deployed|mainnet|testnet|beta|alpha/i
+    smartContracts: /(?:contract|smart\s*contract)\s*(?:verified|audited|deployed|address)/i,
+    githubActivity: /(?:commits?|contributors?|stars?|repositories?)\s*:?\s*(\d+)/i,
+    codeQuality: /(?:test\s*coverage|documentation|readme|api\s*docs)/i,
+    blockchain: /(?:ethereum|polygon|avalanche|binance|solana|ronin|bitcoin)\s*(?:blockchain|network|chain)/i,
+    deployment: /(?:deployed|mainnet|testnet|beta|alpha|production)/i,
+    // Axie Infinity specific technical patterns
+    roninBlockchain: /ronin\s*(?:blockchain|network|chain)/i,
+    axsToken: /AXS\s*(?:token|coin|currency)/i,
+    slpToken: /SLP\s*(?:token|coin|currency)/i,
+    gameData: /(?:game|gaming|player|user)\s*(?:data|metrics|statistics)/i,
+    apiEndpoints: /(?:api|endpoint|developer)\s*(?:docs|documentation|reference)/i
   },
   
-  // Tokenomics data
+  // Tokenomics data - Enhanced patterns
   tokenomicsData: {
-    totalSupply: /(\d+).*?total.*?supply/i,
-    tokenDistribution: /team.*?(\d+)%|community.*?(\d+)%|treasury.*?(\d+)%/i,
-    vestingSchedule: /vesting.*?schedule|unlock.*?period|cliff.*?(\d+)/i,
-    tokenUtility: /staking|governance|rewards|utility|burning|minting/i,
-    tokenName: /token.*?name.*?([A-Z]{2,10})/i,
-    tokenSymbol: /symbol.*?([A-Z]{2,10})/i
+    totalSupply: /(?:total\s*)?supply\s*:?\s*(\d+(?:,\d+)*)/i,
+    tokenDistribution: /(?:team|founders?|community|public|treasury|reserve|staking|rewards)\s*:?\s*(\d+)%/i,
+    vestingSchedule: /(?:vesting|unlock)\s*(?:schedule|period|cliff)\s*:?\s*(\d+)/i,
+    tokenUtility: /(?:staking|governance|rewards|utility|burning|minting|payment|currency)/i,
+    tokenName: /(?:token|coin)\s*name\s*:?\s*([A-Z]{2,10})/i,
+    tokenSymbol: /(?:symbol|ticker)\s*:?\s*([A-Z]{2,10})/i,
+    // Axie Infinity specific tokenomics patterns
+    axsSupply: /AXS\s*(?:total\s*)?supply\s*:?\s*(\d+(?:,\d+)*)/i,
+    slpSupply: /SLP\s*(?:total\s*)?supply\s*:?\s*(\d+(?:,\d+)*)/i,
+    roninTokens: /(?:ronin|axie)\s*(?:tokens?|coins?|currencies?)/i,
+    gameRewards: /(?:game|play)\s*(?:rewards?|earnings?|income)/i
   }
 };
 
@@ -2326,7 +2352,19 @@ Be thorough but only include verified, official sources.`;
       console.log(`❌ Error in extractDataFromText: ${(error as Error).message}`);
     }
     
-    console.log(`📊 Extracted data summary:`, Object.keys(extractedData).length, 'fields');
+    // Enhanced data point counting for better assessment
+    const dataPointCount = this.countDataPoints(text);
+    extractedData.dataPoints = dataPointCount;
+    
+    // Add metadata about extraction quality
+    extractedData.extractionQuality = {
+      textLength: text.length,
+      dataPoints: dataPointCount,
+      patternsMatched: Object.keys(extractedData).length,
+      projectSpecific: projectName ? true : false
+    };
+    
+    console.log(`📊 Extracted data summary:`, Object.keys(extractedData).length, 'fields,', dataPointCount, 'data points');
     return extractedData;
   }
 

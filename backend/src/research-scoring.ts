@@ -113,7 +113,7 @@ export class ResearchScoringEngine {
     }
 
     const grade = this.assignGrade(totalScore);
-    const confidence = this.calculateConfidence(findings, totalScore, isEstablishedProject);
+    const confidence = this.calculateConfidence(findings, totalScore, isEstablishedProject, projectName);
     const passesThreshold = this.checkThreshold(findings, totalScore, isEstablishedProject);
     const missingCritical = this.identifyMissingCritical(findings, isEstablishedProject);
     const recommendations = this.generateRecommendations(findings, totalScore, isEstablishedProject);
@@ -190,16 +190,16 @@ export class ResearchScoringEngine {
     return 'F';
   }
 
-  private calculateConfidence(findings: ResearchFindings, score: number, isEstablishedProject: boolean = false): number {
+  private calculateConfidence(findings: ResearchFindings, score: number, isEstablishedProject: boolean = false, projectName?: string): number {
     const tier1Coverage = this.getTierCoverage(findings, 1);
     const totalDataPoints = this.getTotalDataPoints(findings);
     
     let confidenceScore = score / 100; // Base confidence from score
     
     // Debug logging for Axie Infinity
-    const projectName = this.getProjectNameFromFindings(findings);
-    if (projectName && projectName.toLowerCase().includes('axie')) {
-      console.log(`🔍 Debug confidence calculation for ${projectName}:`);
+    const extractedProjectName = this.getProjectNameFromFindings(findings, projectName);
+    if (extractedProjectName && extractedProjectName.toLowerCase().includes('axie')) {
+      console.log(`🔍 Debug confidence calculation for ${extractedProjectName}:`);
       console.log(`  - Base score: ${score}, Base confidence: ${confidenceScore}`);
       console.log(`  - Tier 1 coverage: ${tier1Coverage}`);
       console.log(`  - Total data points: ${totalDataPoints}`);
@@ -231,7 +231,7 @@ export class ResearchScoringEngine {
       // Reduce penalty for established projects - only penalize by 0.05 per missing source instead of 0.15
       confidenceScore -= missingCritical.length * 0.05;
       
-      if (projectName && projectName.toLowerCase().includes('axie')) {
+      if (extractedProjectName && extractedProjectName.toLowerCase().includes('axie')) {
         console.log(`  - Established project bonus: +0.15`);
         console.log(`  - Missing critical sources: ${missingCritical.join(', ')}`);
         console.log(`  - Penalty for missing sources: -${missingCritical.length * 0.05}`);
@@ -240,19 +240,19 @@ export class ResearchScoringEngine {
     } else {
       // Check if this is a well-known project that should get established project treatment
       const wellKnownProjects = ['axie infinity', 'axie', 'axs', 'sky mavis'];
-      const isWellKnownProject = projectName && wellKnownProjects.some(name => 
-        projectName.toLowerCase().includes(name.toLowerCase())
+      const isWellKnownProject = extractedProjectName && wellKnownProjects.some(name => 
+        extractedProjectName.toLowerCase().includes(name.toLowerCase())
       );
       
       if (isWellKnownProject) {
-        console.log(`🔍 Well-known project detected: ${projectName}, applying established project confidence calculation`);
+        console.log(`🔍 Well-known project detected: ${extractedProjectName}, applying established project confidence calculation`);
         confidenceScore += 0.15; // +15% confidence for well-known projects
         
         // For well-known projects, be very lenient with missing critical sources
         const missingCritical = this.identifyMissingCritical(findings, true);
         confidenceScore -= missingCritical.length * 0.02; // Very small penalty for well-known projects
         
-        if (projectName && projectName.toLowerCase().includes('axie')) {
+        if (extractedProjectName && extractedProjectName.toLowerCase().includes('axie')) {
           console.log(`  - Well-known project bonus: +0.15`);
           console.log(`  - Missing critical sources: ${missingCritical.join(', ')}`);
           console.log(`  - Penalty for missing sources: -${missingCritical.length * 0.02}`);
@@ -272,15 +272,19 @@ export class ResearchScoringEngine {
   private getProjectNameFromFindings(findings: ResearchFindings, projectName?: string): string | null {
     // If project name is provided, use it
     if (projectName) {
+      console.log(`🔍 Using provided project name: ${projectName}`);
       return projectName;
     }
     
     // Try to extract project name from findings data
     for (const [sourceName, finding] of Object.entries(findings)) {
       if (finding?.data?.projectName) {
+        console.log(`🔍 Found project name in ${sourceName}: ${finding.data.projectName}`);
         return finding.data.projectName;
       }
     }
+    
+    console.log(`🔍 No project name found in findings data`);
     return null;
   }
 
