@@ -110,6 +110,29 @@ function App() {
         selectedNetwork
       };
       
+      // Add known contract addresses for well-known projects
+      const knownContracts: { [key: string]: { ronin?: string, ethereum?: string } } = {
+        'axie infinity': {
+          ronin: '0x97a9107C1793BC407d6F527b77e7fff4D812bece', // AXS token on Ronin
+          ethereum: '0xBB0E17EF65F82Ab018d8EDd776e8DD940327B28b' // AXS token on Ethereum
+        },
+        'axie': {
+          ronin: '0x97a9107C1793BC407d6F527b77e7fff4D812bece',
+          ethereum: '0xBB0E17EF65F82Ab018d8EDd776e8DD940327B28b'
+        }
+      };
+      
+      // Check if this is a known project and add contract addresses
+      const projectKey = projectName.toLowerCase();
+      if (knownContracts[projectKey]) {
+        if (selectedNetwork === 'ronin' || selectedNetwork === 'auto') {
+          requestBody.roninContractAddress = knownContracts[projectKey].ronin;
+        }
+        if (selectedNetwork === 'ethereum' || selectedNetwork === 'auto') {
+          requestBody.contractAddress = knownContracts[projectKey].ethereum;
+        }
+      }
+      
       if (selectedNetwork === 'ethereum' && contractAddress) {
         requestBody.contractAddress = contractAddress;
       } else if (selectedNetwork === 'ronin' && roninContractAddress) {
@@ -121,6 +144,9 @@ function App() {
         if (roninContractAddress) requestBody.roninContractAddress = roninContractAddress;
         if (avalancheContractAddress) requestBody.avalancheContractAddress = avalancheContractAddress;
       }
+      
+      // Debug: Log what we're sending
+      console.log('🔍 Sending request with data:', requestBody);
       
       if (useEnhancedResearch && feedback) {
         requestBody.feedback = {
