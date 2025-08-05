@@ -517,7 +517,7 @@ class AIResearchOrchestrator {
     
     // Default confidence thresholds - more lenient for established projects
     this.confidenceThresholds = {
-      minimumForAnalysis: 0.3, // Lowered from 0.5 to allow more research to complete
+      minimumForAnalysis: 0.01, // Temporarily set to very low value to disable confidence threshold
       highConfidence: 0.8,
       refreshThreshold: 0.6,
       cacheExpiryHours: 0 // Disable caching to force fresh data
