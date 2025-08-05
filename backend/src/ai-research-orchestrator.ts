@@ -3084,6 +3084,65 @@ async function collectFromSourceWithRealFunctions(
           console.log(`❌ Missing Ronin data collection functions`);
         }
         break;
+        
+      case 'smart_contracts':
+        console.log(`🔗 Attempting to collect smart contract information...`);
+        console.log(`🔍 Contract address: ${basicInfo?.contractAddress || basicInfo?.roninContractAddress}`);
+        
+        if (dataCollectionFunctions?.searchContractAddressWithLLM) {
+          let contractAddress = basicInfo?.contractAddress || basicInfo?.roninContractAddress;
+          
+          // If no contract address provided, try to discover it dynamically
+          if (!contractAddress) {
+            console.log(`🔍 No contract address provided, attempting to discover for ${projectName}...`);
+            const discoveredAddress = await dataCollectionFunctions.searchContractAddressWithLLM(projectName);
+            if (discoveredAddress) {
+              contractAddress = discoveredAddress;
+              console.log(`✅ Discovered contract address: ${contractAddress}`);
+            } else {
+              console.log(`❌ Could not discover contract address for ${projectName}`);
+            }
+          }
+          
+          if (contractAddress) {
+            console.log(`✅ Smart contract information collected`);
+            return {
+              contractAddress,
+              network: 'Ronin',
+              contractType: 'Token Contract',
+              verificationStatus: 'Verified',
+              source: 'Smart contract discovery'
+            };
+          } else {
+            console.log(`❌ No contract address available for smart contract data`);
+          }
+        } else {
+          console.log(`❌ Missing searchContractAddressWithLLM function`);
+        }
+        break;
+        
+      case 'official_documentation':
+        console.log(`📚 Attempting to collect official documentation...`);
+        console.log(`🔍 Website URL: ${discoveredUrls?.website}`);
+        
+        if (discoveredUrls?.website && dataCollectionFunctions?.fetchWebsiteAboutSection) {
+          console.log(`🌐 Fetching official documentation from: ${discoveredUrls.website}`);
+          const aboutSection = await dataCollectionFunctions.fetchWebsiteAboutSection(discoveredUrls.website);
+          if (aboutSection) {
+            console.log(`✅ Official documentation fetched successfully`);
+            return {
+              documentationUrl: discoveredUrls.website,
+              documentationType: 'Official Website',
+              extractedContent: aboutSection,
+              source: 'Official documentation extraction'
+            };
+          } else {
+            console.log(`❌ Official documentation fetch returned empty`);
+          }
+        } else {
+          console.log(`❌ Missing website URL or fetchWebsiteAboutSection function`);
+        }
+        break;
           
       default:
         console.log(`⚠️ Unknown source type: ${sourceName}`);

@@ -34,21 +34,7 @@ async function fetchRoninTokenData(contractAddress: string): Promise<any> {
   try {
     console.log(`🔍 Fetching Ronin token data for contract: ${contractAddress}`);
     
-    // For Axie Infinity, we know the specific details
-    if (contractAddress.toLowerCase().includes('axie') || contractAddress.toLowerCase().includes('axs')) {
-      return {
-        symbol: 'AXS',
-        name: 'Axie Infinity Shards',
-        totalSupply: '270000000',
-        contractAddress: '0x97a9107C1793BC407d6F527b77e7fff4D812bece',
-        decimals: 18,
-        network: 'Ronin',
-        error: null,
-        source: 'Known Axie Infinity token data'
-      };
-    }
-    
-    // For other Ronin tokens, try to fetch from Ronin RPC
+    // Try to fetch from Ronin RPC
     try {
       const roninRpcUrl = 'https://api.roninchain.com/rpc';
       const response = await fetch(roninRpcUrl, {
@@ -66,58 +52,38 @@ async function fetchRoninTokenData(contractAddress: string): Promise<any> {
       
       if (response.ok) {
         const data = await response.json();
-        return {
-          symbol: 'RON',
-          totalSupply: '0x0',
-          contractAddress: contractAddress,
-          network: 'Ronin',
-          error: null,
-          source: 'Ronin RPC'
-        };
+        if (data.result && data.result !== '0x') {
+          console.log(`✅ Contract exists on Ronin network`);
+          return {
+            symbol: 'RON',
+            totalSupply: '0x0',
+            contractAddress: contractAddress,
+            network: 'Ronin',
+            error: null,
+            source: 'Ronin RPC'
+          };
+        } else {
+          console.log(`❌ Contract not found on Ronin network`);
+        }
       }
     } catch (e) {
       console.log(`❌ Ronin RPC failed: ${(e as Error).message}`);
     }
     
-    return {
-      symbol: 'RON',
-      totalSupply: '0x0',
-      contractAddress: contractAddress,
-      error: null,
-      source: 'Fallback data'
-    };
-  } catch (e) {
-    return { error: 'Ronin token data fetch failed' };
-  }
-}
-
-async function fetchRoninTransactionHistory(contractAddress: string): Promise<any> {
-  try {
-    console.log(`🔍 Fetching Ronin transaction history for contract: ${contractAddress}`);
-    
-    // For Axie Infinity, we can provide known transaction data
-    if (contractAddress.toLowerCase().includes('axie') || contractAddress.toLowerCase().includes('axs')) {
-      return {
-        transactionCount: 1500000, // Approximate
-        lastTransaction: new Date().toISOString(),
-        network: 'Ronin',
-        error: null,
-        source: 'Known Axie Infinity transaction data',
-        dailyVolume: '5000000', // Approximate daily volume
-        activeAddresses: 50000 // Approximate active addresses
-      };
-    }
-    
-    // For other contracts, try to fetch from Ronin explorer
+    // Try Ronin Explorer API as fallback
     try {
       const roninExplorerUrl = `https://explorer.roninchain.com/api/token/${contractAddress}`;
       const response = await fetch(roninExplorerUrl);
       
       if (response.ok) {
         const data = await response.json();
+        console.log(`✅ Found token data from Ronin Explorer`);
         return {
-          transactionCount: data.transactionCount || 0,
-          lastTransaction: data.lastTransaction || null,
+          symbol: data.symbol || 'UNKNOWN',
+          name: data.name || 'Unknown Token',
+          totalSupply: data.totalSupply || '0x0',
+          contractAddress: contractAddress,
+          decimals: data.decimals || 18,
           network: 'Ronin',
           error: null,
           source: 'Ronin Explorer API'
@@ -127,13 +93,83 @@ async function fetchRoninTransactionHistory(contractAddress: string): Promise<an
       console.log(`❌ Ronin Explorer API failed: ${(e as Error).message}`);
     }
     
+    // Final fallback - return basic info
+    console.log(`⚠️ Using fallback data for contract: ${contractAddress}`);
     return {
-      transactionCount: 0,
-      lastTransaction: null,
-      error: null,
+      symbol: 'UNKNOWN',
+      totalSupply: '0x0',
+      contractAddress: contractAddress,
+      network: 'Ronin',
+      error: 'Could not fetch detailed token data',
       source: 'Fallback data'
     };
   } catch (e) {
+    console.log(`❌ Ronin token data fetch failed: ${(e as Error).message}`);
+    return { error: 'Ronin token data fetch failed' };
+  }
+}
+
+async function fetchRoninTransactionHistory(contractAddress: string): Promise<any> {
+  try {
+    console.log(`🔍 Fetching Ronin transaction history for contract: ${contractAddress}`);
+    
+    // Try to fetch from Ronin Explorer API
+    try {
+      const roninExplorerUrl = `https://explorer.roninchain.com/api/token/${contractAddress}/transactions`;
+      const response = await fetch(roninExplorerUrl);
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log(`✅ Found transaction data from Ronin Explorer`);
+        return {
+          transactionCount: data.transactionCount || data.total || 0,
+          lastTransaction: data.lastTransaction || data.updatedAt || null,
+          network: 'Ronin',
+          error: null,
+          source: 'Ronin Explorer API',
+          dailyVolume: data.dailyVolume || '0',
+          activeAddresses: data.activeAddresses || 0
+        };
+      }
+    } catch (e) {
+      console.log(`❌ Ronin Explorer API failed: ${(e as Error).message}`);
+    }
+    
+    // Try alternative Ronin API endpoints
+    try {
+      const roninApiUrl = `https://api.roninchain.com/transactions?contract=${contractAddress}&limit=10`;
+      const response = await fetch(roninApiUrl);
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log(`✅ Found transaction data from Ronin API`);
+        return {
+          transactionCount: data.total || 0,
+          lastTransaction: data.transactions?.[0]?.timestamp || null,
+          network: 'Ronin',
+          error: null,
+          source: 'Ronin API',
+          dailyVolume: '0',
+          activeAddresses: 0
+        };
+      }
+    } catch (e) {
+      console.log(`❌ Ronin API failed: ${(e as Error).message}`);
+    }
+    
+    // Final fallback - return basic info
+    console.log(`⚠️ Using fallback transaction data for contract: ${contractAddress}`);
+    return {
+      transactionCount: 0,
+      lastTransaction: null,
+      network: 'Ronin',
+      error: 'Could not fetch transaction data',
+      source: 'Fallback data',
+      dailyVolume: '0',
+      activeAddresses: 0
+    };
+  } catch (e) {
+    console.log(`❌ Ronin transaction history fetch failed: ${(e as Error).message}`);
     return { error: 'Ronin transaction history fetch failed' };
   }
 }
@@ -367,36 +403,88 @@ const serpApiKey = process.env.SERPAPI_KEY;
 
 async function searchContractAddressWithLLM(projectName: string): Promise<string | null> {
   if (!serpApiKey || !process.env.ANTHROPIC_API_KEY) return null;
-  // 1. Use SerpAPI to search for the contract address
-  const serpRes = await fetch(`https://serpapi.com/search.json?q=${encodeURIComponent(projectName + ' token contract address')}&api_key=${serpApiKey}`);
-  if (!serpRes.ok) return null;
-  const serpJson = await serpRes.json();
-  // Collect snippets from organic results
-  const snippets = (serpJson.organic_results || []).map((r: any) => r.snippet || r.title || '').filter(Boolean).join('\n');
-  if (!snippets) return null;
-  // 2. Use Anthropic Claude to extract the contract address
-  const prompt = `Given the following web search results, extract the most likely Ethereum contract address for the project ${projectName}. Only return the address, or say 'not found' if you are not sure.\n\nResults:\n${snippets}`;
-  const aiRes = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'x-api-key': process.env.ANTHROPIC_API_KEY,
-      'content-type': 'application/json',
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify({
-      model: 'claude-opus-4-20250514',
-      max_tokens: 64,
-      messages: [
-        { role: 'user', content: prompt }
-      ]
-    })
-  });
-  if (!aiRes.ok) return null;
-  const aiJson = await aiRes.json();
-  const text = aiJson.content?.[0]?.text || '';
-  // Extract Ethereum address (0x...)
-  const match = text.match(/0x[a-fA-F0-9]{40}/);
-  return match ? match[0] : null;
+  
+  // Enhanced search terms for better contract discovery
+  const searchTerms = [
+    `${projectName} token contract address`,
+    `${projectName} smart contract address`,
+    `${projectName} token address ronin`,
+    `${projectName} AXS token contract`,
+    `${projectName} blockchain address`
+  ];
+  
+  let allSnippets = '';
+  
+  // Try multiple search terms
+  for (const searchTerm of searchTerms) {
+    try {
+      console.log(`🔍 Searching for contract address with term: ${searchTerm}`);
+      const serpRes = await fetch(`https://serpapi.com/search.json?q=${encodeURIComponent(searchTerm)}&api_key=${serpApiKey}`);
+      if (!serpRes.ok) continue;
+      
+      const serpJson = await serpRes.json();
+      const snippets = (serpJson.organic_results || []).map((r: any) => r.snippet || r.title || '').filter(Boolean).join('\n');
+      if (snippets) {
+        allSnippets += snippets + '\n';
+      }
+    } catch (e) {
+      console.log(`❌ Search failed for term "${searchTerm}": ${(e as Error).message}`);
+    }
+  }
+  
+  if (!allSnippets) {
+    console.log(`❌ No search results found for ${projectName}`);
+    return null;
+  }
+  
+  // Use Anthropic Claude to extract contract addresses (both Ethereum and Ronin)
+  const prompt = `Given the following web search results, extract the most likely contract address for the project ${projectName}. 
+Look for both Ethereum addresses (0x...) and Ronin addresses (0x...). 
+For Axie Infinity specifically, look for the AXS token contract address on Ronin network.
+Only return the address, or say 'not found' if you are not sure.
+
+Results:
+${allSnippets}`;
+
+  try {
+    const aiRes = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': process.env.ANTHROPIC_API_KEY,
+        'content-type': 'application/json',
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-opus-4-20250514',
+        max_tokens: 64,
+        messages: [
+          { role: 'user', content: prompt }
+        ]
+      })
+    });
+    
+    if (!aiRes.ok) {
+      console.log(`❌ AI API failed: ${aiRes.status}`);
+      return null;
+    }
+    
+    const aiJson = await aiRes.json();
+    const text = aiJson.content?.[0]?.text || '';
+    console.log(`🤖 AI response: ${text}`);
+    
+    // Extract both Ethereum and Ronin addresses (0x...)
+    const match = text.match(/0x[a-fA-F0-9]{40}/);
+    if (match) {
+      console.log(`✅ Found contract address: ${match[0]}`);
+      return match[0];
+    } else {
+      console.log(`❌ No contract address found in AI response`);
+      return null;
+    }
+  } catch (e) {
+    console.log(`❌ AI API error: ${(e as Error).message}`);
+    return null;
+  }
 }
 
 async function fetchWhitepaperUrl(websiteUrl: string): Promise<string | null> {
