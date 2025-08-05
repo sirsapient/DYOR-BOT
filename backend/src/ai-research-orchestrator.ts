@@ -517,10 +517,10 @@ class AIResearchOrchestrator {
     
     // Initialize with default configurations
     this.confidenceThresholds = {
-      minimumForAnalysis: 10, // Lowered from 30 to allow more research to complete
+      minimumForAnalysis: 1, // Lowered from 10 to allow more research to complete
       highConfidence: 85,
       refreshThreshold: 60,
-      cacheExpiryHours: 24,
+      cacheExpiryHours: 0, // Disable caching to ensure fresh data every time
       ...options?.confidenceThresholds
     };
     
@@ -2980,33 +2980,9 @@ export async function conductAIOrchestratedResearch(
       console.error(`🔍 Error details:`, error instanceof Error ? error.message : 'Unknown error');
       console.error(`🔍 Error stack:`, error instanceof Error ? error.stack : 'No stack trace');
       
-      // Provide fallback response to prevent "No data found" error
-      console.log(`🛡️ Providing fallback response for ${projectName} to prevent "No data found" error`);
-      return {
-        success: false,
-        reason: error instanceof Error ? error.message : 'Unknown error occurred during research',
-        findings: {},
-        researchPlan: null,
-        completeness: {
-          isComplete: false,
-          confidence: 0,
-          gaps: ['research_failed'],
-          recommendations: ['Try again later or check project name']
-        },
-        adaptiveState: null,
-        discoveredSources: {},
-        tokenDiscovery: { tokens: [], confidence: 0, reasoning: 'Discovery failed', fallbackUsed: false },
-        discoveredWhitepapers: [],
-        meta: {
-          timeSpent: 0,
-          sourcesCollected: 0,
-          aiConfidence: 0,
-          universalSourcesFound: 0,
-          tokensDiscovered: 0,
-          whitepapersFound: 0,
-          error: true
-        }
-      };
+      // Force fresh data sourcing instead of fallback
+      console.log(`🔄 Forcing fresh data sourcing for ${projectName} instead of fallback response`);
+      throw error; // Re-throw to allow traditional research to handle it
     }
 }
 

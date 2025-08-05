@@ -1285,7 +1285,9 @@ app.post('/api/research', async (req: any, res: any) => {
     if (!aiResult.success) {
       console.log(`❌ AI Orchestrator failed for ${projectName}: ${aiResult.reason}`);
       
+      // DISABLED: Fallback data - forcing fresh data sourcing instead
       // Special handling for Axie Infinity - provide fallback data even if AI fails
+      /*
       if (projectName.toLowerCase().includes('axie')) {
         console.log(`🎯 Providing fallback data for Axie Infinity despite AI failure`);
         
@@ -1379,31 +1381,34 @@ app.post('/api/research', async (req: any, res: any) => {
               description: 'Strong data coverage with fallback sources'
             },
             breakdown: {
-              dataCompleteness: { score: 80, found: 6, total: 8, missing: ['External APIs'] },
-              sourceReliability: { score: 90, official: 1, verified: 5, scraped: 0 },
-              dataFreshness: { score: 100, averageAge: 0, oldestSource: 'Known Data' }
+              dataCompleteness: { score: 85, found: 8, total: 10, missing: ['team_verified', 'security_audited'] },
+              sourceReliability: { score: 90, official: 6, verified: 2, scraped: 0 },
+              dataFreshness: { score: 80, averageAge: 1, oldestSource: 'whitepaper.axieinfinity.com' }
             },
-            sourceDetails: [],
+            sourceDetails: [
+              { name: 'whitepaper', displayName: 'Whitepaper', found: true, quality: 'high', reliability: 'official', dataPoints: 8, lastUpdated: new Date().toISOString(), confidence: 90, icon: '📄', description: 'Official whitepaper data' },
+              { name: 'token_data', displayName: 'Token Data', found: true, quality: 'high', reliability: 'official', dataPoints: 6, lastUpdated: new Date().toISOString(), confidence: 85, icon: '💰', description: 'Ronin network token data' },
+              { name: 'team_info', displayName: 'Team Info', found: false, quality: 'low', reliability: 'scraped', dataPoints: 0, lastUpdated: new Date().toISOString(), confidence: 0, icon: '👥', description: 'Team information not available' }
+            ],
             limitations: ['Using fallback data sources'],
-            strengths: ['Known Axie Infinity data', 'Official sources available'],
+            strengths: ['Comprehensive token data', 'Official whitepaper available', 'Ronin network integration'],
             userGuidance: {
               trustLevel: 'high',
-              useCase: 'Comprehensive project analysis and research',
+              useCase: 'Investment research with known data',
               warnings: ['Using fallback data sources'],
-              additionalResearch: ['Check for recent updates', 'Verify current market data']
+              additionalResearch: ['Verify current market data', 'Check recent team updates']
             }
-          },
-          qualityGates: {
-            passed: true,
-            gatesFailed: [],
-            recommendations: ['Using fallback data for well-known project'],
-            userMessage: 'Research completed with fallback data'
           }
         };
         
         return res.json(fallbackReport);
       }
+      */
       
+      // Force fresh data sourcing instead of fallback
+      console.log(`🔄 Forcing fresh data sourcing for ${projectName} instead of fallback data`);
+      
+      // Continue with traditional research to get fresh data
       return await performTraditionalResearch(req, res);
     }
 
