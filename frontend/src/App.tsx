@@ -190,7 +190,7 @@ function App() {
         </div>
 
             {/* Gathered Links */}
-            {research.sourcesUsed && research.sourcesUsed.length > 0 && (
+            {research.sourcesUsed && Array.isArray(research.sourcesUsed) && research.sourcesUsed.length > 0 && (
               <div className="sources-section">
                 <div className="search-input-title">GATHERED LINKS</div>
                 <div className="links-container">
@@ -199,12 +199,12 @@ function App() {
                       <div className="link-icon">🔗</div>
                       <div className="link-content">
                         <div className="link-url">
-                          {source.length > 50 ? source.substring(0, 50) + '...' : source}
+                          {source && source.length > 50 ? source.substring(0, 50) + '...' : source}
                         </div>
                         <div className="link-domain">
                           {(() => {
                             try {
-                              return new URL(source).hostname;
+                              return source && new URL(source).hostname;
                             } catch (error) {
                               return 'Invalid URL';
                             }
@@ -246,7 +246,7 @@ function App() {
               <div className="research-section">
                 <div className="section-title">KEY FINDINGS</div>
                 <div className="findings-grid">
-                  {research.keyFindings.positives.length > 0 && (
+                  {research.keyFindings.positives && Array.isArray(research.keyFindings.positives) && research.keyFindings.positives.length > 0 && (
                     <div className="finding-category positive">
                       <div className="finding-title">✅ POSITIVE ASPECTS</div>
                       <ul>
@@ -257,7 +257,7 @@ function App() {
                     </div>
                   )}
                   
-                  {research.keyFindings.negatives.length > 0 && (
+                  {research.keyFindings.negatives && Array.isArray(research.keyFindings.negatives) && research.keyFindings.negatives.length > 0 && (
                     <div className="finding-category negative">
                       <div className="finding-title">⚠️ NEGATIVE ASPECTS</div>
                       <ul>
@@ -268,7 +268,7 @@ function App() {
                     </div>
                   )}
                   
-                  {research.keyFindings.redFlags.length > 0 && (
+                  {research.keyFindings.redFlags && Array.isArray(research.keyFindings.redFlags) && research.keyFindings.redFlags.length > 0 && (
                     <div className="finding-category red-flag">
                       <div className="finding-title">🚨 RED FLAGS</div>
                       <ul>
@@ -336,7 +336,7 @@ function App() {
               <div className="research-section">
                 <div className="section-title">TEAM ANALYSIS</div>
                 <div className="team-content">
-                  {research.teamAnalysis.studioAssessment && research.teamAnalysis.studioAssessment.length > 0 && (
+                  {research.teamAnalysis.studioAssessment && Array.isArray(research.teamAnalysis.studioAssessment) && research.teamAnalysis.studioAssessment.length > 0 && (
                     <div className="team-item">
                       <div className="team-label">🏢 Studio Background</div>
                       <ul>
@@ -470,7 +470,7 @@ function App() {
               )}
             
             {/* Data Sources Overview */}
-            {research.confidence && (
+            {research.confidence && research.confidence.sourceDetails && Array.isArray(research.confidence.sourceDetails) && (
               <div className="sources-overview">
                 <div className="signal-title">DATA SOURCES</div>
                 <div className="sources-grid">
@@ -493,7 +493,7 @@ function App() {
                 <div className="signal-title">RECOMMENDED USE</div>
                 <div className="guidance-content">
                   <div className="guidance-text">{research.confidence.userGuidance.useCase}</div>
-                  {research.confidence.userGuidance.warnings && research.confidence.userGuidance.warnings.length > 0 && (
+                  {research.confidence.userGuidance.warnings && Array.isArray(research.confidence.userGuidance.warnings) && research.confidence.userGuidance.warnings.length > 0 && (
                     <div className="guidance-warnings">
                       <div className="warning-title">⚠️ WARNINGS</div>
                       <ul>
