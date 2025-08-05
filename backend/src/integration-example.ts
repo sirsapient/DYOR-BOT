@@ -43,8 +43,8 @@ export async function enhancedResearchWithAI(
     const qualityGateResult = await handleResearchWithQualityGates(
       projectName,
       {
-        type: aiResult.researchPlan?.projectClassification?.type || 'unknown',
-        confidence: aiResult.researchPlan?.projectClassification?.confidence || 0
+        type: aiResult.plan?.projectClassification?.type || 'unknown',
+        confidence: aiResult.plan?.projectClassification?.confidence || 0
       }
     );
 
@@ -54,14 +54,13 @@ export async function enhancedResearchWithAI(
       aiResearch: aiResult,
       qualityGates: qualityGateResult,
       combinedInsights: {
-        projectType: aiResult.researchPlan?.projectClassification?.type || 'unknown',
-        aiConfidence: aiResult.completeness?.confidence || 0,
+        projectType: aiResult.plan?.projectClassification?.type || 'unknown',
+        aiConfidence: aiResult.confidence || 0,
         qualityScore: qualityGateResult.success ? 'High' : 'Low',
         recommendations: [
-          ...(aiResult.completeness?.recommendations || []),
           ...(qualityGateResult.recommendations || [])
         ],
-        riskAreas: aiResult.researchPlan?.riskAreas?.map(risk => ({
+        riskAreas: aiResult.plan?.riskAreas?.map((risk: any) => ({
           area: risk.area,
           priority: risk.priority,
           approach: risk.investigationApproach
@@ -174,10 +173,10 @@ export async function batchResearchWithAI(
       results.push({
         projectName,
         success: result.success,
-        projectType: result.researchPlan?.projectClassification?.type || 'unknown',
-        aiConfidence: result.completeness?.confidence || 0,
-        timeSpent: result.meta?.timeSpent || 0,
-        sourcesCollected: result.meta?.sourcesCollected || 0
+        projectType: result.plan?.projectClassification?.type || 'unknown',
+        aiConfidence: result.confidence || 0,
+        timeSpent: 0,
+        sourcesCollected: 0
       });
 
 

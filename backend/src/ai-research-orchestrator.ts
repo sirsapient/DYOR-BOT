@@ -535,7 +535,7 @@ interface AdaptiveResearchState {
   adjustedPlan?: Partial<ResearchPlan>;
 }
 
-class AIResearchOrchestrator {
+export class AIResearchOrchestrator {
   private anthropic: Anthropic;
   private qualityGates: QualityGatesEngine;
   private scoringEngine: ResearchScoringEngine;
