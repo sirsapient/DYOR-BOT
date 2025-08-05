@@ -277,14 +277,20 @@ export class ResearchScoringEngine {
     }
     
     // Try to extract project name from findings data
+    console.log(`🔍 Attempting to extract project name from findings data`);
+    console.log(`🔍 Findings keys: ${Object.keys(findings).join(', ')}`);
+    
     for (const [sourceName, finding] of Object.entries(findings)) {
+      console.log(`🔍 Checking source: ${sourceName}`);
+      console.log(`🔍 Finding data keys: ${finding?.data ? Object.keys(finding.data).join(', ') : 'no data'}`);
+      
       if (finding?.data?.projectName) {
         console.log(`🔍 Found project name in ${sourceName}: ${finding.data.projectName}`);
         return finding.data.projectName;
       }
     }
     
-    console.log(`🔍 No project name found in findings data`);
+    console.log(`🔍 No project name found in findings data - returning null`);
     return null;
   }
 
