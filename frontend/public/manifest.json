@@ -1,6 +1,6 @@
 {
-  "short_name": "React App",
-  "name": "Create React App Sample",
+  "short_name": "DYOR BOT",
+  "name": "DYOR BOT - Web3 Research Assistant",
   "icons": [
     {
       "src": "favicon.ico",
@@ -21,5 +21,6 @@
   "start_url": ".",
   "display": "standalone",
   "theme_color": "#000000",
-  "background_color": "#ffffff"
+  "background_color": "#000000",
+  "description": "AI-powered Web3 project research and analysis tool"
 }
