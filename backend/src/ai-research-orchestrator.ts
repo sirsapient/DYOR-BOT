@@ -2752,7 +2752,7 @@ export async function conductAIOrchestratedResearch(
     // NEW: Phase 0: Lightweight token discovery (as proposed in architecture)
     console.log(`🔍 Phase 0: Lightweight token discovery for ${projectName}`);
     const tokenDiscovery = await orchestrator['discoverTokensLightweight'](projectName);
-    console.log(`✅ Token discovery completed: ${tokenDiscovery.tokens.join(', ')} (confidence: ${tokenDiscovery.confidence}%)`);
+    console.log(`✅ Token discovery completed: ${tokenDiscovery.tokens.join(', ')} (confidence: ${(tokenDiscovery.confidence * 100).toFixed(2)}%)`);
     
     // NEW: Phase 0.5: Enhanced whitepaper discovery (as proposed in architecture)
     console.log(`📄 Phase 0.5: Enhanced whitepaper discovery for ${projectName}`);
@@ -2953,7 +2953,7 @@ export async function conductAIOrchestratedResearch(
   const completeness = await orchestrator.assessResearchCompleteness(researchPlan, findings);
   const thresholdCheck = orchestrator.shouldPassToSecondAI(findings);
   
-  console.log(`📊 Final assessment - Confidence: ${thresholdCheck.confidenceScore}%, Complete: ${completeness.isComplete}`);
+  console.log(`📊 Final assessment - Confidence: ${(thresholdCheck.confidenceScore * 100).toFixed(2)}%, Complete: ${completeness.isComplete}`);
   console.log(`📋 Gaps identified: ${completeness.gaps.length}`);
   console.log(`💡 Recommendations: ${completeness.recommendations.length}`);
   
