@@ -1282,6 +1282,8 @@ app.post('/api/research', async (req: any, res: any) => {
       {
         name: projectName,
         aliases: tokenSymbol ? [projectName, tokenSymbol] : [projectName],
+        contractAddress: contractAddress || undefined,
+        roninContractAddress: roninContractAddress || undefined,
         // Add any additional basic info if available
       },
       {
