@@ -24,6 +24,114 @@
   pointer-events: none;
 }
 
+/* Initial Screen Layout */
+.initial-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 40px 20px;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.search-form-container {
+  width: 100%;
+  max-width: 500px;
+  margin: 40px 0;
+}
+
+.search-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  align-items: center;
+}
+
+.search-input-large {
+  width: 100%;
+  background: #000;
+  border: 2px solid #00ff41;
+  color: #00ff41;
+  padding: 16px 20px;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 16px;
+  border-radius: 8px;
+  text-align: center;
+  transition: all 0.3s ease;
+}
+
+.search-input-large::placeholder {
+  color: #666;
+}
+
+.search-input-large:focus {
+  outline: none;
+  box-shadow: 0 0 20px #00ff41;
+}
+
+.search-button-large {
+  background: #00ff41;
+  color: #000;
+  border: none;
+  padding: 16px 32px;
+  font-family: 'Share Tech Mono', monospace;
+  font-weight: bold;
+  font-size: 16px;
+  cursor: pointer;
+  border-radius: 8px;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  transition: all 0.3s ease;
+  min-width: 200px;
+}
+
+.search-button-large:hover {
+  background: #00cc33;
+  box-shadow: 0 0 20px #00ff41;
+  transform: translateY(-2px);
+}
+
+.search-button-large:disabled {
+  background: #333;
+  color: #666;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+.app-description {
+  background: #111;
+  border: 2px solid #00ff41;
+  padding: 30px;
+  border-radius: 12px;
+  margin-top: 40px;
+  max-width: 600px;
+  text-align: left;
+}
+
+.description-title {
+  font-size: 18px;
+  font-weight: bold;
+  color: #00ff41;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  margin-bottom: 15px;
+  text-shadow: 0 0 10px #00ff41;
+}
+
+.app-description p {
+  color: #00ff41;
+  font-size: 14px;
+  line-height: 1.6;
+  margin-bottom: 20px;
+}
+
+.app-description .description-title:last-of-type {
+  margin-top: 30px;
+}
+
 /* Main layout container */
 .main-container {
   display: grid;
@@ -395,6 +503,19 @@
   
   .data-grid {
     grid-template-columns: 1fr;
+  }
+  
+  .initial-screen {
+    padding: 20px 10px;
+  }
+  
+  .search-form-container {
+    max-width: 100%;
+  }
+  
+  .app-description {
+    margin-top: 20px;
+    padding: 20px;
   }
 }
 
