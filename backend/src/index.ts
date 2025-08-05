@@ -1298,7 +1298,8 @@ app.post('/api/research', async (req: any, res: any) => {
         fetchRoninTokenData,
         fetchRoninTransactionHistory,
         discoverOfficialUrlsWithAI,
-        findOfficialSourcesForEstablishedProject
+        findOfficialSourcesForEstablishedProject,
+        searchContractAddressWithLLM
       }
     );
 
@@ -1623,7 +1624,8 @@ app.post('/api/research-enhanced', async (req: any, res: any) => {
       fetchRoninTokenData,
       fetchRoninTransactionHistory,
       discoverOfficialUrlsWithAI,
-      findOfficialSourcesForEstablishedProject
+      findOfficialSourcesForEstablishedProject,
+      searchContractAddressWithLLM
     };
 
     // Conduct enhanced research

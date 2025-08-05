@@ -21,6 +21,7 @@ interface DataCollectionFunctions {
   fetchRoninTransactionHistory: (contractAddress: string) => Promise<any>;
   discoverOfficialUrlsWithAI: (projectName: string, aliases: string[]) => Promise<any>;
   findOfficialSourcesForEstablishedProject: (projectName: string, aliases: string[]) => Promise<any>;
+  searchContractAddressWithLLM: (projectName: string) => Promise<string | null>;
 }
 
 // NEW: Feedback interface for second AI communication
@@ -3038,7 +3039,20 @@ async function collectFromSourceWithRealFunctions(
         console.log(`🔍 Contract address: ${basicInfo?.contractAddress || basicInfo?.roninContractAddress}`);
         
         if (dataCollectionFunctions?.fetchRoninTokenData && dataCollectionFunctions?.fetchRoninTransactionHistory) {
-          const contractAddress = basicInfo?.contractAddress || basicInfo?.roninContractAddress;
+          let contractAddress = basicInfo?.contractAddress || basicInfo?.roninContractAddress;
+          
+          // If no contract address provided, try to discover it dynamically
+          if (!contractAddress && dataCollectionFunctions?.searchContractAddressWithLLM) {
+            console.log(`🔍 No contract address provided, attempting to discover for ${projectName}...`);
+            const discoveredAddress = await dataCollectionFunctions.searchContractAddressWithLLM(projectName);
+            if (discoveredAddress) {
+              contractAddress = discoveredAddress;
+              console.log(`✅ Discovered contract address: ${contractAddress}`);
+            } else {
+              console.log(`❌ Could not discover contract address for ${projectName}`);
+            }
+          }
+          
           if (contractAddress) {
             console.log(`🔍 Attempting to fetch Ronin token data for contract: ${contractAddress}`);
             const tokenData = await dataCollectionFunctions.fetchRoninTokenData(contractAddress);
@@ -3060,7 +3074,7 @@ async function collectFromSourceWithRealFunctions(
               console.log(`❌ Both token data and transaction history returned null`);
             }
           } else {
-            console.log(`⚠️ On-chain data collection requires contract address, not found in basicInfo.`);
+            console.log(`⚠️ On-chain data collection requires contract address, not found in basicInfo or discoverable.`);
           }
         } else {
           console.log(`❌ Missing Ronin data collection functions`);
