@@ -517,7 +517,7 @@ class AIResearchOrchestrator {
     
     // Initialize with default configurations
     this.confidenceThresholds = {
-      minimumForAnalysis: 1, // Lowered from 10 to allow more research to complete
+      minimumForAnalysis: 0.5, // Lowered to 0.5 (50%) to allow more research to complete
       highConfidence: 85,
       refreshThreshold: 60,
       cacheExpiryHours: 0, // Disable caching to ensure fresh data every time

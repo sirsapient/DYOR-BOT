@@ -202,7 +202,13 @@ function App() {
                           {source.length > 50 ? source.substring(0, 50) + '...' : source}
                         </div>
                         <div className="link-domain">
-                          {new URL(source).hostname}
+                          {(() => {
+                            try {
+                              return new URL(source).hostname;
+                            } catch (error) {
+                              return 'Invalid URL';
+                            }
+                          })()}
                         </div>
                       </div>
                     </div>
