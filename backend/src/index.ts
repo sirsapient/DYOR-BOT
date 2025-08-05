@@ -921,31 +921,34 @@ Return only valid JSON:`;
       
       console.log(`🤖 AI response for ${projectName}:`, text.substring(0, 200) + '...');
       
-      // Try to parse JSON from response
+      // Parse AI response
+      let cleanedJson = null;
       try {
-        const json = JSON.parse(text);
+        // Handle both direct JSON and JSON wrapped in markdown code blocks
+        let jsonText = text.trim();
         
-        // Validate and clean URLs
-        const cleanedJson: any = {};
-        for (const [key, url] of Object.entries(json)) {
-          if (url && typeof url === 'string') {
-            // Basic URL validation
-            if (url.startsWith('http') && (url.includes('.com') || url.includes('.io') || url.includes('.org') || url.includes('github.com'))) {
-              cleanedJson[key] = url;
-            } else {
-              console.log(`⚠️ Invalid URL format for ${key}: ${url}`);
-            }
-          } else {
-            cleanedJson[key] = null;
-          }
+        // Remove markdown code block wrappers if present
+        if (jsonText.startsWith('```json')) {
+          jsonText = jsonText.replace(/^```json\s*/, '').replace(/\s*```$/, '');
+        } else if (jsonText.startsWith('```')) {
+          jsonText = jsonText.replace(/^```\s*/, '').replace(/\s*```$/, '');
         }
         
-        console.log(`✅ AI discovered URLs for ${projectName}:`, cleanedJson);
-        return cleanedJson;
-      } catch (e) {
-        console.log('❌ Failed to parse AI response as JSON:', text.substring(0, 200));
+        // Try to parse the cleaned JSON
+        cleanedJson = JSON.parse(jsonText);
+        
+        // Validate that we have the expected structure
+        if (!cleanedJson || typeof cleanedJson !== 'object') {
+          throw new Error('Invalid JSON structure');
+        }
+      } catch (parseError) {
+        console.log(`❌ Failed to parse AI response as JSON: ${parseError}`);
+        console.log(`Raw AI response (first 500 chars): ${text.substring(0, 500)}`);
         return null;
       }
+      
+      console.log(`✅ AI discovered URLs for ${projectName}:`, cleanedJson);
+      return cleanedJson;
     } else {
       console.log(`❌ AI API error: ${aiRes.status} ${aiRes.statusText}`);
     }

@@ -1484,21 +1484,36 @@ Be thorough but only include verified, official sources.`;
     if (projectName.toLowerCase().includes('axie')) {
       console.log(`🔍 Data extraction for ${projectName}:`);
       console.log(`  - Available sources: ${Object.keys(sources).join(', ')}`);
+      console.log(`  - Documentation sources: ${sources.documentation?.length || 0}`);
+      console.log(`  - Company sources: ${sources.company?.length || 0}`);
     }
     
     // Extract team information from company sources
     for (const companyUrl of sources.company || []) {
       try {
+        console.log(`🔍 Fetching team data from: ${companyUrl}`);
         const res = await this.executeWithRetry(
-          () => fetch(companyUrl),
+          () => fetch(companyUrl, { 
+            method: 'GET',
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            },
+            signal: AbortSignal.timeout(10000) // 10 second timeout
+          }),
           `Fetching company data from ${companyUrl}`
         );
         if (res.ok) {
           const html = await res.text();
+          console.log(`✅ Successfully fetched ${html.length} characters from ${companyUrl}`);
           const teamData = this.extractDataFromText(html, UNIVERSAL_EXTRACTION_PATTERNS.teamVerification);
           if (Object.keys(teamData).length > 0) {
             extractedData.teamInfo = { ...extractedData.teamInfo, ...teamData };
+            console.log(`✅ Extracted team data:`, teamData);
+          } else {
+            console.log(`⚠️ No team data extracted from ${companyUrl}`);
           }
+        } else {
+          console.log(`❌ HTTP ${res.status} for ${companyUrl}`);
         }
       } catch (e) {
         console.log(`❌ Failed to extract team data from ${companyUrl}: ${(e as Error).message}`);
@@ -1508,16 +1523,29 @@ Be thorough but only include verified, official sources.`;
     // Extract security audit information
     for (const securityUrl of sources.security || []) {
       try {
+        console.log(`🔍 Fetching security data from: ${securityUrl}`);
         const res = await this.executeWithRetry(
-          () => fetch(securityUrl),
+          () => fetch(securityUrl, { 
+            method: 'GET',
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            },
+            signal: AbortSignal.timeout(10000)
+          }),
           `Fetching security data from ${securityUrl}`
         );
         if (res.ok) {
           const html = await res.text();
+          console.log(`✅ Successfully fetched ${html.length} characters from ${securityUrl}`);
           const auditData = this.extractDataFromText(html, UNIVERSAL_EXTRACTION_PATTERNS.securityAudits);
           if (Object.keys(auditData).length > 0) {
             extractedData.securityAudits = { ...extractedData.securityAudits, ...auditData };
+            console.log(`✅ Extracted security data:`, auditData);
+          } else {
+            console.log(`⚠️ No security data extracted from ${securityUrl}`);
           }
+        } else {
+          console.log(`❌ HTTP ${res.status} for ${securityUrl}`);
         }
       } catch (e) {
         console.log(`❌ Failed to extract security data from ${securityUrl}: ${(e as Error).message}`);
@@ -1527,16 +1555,29 @@ Be thorough but only include verified, official sources.`;
     // Extract funding information
     for (const fundingUrl of sources.funding || []) {
       try {
+        console.log(`🔍 Fetching funding data from: ${fundingUrl}`);
         const res = await this.executeWithRetry(
-          () => fetch(fundingUrl),
+          () => fetch(fundingUrl, { 
+            method: 'GET',
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            },
+            signal: AbortSignal.timeout(10000)
+          }),
           `Fetching funding data from ${fundingUrl}`
         );
         if (res.ok) {
           const html = await res.text();
+          console.log(`✅ Successfully fetched ${html.length} characters from ${fundingUrl}`);
           const fundingData = this.extractDataFromText(html, UNIVERSAL_EXTRACTION_PATTERNS.fundingData);
           if (Object.keys(fundingData).length > 0) {
             extractedData.fundingData = { ...extractedData.fundingData, ...fundingData };
+            console.log(`✅ Extracted funding data:`, fundingData);
+          } else {
+            console.log(`⚠️ No funding data extracted from ${fundingUrl}`);
           }
+        } else {
+          console.log(`❌ HTTP ${res.status} for ${fundingUrl}`);
         }
       } catch (e) {
         console.log(`❌ Failed to extract funding data from ${fundingUrl}: ${(e as Error).message}`);
@@ -1546,16 +1587,29 @@ Be thorough but only include verified, official sources.`;
     // Extract technical metrics
     for (const technicalUrl of sources.technical || []) {
       try {
+        console.log(`🔍 Fetching technical data from: ${technicalUrl}`);
         const res = await this.executeWithRetry(
-          () => fetch(technicalUrl),
+          () => fetch(technicalUrl, { 
+            method: 'GET',
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            },
+            signal: AbortSignal.timeout(10000)
+          }),
           `Fetching technical data from ${technicalUrl}`
         );
         if (res.ok) {
           const html = await res.text();
+          console.log(`✅ Successfully fetched ${html.length} characters from ${technicalUrl}`);
           const technicalData = this.extractDataFromText(html, UNIVERSAL_EXTRACTION_PATTERNS.technicalMetrics);
           if (Object.keys(technicalData).length > 0) {
             extractedData.technicalMetrics = { ...extractedData.technicalMetrics, ...technicalData };
+            console.log(`✅ Extracted technical data:`, technicalData);
+          } else {
+            console.log(`⚠️ No technical data extracted from ${technicalUrl}`);
           }
+        } else {
+          console.log(`❌ HTTP ${res.status} for ${technicalUrl}`);
         }
       } catch (e) {
         console.log(`❌ Failed to extract technical data from ${technicalUrl}: ${(e as Error).message}`);
@@ -1570,31 +1624,32 @@ Be thorough but only include verified, official sources.`;
         
         if (extractedDocData.tokenomics && Object.keys(extractedDocData.tokenomics).length > 0) {
           extractedData.tokenomicsData = { ...extractedData.tokenomicsData, ...extractedDocData.tokenomics };
+          console.log(`✅ Extracted tokenomics data:`, extractedDocData.tokenomics);
         }
         
         if (extractedDocData.tokenInfo && Object.keys(extractedDocData.tokenInfo).length > 0) {
           extractedData.tokenInfo = { ...extractedData.tokenInfo, ...extractedDocData.tokenInfo };
+          console.log(`✅ Extracted token info:`, extractedDocData.tokenInfo);
         }
         
         if (extractedDocData.chainInfo && Object.keys(extractedDocData.chainInfo).length > 0) {
           extractedData.chainInfo = { ...extractedData.chainInfo, ...extractedDocData.chainInfo };
+          console.log(`✅ Extracted chain info:`, extractedDocData.chainInfo);
         }
       } catch (e) {
         console.log(`❌ Failed to extract from documentation ${docUrl}: ${(e as Error).message}`);
       }
     }
     
-    // Debug logging for Axie Infinity
-    if (projectName.toLowerCase().includes('axie')) {
-      console.log(`🔍 Data extraction summary for ${projectName}:`);
-      console.log(`  - Team info: ${Object.keys(extractedData.teamInfo).length} items`);
-      console.log(`  - Security audits: ${Object.keys(extractedData.securityAudits).length} items`);
-      console.log(`  - Funding data: ${Object.keys(extractedData.fundingData).length} items`);
-      console.log(`  - Technical metrics: ${Object.keys(extractedData.technicalMetrics).length} items`);
-      console.log(`  - Tokenomics data: ${Object.keys(extractedData.tokenomicsData).length} items`);
-      console.log(`  - Token info: ${Object.keys(extractedData.tokenInfo).length} items`);
-      console.log(`  - Chain info: ${Object.keys(extractedData.chainInfo).length} items`);
-    }
+    // Summary of extracted data
+    console.log(`📊 Data extraction summary for ${projectName}:`);
+    console.log(`  - Team info: ${Object.keys(extractedData.teamInfo).length} items`);
+    console.log(`  - Security audits: ${Object.keys(extractedData.securityAudits).length} items`);
+    console.log(`  - Funding data: ${Object.keys(extractedData.fundingData).length} items`);
+    console.log(`  - Technical metrics: ${Object.keys(extractedData.technicalMetrics).length} items`);
+    console.log(`  - Tokenomics data: ${Object.keys(extractedData.tokenomicsData).length} items`);
+    console.log(`  - Token info: ${Object.keys(extractedData.tokenInfo).length} items`);
+    console.log(`  - Chain info: ${Object.keys(extractedData.chainInfo).length} items`);
     
     return extractedData;
   }
@@ -2014,19 +2069,106 @@ Be thorough but only include verified, official sources.`;
   }
 
   private extractDataFromText(text: string, patterns: any): any {
-    const extracted: any = {};
+    const extractedData: any = {};
     
-    for (const [category, categoryPatterns] of Object.entries(patterns as Record<string, any>)) {
-      extracted[category] = {};
-      for (const [key, pattern] of Object.entries(categoryPatterns as Record<string, any>)) {
-        const match = text.match(pattern as RegExp);
-        if (match) {
-          extracted[category][key] = match[1] || match[0];
+    try {
+      // Clean the text first
+      const cleanText = text.replace(/\s+/g, ' ').trim();
+      
+      // Extract data using patterns
+      for (const [key, pattern] of Object.entries(patterns)) {
+        if (pattern instanceof RegExp) {
+          const matches = cleanText.match(pattern);
+          if (matches && matches.length > 0) {
+            // For patterns with capture groups, use the first match
+            if (matches.length > 1) {
+              extractedData[key] = matches[1] || matches[0];
+            } else {
+              extractedData[key] = matches[0];
+            }
+          }
+        } else if (typeof pattern === 'string') {
+          // Simple string search
+          if (cleanText.toLowerCase().includes(pattern.toLowerCase())) {
+            extractedData[key] = true;
+          }
         }
       }
+      
+      // Additional extraction for common patterns
+      if (patterns.founders) {
+        // Look for founder information in various formats
+        const founderPatterns = [
+          /founder[:\s]+([A-Z][a-z]+ [A-Z][a-z]+)/gi,
+          /ceo[:\s]+([A-Z][a-z]+ [A-Z][a-z]+)/gi,
+          /co-founder[:\s]+([A-Z][a-z]+ [A-Z][a-z]+)/gi
+        ];
+        
+        for (const pattern of founderPatterns) {
+          const matches = cleanText.match(pattern);
+          if (matches && matches.length > 0) {
+            extractedData.founders = extractedData.founders || [];
+            extractedData.founders.push(matches[1] || matches[0]);
+          }
+        }
+      }
+      
+      if (patterns.auditFirm) {
+        // Look for audit firm mentions
+        const auditPatterns = [
+          /(certik|consensys|trail of bits|quantstamp|openzeppelin|hacken|slowmist)/gi
+        ];
+        
+        for (const pattern of auditPatterns) {
+          const matches = cleanText.match(pattern);
+          if (matches && matches.length > 0) {
+            extractedData.auditFirm = matches[0];
+            extractedData.hasAudit = true;
+            break;
+          }
+        }
+      }
+      
+      if (patterns.totalRaised) {
+        // Look for funding amounts
+        const fundingPatterns = [
+          /raised.*?\$([0-9.,]+\s*[MBK])/gi,
+          /funding.*?\$([0-9.,]+\s*[MBK])/gi,
+          /investment.*?\$([0-9.,]+\s*[MBK])/gi
+        ];
+        
+        for (const pattern of fundingPatterns) {
+          const matches = cleanText.match(pattern);
+          if (matches && matches.length > 0) {
+            extractedData.totalRaised = matches[1] || matches[0];
+            break;
+          }
+        }
+      }
+      
+      if (patterns.smartContracts) {
+        // Look for blockchain/contract information
+        const blockchainPatterns = [
+          /(ethereum|polygon|avalanche|binance|solana|ronin)/gi,
+          /contract.*?verified/gi,
+          /etherscan\.io/gi,
+          /bscscan\.com/gi
+        ];
+        
+        for (const pattern of blockchainPatterns) {
+          const matches = cleanText.match(pattern);
+          if (matches && matches.length > 0) {
+            extractedData.blockchain = extractedData.blockchain || [];
+            extractedData.blockchain.push(matches[0]);
+          }
+        }
+      }
+      
+    } catch (error) {
+      console.log(`❌ Error in extractDataFromText: ${(error as Error).message}`);
     }
     
-    return extracted;
+    return extractedData;
   }
 
   private countDataPoints(text: string): number {
