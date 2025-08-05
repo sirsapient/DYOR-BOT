@@ -3003,20 +3003,7 @@ async function collectFromSourceWithRealFunctions(
         console.log(`👥 Attempting to collect team information...`);
         console.log(`🔍 Website URL: ${discoveredUrls?.website}`);
         
-        // Special handling for Axie Infinity
-        if (projectName.toLowerCase().includes('axie') || projectName.toLowerCase().includes('axie infinity')) {
-          console.log(`🎮 Special handling for Axie Infinity - providing known team information`);
-          return {
-            aboutSection: 'Axie Infinity is developed by Sky Mavis, a Vietnamese game studio founded in 2018. The team includes co-founders Trung Nguyen (CEO), Aleksander Larsen (COO), and Jeffrey Zirlin (Growth Lead). The company has raised significant funding and has a strong team with experience in blockchain gaming.',
-            website: discoveredUrls?.website || 'https://axieinfinity.com',
-            teamInfo: 'Sky Mavis team information',
-            founders: ['Trung Nguyen', 'Aleksander Larsen', 'Jeffrey Zirlin'],
-            company: 'Sky Mavis',
-            founded: '2018',
-            location: 'Vietnam',
-            source: 'Known Axie Infinity team data'
-          };
-        }
+
         
         if (discoveredUrls?.website && dataCollectionFunctions?.fetchWebsiteAboutSection) {
           console.log(`🌐 Fetching website about section from: ${discoveredUrls.website}`);
@@ -3056,13 +3043,7 @@ async function collectFromSourceWithRealFunctions(
         if (dataCollectionFunctions?.fetchRoninTokenData && dataCollectionFunctions?.fetchRoninTransactionHistory) {
           let contractAddress = basicInfo?.contractAddress || basicInfo?.roninContractAddress;
           
-          // Special handling for Axie Infinity
-          if (projectName.toLowerCase().includes('axie') || projectName.toLowerCase().includes('axie infinity')) {
-            if (!contractAddress) {
-              contractAddress = '0x97a9107C1793BC407d6F527b77e7fff4D812bece'; // AXS token on Ronin
-              console.log(`🎮 Using known Axie Infinity Ronin contract address: ${contractAddress}`);
-            }
-          }
+
           
           // If no contract address provided, try to discover it dynamically
           if (!contractAddress && dataCollectionFunctions?.searchContractAddressWithLLM) {

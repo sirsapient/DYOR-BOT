@@ -1332,14 +1332,7 @@ app.post('/api/research', async (req: any, res: any) => {
     return res.status(400).json({ error: 'Missing projectName' });
   }
 
-  // Special handling for Axie Infinity - provide known contract addresses
   let finalRoninContractAddress = roninContractAddress;
-  if (projectName.toLowerCase().includes('axie') || projectName.toLowerCase().includes('axie infinity')) {
-    if (!finalRoninContractAddress) {
-      finalRoninContractAddress = '0x97a9107C1793BC407d6F527b77e7fff4D812bece'; // AXS token on Ronin
-      console.log(`🎮 Detected Axie Infinity - using known Ronin contract address: ${finalRoninContractAddress}`);
-    }
-  }
 
   console.log(`✅ Request validation passed`);
 
