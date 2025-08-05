@@ -1238,14 +1238,85 @@ async function fetchSteamDescription(appid: string): Promise<string> {
 
 async function fetchWebsiteAboutSection(url: string): Promise<string> {
   try {
-    const res = await fetch(url);
-    if (!res.ok) return '';
+    console.log(`🌐 Fetching website content from: ${url}`);
+    
+    // Add headers to mimic a real browser
+    const headers = {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+      'Accept-Language': 'en-US,en;q=0.5',
+      'Accept-Encoding': 'gzip, deflate',
+      'Connection': 'keep-alive',
+      'Upgrade-Insecure-Requests': '1',
+    };
+
+    const res = await fetch(url, { headers });
+    if (!res.ok) {
+      console.log(`❌ HTTP ${res.status}: ${res.statusText} for ${url}`);
+      return '';
+    }
+    
     const html = await res.text();
     const $ = cheerio.load(html);
-    // Try to find About/Game section
-    let about = $('section:contains("About")').text() || $('section:contains("Game")').text() || $('body').text();
-    return about.replace(/\s+/g, ' ').trim().substring(0, 2000);
-  } catch (e) { return ''; }
+    
+    // Remove script and style tags
+    $('script, style').remove();
+    
+    // Try multiple selectors for about/game information
+    let about = '';
+    
+    // Method 1: Look for specific sections
+    const aboutSelectors = [
+      'section:contains("About")',
+      'section:contains("Game")',
+      'section:contains("Story")',
+      'div:contains("About")',
+      'div:contains("Game")',
+      'div:contains("Story")',
+      '[class*="about"]',
+      '[class*="game"]',
+      '[id*="about"]',
+      '[id*="game"]'
+    ];
+    
+    for (const selector of aboutSelectors) {
+      const element = $(selector);
+      if (element.length > 0) {
+        about = element.text();
+        console.log(`✅ Found content using selector: ${selector}`);
+        break;
+      }
+    }
+    
+    // Method 2: Look for main content area
+    if (!about) {
+      const mainContent = $('main, [role="main"], .main, .content, .container').text();
+      if (mainContent.length > 100) {
+        about = mainContent;
+        console.log(`✅ Found content in main area`);
+      }
+    }
+    
+    // Method 3: Fallback to body text
+    if (!about) {
+      about = $('body').text();
+      console.log(`✅ Using body text as fallback`);
+    }
+    
+    // Clean up the text
+    const cleanedText = about
+      .replace(/\s+/g, ' ')
+      .replace(/\n+/g, ' ')
+      .trim()
+      .substring(0, 3000); // Increased limit for better coverage
+    
+    console.log(`📄 Extracted ${cleanedText.length} characters of content`);
+    return cleanedText;
+    
+  } catch (e) {
+    console.log(`❌ Error fetching website content: ${(e as Error).message}`);
+    return '';
+  }
 }
 
 app.post('/api/research', async (req: any, res: any) => {
@@ -1259,6 +1330,15 @@ app.post('/api/research', async (req: any, res: any) => {
   if (!projectName) {
     console.log(`❌ ERROR: Missing projectName in request`);
     return res.status(400).json({ error: 'Missing projectName' });
+  }
+
+  // Special handling for Axie Infinity - provide known contract addresses
+  let finalRoninContractAddress = roninContractAddress;
+  if (projectName.toLowerCase().includes('axie') || projectName.toLowerCase().includes('axie infinity')) {
+    if (!finalRoninContractAddress) {
+      finalRoninContractAddress = '0x97a9107C1793BC407d6F527b77e7fff4D812bece'; // AXS token on Ronin
+      console.log(`🎮 Detected Axie Infinity - using known Ronin contract address: ${finalRoninContractAddress}`);
+    }
   }
 
   console.log(`✅ Request validation passed`);
@@ -1283,7 +1363,7 @@ app.post('/api/research', async (req: any, res: any) => {
         name: projectName,
         aliases: tokenSymbol ? [projectName, tokenSymbol] : [projectName],
         contractAddress: contractAddress || undefined,
-        roninContractAddress: roninContractAddress || undefined,
+        roninContractAddress: finalRoninContractAddress || undefined,
         // Add any additional basic info if available
       },
       {
