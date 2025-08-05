@@ -100,19 +100,12 @@ function App() {
 
   // If we have research results, show the three-panel layout
   if (research) {
-    const dataGridItems = [
-      { icon: '🎯', title: 'PRODUCT METRICS' },
-      { icon: '🛡️', title: 'SECURITY AUDIT' },
-      { icon: '👥', title: 'TEAM INFO SECU!' },
-      { icon: '👤', title: 'COMMUNITY // NOT FAURD' }
-    ];
-
     return (
       <div className="App">
         <LoadingModal show={researchLoading} />
         
         <div className="main-container">
-          {/* Left Panel - DYOR BOT Branding */}
+          {/* Left Panel - DYOR BOT Branding and Search */}
           <div className="left-panel">
             <div className="logo-container">
               <div className="logo">
@@ -122,27 +115,6 @@ function App() {
             </div>
             
             <div className="search-input-section">
-              <div className="search-input-title">SEARCH INPUT O X</div>
-              <div className="search-suggestions">
-                <div className="suggestion-item">ABOUT</div>
-                <div className="suggestion-item">ASSORCS /HOW-TO</div>
-                <div className="suggestion-item">Try: SRRN: SYGG</div>
-                <div className="suggestion-item">Try: SRON SYGG</div>
-                <div className="suggestion-item">// TRY + SYGG</div>
-                <div className="suggestion-item">TRY: SYGG</div>
-              </div>
-            </div>
-            
-            <div className="color-swatches">
-              <div className="color-swatch green"></div>
-              <div className="color-swatch magenta"></div>
-              <div className="color-swatch gray"></div>
-            </div>
-          </div>
-
-          {/* Middle Panel - Search and Data Grid */}
-          <div className="middle-panel">
-            <div className="search-container">
               <div className="search-input-title">SEARCH INPUT</div>
               <form onSubmit={handleSearch}>
                 <input
@@ -160,75 +132,324 @@ function App() {
                   {researchLoading ? 'SEARCHING...' : 'SEARCH'}
                 </button>
               </form>
-              
-              <div className="search-suggestions" style={{ marginTop: '15px' }}>
-                <div className="suggestion-item">ABOUT SROM</div>
-                <div className="suggestion-item">About: Ran a mjcst about Intercats. Try:</div>
-                <div className="suggestion-item">SUGGEST USE</div>
-                <div className="suggestion-item">Proceed with further research</div>
-              </div>
             </div>
 
-            <div className="search-input-title">DATA GRID</div>
-            <div className="data-grid">
-              {dataGridItems.map((item, index) => (
-                <div key={index} className="data-grid-item">
-                  <span className="data-grid-icon">{item.icon}</span>
-                  <div className="data-grid-title">{item.title}</div>
+            {/* Sources Used */}
+            {research.sourcesUsed && research.sourcesUsed.length > 0 && (
+              <div className="sources-section">
+                <div className="search-input-title">SOURCES USED</div>
+                <div className="search-suggestions">
+                  {research.sourcesUsed.slice(0, 5).map((source, index) => (
+                    <div key={index} className="suggestion-item">
+                      {source.length > 30 ? source.substring(0, 30) + '...' : source}
+                    </div>
+                  ))}
+                  {research.sourcesUsed.length > 5 && (
+                    <div className="suggestion-item">
+                      +{research.sourcesUsed.length - 5} more sources
+                    </div>
+                  )}
                 </div>
-              ))}
-            </div>
-
-            {/* Research Results */}
-            <div className="research-container">
-              <div className="research-header">
-                <h2 className="research-title">{research.projectName}</h2>
-                {research.confidence && (
-                  <div className="confidence-display">
-                    <div className="grade-badge">Grade {research.confidence.overall.grade}</div>
-                    <div className="confidence-badge">{research.confidence.overall.score}% Confidence</div>
-                  </div>
-                )}
               </div>
-              
-              {research.confidence && (
-                <ConfidenceIndicator confidence={research.confidence} />
-              )}
-              
-              {/* Research content would go here */}
-              <div style={{ marginTop: '20px' }}>
-                <p>Research data for {research.projectName} would be displayed here...</p>
-              </div>
-            </div>
+            )}
           </div>
 
-          {/* Right Panel - Signal Report Card */}
-          <div className="right-panel">
-            <div className="signal-report">
-              <div className="signal-title">SIGNAL REPORT CARD</div>
-              <div className="grade-display">
-                <div className="grade-text">GRADE A</div>
-                <div className="confidence-bar">
-                  <div className="confidence-fill" style={{ width: '85%' }}></div>
-                </div>
-                <div style={{ fontSize: '12px', color: '#00ff41' }}>05's CONFIDENCE</div>
-              </div>
-              <div className="search-suggestions">
-                <div className="suggestion-item">SUGGESTED ACTION</div>
-                <div className="suggestion-item">Proceed with further research</div>
-              </div>
+          {/* Middle Panel - Research Results */}
+          <div className="middle-panel">
+            {/* Project Header */}
+            <div className="research-header">
+              <h2 className="research-title">{research.projectName}</h2>
+              <div className="project-type">{research.projectType}</div>
             </div>
 
-            <div className="signal-title">WARNING BADGE</div>
-            <div className="warning-badge">// DATA REDACTED</div>
+            {/* AI Summary */}
+            {research.aiSummary && (
+              <div className="research-section">
+                <div className="section-title">AI ANALYSIS SUMMARY</div>
+                <div className="markdown-content">
+                  <ReactMarkdown>{research.aiSummary}</ReactMarkdown>
+                </div>
+              </div>
+            )}
 
-            <div className="signal-title">GLITCH BUTTON</div>
-            <button className="glitch-button export">
-              EXPORT
-            </button>
-            <button className="glitch-button export">
-              EXPORT ▼
-            </button>
+            {/* Key Findings */}
+            {(research.keyFindings.positives.length > 0 || 
+              research.keyFindings.negatives.length > 0 || 
+              research.keyFindings.redFlags.length > 0) && (
+              <div className="research-section">
+                <div className="section-title">KEY FINDINGS</div>
+                <div className="findings-grid">
+                  {research.keyFindings.positives.length > 0 && (
+                    <div className="finding-category positive">
+                      <div className="finding-title">✅ POSITIVE ASPECTS</div>
+                      <ul>
+                        {research.keyFindings.positives.map((finding, index) => (
+                          <li key={index}>{finding}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  
+                  {research.keyFindings.negatives.length > 0 && (
+                    <div className="finding-category negative">
+                      <div className="finding-title">⚠️ NEGATIVE ASPECTS</div>
+                      <ul>
+                        {research.keyFindings.negatives.map((finding, index) => (
+                          <li key={index}>{finding}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  
+                  {research.keyFindings.redFlags.length > 0 && (
+                    <div className="finding-category red-flag">
+                      <div className="finding-title">🚨 RED FLAGS</div>
+                      <ul>
+                        {research.keyFindings.redFlags.map((finding, index) => (
+                          <li key={index}>{finding}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Financial Data */}
+            {research.financialData && (
+              <div className="research-section">
+                <div className="section-title">FINANCIAL DATA</div>
+                <div className="financial-grid">
+                  {research.financialData.marketCap && (
+                    <div className="financial-item">
+                      <div className="financial-label">Market Cap</div>
+                      <div className="financial-value">${research.financialData.marketCap.toLocaleString()}</div>
+                    </div>
+                  )}
+                  
+                  {research.financialData.roninTokenInfo && (
+                    <div className="financial-item">
+                      <div className="financial-label">🌐 Ronin Network</div>
+                      <div className="financial-details">
+                        {research.financialData.roninTokenInfo.symbol && (
+                          <div>Symbol: {research.financialData.roninTokenInfo.symbol}</div>
+                        )}
+                        {research.financialData.roninTokenInfo.totalSupply && (
+                          <div>Supply: {parseInt(research.financialData.roninTokenInfo.totalSupply, 16).toLocaleString()}</div>
+                        )}
+                        {research.financialData.roninTokenInfo.contractAddress && (
+                          <div>Contract: {research.financialData.roninTokenInfo.contractAddress.substring(0, 20)}...</div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {research.financialData.avalancheTokenInfo && (
+                    <div className="financial-item">
+                      <div className="financial-label">❄️ Avalanche Network</div>
+                      <div className="financial-details">
+                        {research.financialData.avalancheTokenInfo.tokenInfo?.tokenSymbol && (
+                          <div>Symbol: {research.financialData.avalancheTokenInfo.tokenInfo.tokenSymbol}</div>
+                        )}
+                        {research.financialData.avalancheTokenInfo.tokenInfo?.totalSupply && (
+                          <div>Supply: {parseInt(research.financialData.avalancheTokenInfo.tokenInfo.totalSupply, 16).toLocaleString()}</div>
+                        )}
+                        {research.financialData.avalancheTokenInfo.contractAddress && (
+                          <div>Contract: {research.financialData.avalancheTokenInfo.contractAddress.substring(0, 20)}...</div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Team Analysis */}
+            {research.teamAnalysis && (
+              <div className="research-section">
+                <div className="section-title">TEAM ANALYSIS</div>
+                <div className="team-content">
+                  {research.teamAnalysis.studioAssessment && research.teamAnalysis.studioAssessment.length > 0 && (
+                    <div className="team-item">
+                      <div className="team-label">🏢 Studio Background</div>
+                      <ul>
+                        {research.teamAnalysis.studioAssessment.map((studio: any, i: number) => (
+                          <li key={i}>
+                            <strong>{studio.companyName}</strong>
+                            {studio.isDeveloper ? ' (Developer)' : ''}
+                            {studio.isPublisher ? ' (Publisher)' : ''}
+                            {studio.firstProjectDate && studio.firstProjectDate !== 'N/A' ? 
+                              ` | First project: ${studio.firstProjectDate}` : ''}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  
+                  {research.teamAnalysis.linkedinSummary && (
+                    <div className="team-item">
+                      <div className="team-label">💼 LinkedIn Insights</div>
+                      <p>{research.teamAnalysis.linkedinSummary}</p>
+                    </div>
+                  )}
+                  
+                  {research.teamAnalysis.glassdoorSummary && (
+                    <div className="team-item">
+                      <div className="team-label">🏢 Company Reviews</div>
+                      <p>{research.teamAnalysis.glassdoorSummary}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Technical Assessment */}
+            {research.technicalAssessment && (
+              <div className="research-section">
+                <div className="section-title">TECHNICAL ASSESSMENT</div>
+                <div className="technical-content">
+                  {research.technicalAssessment.securitySummary && (
+                    <div className="technical-item">
+                      <div className="technical-label">🔒 Security Analysis</div>
+                      <p>{research.technicalAssessment.securitySummary}</p>
+                    </div>
+                  )}
+                  
+                  {research.technicalAssessment.reviewSummary && (
+                    <div className="technical-item">
+                      <div className="technical-label">📊 Review Scores</div>
+                      <p>{research.technicalAssessment.reviewSummary}</p>
+                    </div>
+                  )}
+                  
+                  {research.technicalAssessment.githubRepo && (
+                    <div className="technical-item">
+                      <div className="technical-label">💻 GitHub Activity</div>
+                      <p>
+                        <strong>Repository:</strong> {research.technicalAssessment.githubRepo}
+                        {research.technicalAssessment.githubStats && (
+                          <span> | <strong>Stats:</strong> {research.technicalAssessment.githubStats}</span>
+                        )}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Community Health */}
+            {research.communityHealth && (
+              <div className="research-section">
+                <div className="section-title">COMMUNITY HEALTH</div>
+                <div className="community-content">
+                  {research.communityHealth.twitterSummary && (
+                    <div className="community-item">
+                      <div className="community-label">🐦 Twitter Activity</div>
+                      <p>{research.communityHealth.twitterSummary}</p>
+                    </div>
+                  )}
+                  
+                  {research.communityHealth.steamReviewSummary && (
+                    <div className="community-item">
+                      <div className="community-label">🎮 Steam Reviews</div>
+                      <p>{research.communityHealth.steamReviewSummary}</p>
+                    </div>
+                  )}
+                  
+                  {research.communityHealth.discordData && research.communityHealth.discordData.server_name && (
+                    <div className="community-item">
+                      <div className="community-label">💬 Discord Community</div>
+                      <p>
+                        <strong>Server:</strong> {research.communityHealth.discordData.server_name}
+                        {research.communityHealth.discordData.member_count && (
+                          <span> | <strong>Members:</strong> {research.communityHealth.discordData.member_count.toLocaleString()}</span>
+                        )}
+                      </p>
+                    </div>
+                  )}
+                  
+                  {research.communityHealth.redditSummary && (
+                    <div className="community-item">
+                      <div className="community-label">📱 Reddit Community</div>
+                      <p>{research.communityHealth.redditSummary}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {error && <div className="error-message">{error}</div>}
+          </div>
+
+          {/* Right Panel - Confidence and Signal Report */}
+          <div className="right-panel">
+            {/* Confidence Display */}
+            {research.confidence && (
+              <div className="confidence-section">
+                <div className="signal-title">RESEARCH GRADE</div>
+                <div className="grade-display">
+                  <div className="grade-text">GRADE {research.confidence.overall.grade}</div>
+                  <div className="confidence-bar">
+                    <div className="confidence-fill" style={{ width: `${research.confidence.overall.score}%` }}></div>
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#00ff41' }}>
+                    {research.confidence.overall.score}% CONFIDENCE
+                  </div>
+                </div>
+                <div className="confidence-description">
+                  {research.confidence.overall.description}
+                </div>
+              </div>
+            )}
+
+            {/* Data Sources Overview */}
+            {research.confidence && (
+              <div className="sources-overview">
+                <div className="signal-title">DATA SOURCES</div>
+                <div className="sources-grid">
+                  {research.confidence.sourceDetails.map((source, index) => (
+                    <div key={index} className={`source-item ${source.found ? 'found' : 'not-found'}`}>
+                      <div className="source-icon">{source.icon}</div>
+                      <div className="source-name">{source.displayName}</div>
+                      <div className="source-status">
+                        {source.found ? `${source.dataPoints} data points` : 'Not found'}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* User Guidance */}
+            {research.confidence && research.confidence.userGuidance && (
+              <div className="guidance-section">
+                <div className="signal-title">RECOMMENDED USE</div>
+                <div className="guidance-content">
+                  <div className="guidance-text">{research.confidence.userGuidance.useCase}</div>
+                  {research.confidence.userGuidance.warnings && research.confidence.userGuidance.warnings.length > 0 && (
+                    <div className="guidance-warnings">
+                      <div className="warning-title">⚠️ WARNINGS</div>
+                      <ul>
+                        {research.confidence.userGuidance.warnings.map((warning, index) => (
+                          <li key={index}>{warning}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Export Buttons */}
+            <div className="export-section">
+              <div className="signal-title">EXPORT OPTIONS</div>
+              <button className="glitch-button export">
+                EXPORT REPORT
+              </button>
+              <button className="glitch-button export">
+                EXPORT DATA ▼
+              </button>
+            </div>
           </div>
         </div>
       </div>
