@@ -155,9 +155,9 @@ function App() {
 
   // If we have research results, show the three-panel layout
   if (research) {
-    return (
-      <div className="App">
-        <LoadingModal show={researchLoading} />
+  return (
+    <div className="App">
+      <LoadingModal show={researchLoading} />
         
         <div className="main-container">
           {/* Left Panel - DYOR BOT Branding and Search */}
@@ -172,22 +172,22 @@ function App() {
             <div className="search-input-section">
               <div className="search-input-title">SEARCH INPUT</div>
               <form onSubmit={handleSearch}>
-                <input
-                  type="text"
-                  value={projectName}
-                  onChange={e => setProjectName(e.target.value)}
+          <input
+            type="text"
+            value={projectName}
+            onChange={e => setProjectName(e.target.value)}
                   placeholder="// enter token or project"
                   className="search-input"
-                />
-                <button 
-                  type="submit" 
-                  disabled={researchLoading || !projectName}
+          />
+          <button 
+            type="submit" 
+            disabled={researchLoading || !projectName}
                   className="search-button"
                 >
                   {researchLoading ? 'SEARCHING...' : 'SEARCH'}
-                </button>
+          </button>
               </form>
-            </div>
+        </div>
 
             {/* Gathered Links */}
             {research.sourcesUsed && research.sourcesUsed.length > 0 && (
@@ -413,14 +413,14 @@ function App() {
                     <div className="community-item">
                       <div className="community-label">🐦 Twitter Activity</div>
                       <p>{research.communityHealth.twitterSummary}</p>
-                    </div>
-                  )}
+            </div>
+          )}
                   
                   {research.communityHealth.steamReviewSummary && (
                     <div className="community-item">
                       <div className="community-label">🎮 Steam Reviews</div>
                       <p>{research.communityHealth.steamReviewSummary}</p>
-                    </div>
+      </div>
                   )}
                   
                   {research.communityHealth.discordData && research.communityHealth.discordData.server_name && (
@@ -451,7 +451,7 @@ function App() {
           {/* Right Panel - Confidence and Signal Report */}
           <div className="right-panel">
             {/* Confidence Display */}
-            {research.confidence && (
+              {research.confidence && (
               <div className="confidence-section">
                 <div className="signal-title">RESEARCH GRADE</div>
                 <div className="grade-display">
@@ -465,10 +465,10 @@ function App() {
                 </div>
                 <div className="confidence-description">
                   {research.confidence.overall.description}
+                  </div>
                 </div>
-              </div>
-            )}
-
+              )}
+            
             {/* Data Sources Overview */}
             {research.confidence && (
               <div className="sources-overview">

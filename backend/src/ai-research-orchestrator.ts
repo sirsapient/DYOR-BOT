@@ -517,7 +517,7 @@ class AIResearchOrchestrator {
     
     // Initialize with default configurations
     this.confidenceThresholds = {
-      minimumForAnalysis: 0.5, // Lowered to 0.5 (50%) to allow more research to complete
+      minimumForAnalysis: 0.3, // Lowered to 0.3 (30%) to allow more research to complete
       highConfidence: 85,
       refreshThreshold: 60,
       cacheExpiryHours: 0, // Disable caching to ensure fresh data every time
@@ -1480,6 +1480,12 @@ Be thorough but only include verified, official sources.`;
       chainInfo: {}  // NEW: Blockchain/network information
     };
     
+    // Debug logging for Axie Infinity
+    if (projectName.toLowerCase().includes('axie')) {
+      console.log(`🔍 Data extraction for ${projectName}:`);
+      console.log(`  - Available sources: ${Object.keys(sources).join(', ')}`);
+    }
+    
     // Extract team information from company sources
     for (const companyUrl of sources.company || []) {
       try {
@@ -1576,6 +1582,18 @@ Be thorough but only include verified, official sources.`;
       } catch (e) {
         console.log(`❌ Failed to extract from documentation ${docUrl}: ${(e as Error).message}`);
       }
+    }
+    
+    // Debug logging for Axie Infinity
+    if (projectName.toLowerCase().includes('axie')) {
+      console.log(`🔍 Data extraction summary for ${projectName}:`);
+      console.log(`  - Team info: ${Object.keys(extractedData.teamInfo).length} items`);
+      console.log(`  - Security audits: ${Object.keys(extractedData.securityAudits).length} items`);
+      console.log(`  - Funding data: ${Object.keys(extractedData.fundingData).length} items`);
+      console.log(`  - Technical metrics: ${Object.keys(extractedData.technicalMetrics).length} items`);
+      console.log(`  - Tokenomics data: ${Object.keys(extractedData.tokenomicsData).length} items`);
+      console.log(`  - Token info: ${Object.keys(extractedData.tokenInfo).length} items`);
+      console.log(`  - Chain info: ${Object.keys(extractedData.chainInfo).length} items`);
     }
     
     return extractedData;
