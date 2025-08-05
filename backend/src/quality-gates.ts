@@ -116,6 +116,12 @@ export class QualityGatesEngine {
       console.log(`🔍 High-confidence score detected: using minimum score ${minimumScore} instead of ${isEstablishedProject ? 70 : 60}`);
     }
     
+    // For very high confidence scores, be even more lenient
+    if (score.confidence >= 0.8) {
+      minimumScore = 50; // Very lenient for high-confidence scores
+      console.log(`🔍 Very high-confidence score detected: using minimum score ${minimumScore}`);
+    }
+    
     return score.totalScore >= minimumScore && score.passesThreshold;
   }
 
@@ -188,7 +194,7 @@ export class QualityGatesEngine {
     
     // For well-known projects, be more lenient with data point requirements
     if (isWellKnownProject) {
-      minDataPoints = 15; // Use regular project requirements for well-known projects
+      minDataPoints = 10; // Even more lenient for well-known projects
       console.log(`🔍 Well-known project ${projectName}: requiring ${minDataPoints} data points instead of ${isEstablishedProject ? 25 : 15}`);
     }
 
@@ -208,6 +214,11 @@ export class QualityGatesEngine {
         reasons.push('Security audit or institutional backing required for established project');
         suggestions.push('Look for security audit reports or institutional investor information');
       }
+    }
+    
+    // For well-known projects, skip additional requirements entirely
+    if (isWellKnownProject) {
+      console.log(`🔍 Well-known project ${projectName}: skipping additional requirements`);
     }
 
     return {

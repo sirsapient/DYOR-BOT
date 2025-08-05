@@ -934,6 +934,10 @@ Return only valid JSON:`;
           jsonText = jsonText.replace(/^```\s*/, '').replace(/\s*```$/, '');
         }
         
+        // Additional cleaning for common AI response issues
+        jsonText = jsonText.replace(/^\s*```\s*/, '').replace(/\s*```\s*$/, '');
+        jsonText = jsonText.trim();
+        
         // Try to parse the cleaned JSON
         cleanedJson = JSON.parse(jsonText);
         
@@ -941,10 +945,27 @@ Return only valid JSON:`;
         if (!cleanedJson || typeof cleanedJson !== 'object') {
           throw new Error('Invalid JSON structure');
         }
+        
+        console.log(`✅ Successfully parsed AI response for ${projectName}`);
       } catch (parseError) {
         console.log(`❌ Failed to parse AI response as JSON: ${parseError}`);
         console.log(`Raw AI response (first 500 chars): ${text.substring(0, 500)}`);
-        return null;
+        
+        // Try to extract JSON from the response using regex
+        try {
+          const jsonMatch = text.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            const extractedJson = jsonMatch[0];
+            cleanedJson = JSON.parse(extractedJson);
+            console.log(`✅ Successfully extracted JSON using regex for ${projectName}`);
+          } else {
+            console.log(`❌ No JSON object found in AI response for ${projectName}`);
+            return null;
+          }
+        } catch (regexParseError) {
+          console.log(`❌ Failed to extract JSON using regex: ${regexParseError}`);
+          return null;
+        }
       }
       
       console.log(`✅ AI discovered URLs for ${projectName}:`, cleanedJson);

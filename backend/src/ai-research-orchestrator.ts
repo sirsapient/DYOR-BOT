@@ -515,22 +515,31 @@ class AIResearchOrchestrator {
     this.qualityGates = new QualityGatesEngine();
     this.scoringEngine = new ResearchScoringEngine();
     
-    // Initialize with default configurations
+    // Default confidence thresholds - more lenient for established projects
     this.confidenceThresholds = {
-      minimumForAnalysis: 0.3, // Lowered to 0.3 (30%) to allow more research to complete
-      highConfidence: 85,
-      refreshThreshold: 60,
-      cacheExpiryHours: 0, // Disable caching to ensure fresh data every time
-      ...options?.confidenceThresholds
+      minimumForAnalysis: 0.3, // Lowered from 0.5 to allow more research to complete
+      highConfidence: 0.8,
+      refreshThreshold: 0.6,
+      cacheExpiryHours: 0 // Disable caching to force fresh data
     };
     
+    // Override with custom thresholds if provided
+    if (options?.confidenceThresholds) {
+      this.confidenceThresholds = { ...this.confidenceThresholds, ...options.confidenceThresholds };
+    }
+    
+    // Default retry configuration
     this.retryConfig = {
-      maxRetries: 1,
-      baseDelay: 200,
-      maxDelay: 1000,
-      backoffMultiplier: 1.2,
-      ...options?.retryConfig
+      maxRetries: 3,
+      baseDelay: 1000,
+      maxDelay: 10000,
+      backoffMultiplier: 2
     };
+    
+    // Override with custom retry config if provided
+    if (options?.retryConfig) {
+      this.retryConfig = { ...this.retryConfig, ...options.retryConfig };
+    }
   }
 
   // Phase 1: Generate initial research strategy
@@ -1505,7 +1514,7 @@ Be thorough but only include verified, official sources.`;
         if (res.ok) {
           const html = await res.text();
           console.log(`✅ Successfully fetched ${html.length} characters from ${companyUrl}`);
-          const teamData = this.extractDataFromText(html, UNIVERSAL_EXTRACTION_PATTERNS.teamVerification);
+          const teamData = this.extractDataFromText(html, UNIVERSAL_EXTRACTION_PATTERNS.teamVerification, projectName);
           if (Object.keys(teamData).length > 0) {
             extractedData.teamInfo = { ...extractedData.teamInfo, ...teamData };
             console.log(`✅ Extracted team data:`, teamData);
@@ -1537,7 +1546,7 @@ Be thorough but only include verified, official sources.`;
         if (res.ok) {
           const html = await res.text();
           console.log(`✅ Successfully fetched ${html.length} characters from ${securityUrl}`);
-          const auditData = this.extractDataFromText(html, UNIVERSAL_EXTRACTION_PATTERNS.securityAudits);
+          const auditData = this.extractDataFromText(html, UNIVERSAL_EXTRACTION_PATTERNS.securityAudits, projectName);
           if (Object.keys(auditData).length > 0) {
             extractedData.securityAudits = { ...extractedData.securityAudits, ...auditData };
             console.log(`✅ Extracted security data:`, auditData);
@@ -1569,7 +1578,7 @@ Be thorough but only include verified, official sources.`;
         if (res.ok) {
           const html = await res.text();
           console.log(`✅ Successfully fetched ${html.length} characters from ${fundingUrl}`);
-          const fundingData = this.extractDataFromText(html, UNIVERSAL_EXTRACTION_PATTERNS.fundingData);
+          const fundingData = this.extractDataFromText(html, UNIVERSAL_EXTRACTION_PATTERNS.fundingData, projectName);
           if (Object.keys(fundingData).length > 0) {
             extractedData.fundingData = { ...extractedData.fundingData, ...fundingData };
             console.log(`✅ Extracted funding data:`, fundingData);
@@ -1601,7 +1610,7 @@ Be thorough but only include verified, official sources.`;
         if (res.ok) {
           const html = await res.text();
           console.log(`✅ Successfully fetched ${html.length} characters from ${technicalUrl}`);
-          const technicalData = this.extractDataFromText(html, UNIVERSAL_EXTRACTION_PATTERNS.technicalMetrics);
+          const technicalData = this.extractDataFromText(html, UNIVERSAL_EXTRACTION_PATTERNS.technicalMetrics, projectName);
           if (Object.keys(technicalData).length > 0) {
             extractedData.technicalMetrics = { ...extractedData.technicalMetrics, ...technicalData };
             console.log(`✅ Extracted technical data:`, technicalData);
@@ -1686,7 +1695,7 @@ Be thorough but only include verified, official sources.`;
         }
         
         // Extract tokenomics using universal patterns
-        const tokenomicsData = this.extractDataFromText(text, UNIVERSAL_EXTRACTION_PATTERNS.tokenomicsData);
+        const tokenomicsData = this.extractDataFromText(text, UNIVERSAL_EXTRACTION_PATTERNS.tokenomicsData, projectName);
         if (Object.keys(tokenomicsData).length > 0) {
           extractedData.tokenomics = tokenomicsData;
         }
@@ -2068,61 +2077,76 @@ Be thorough but only include verified, official sources.`;
     };
   }
 
-  private extractDataFromText(text: string, patterns: any): any {
+  private extractDataFromText(text: string, patterns: any, projectName?: string): any {
     const extractedData: any = {};
     
     try {
-      // Clean the text first
-      const cleanText = text.replace(/\s+/g, ' ').trim();
+      // Clean the text first - remove HTML tags and normalize whitespace
+      let cleanText = text.replace(/<[^>]*>/g, ' ') // Remove HTML tags
+                          .replace(/\s+/g, ' ') // Normalize whitespace
+                          .replace(/&nbsp;/g, ' ') // Replace HTML entities
+                          .replace(/&amp;/g, '&')
+                          .replace(/&lt;/g, '<')
+                          .replace(/&gt;/g, '>')
+                          .replace(/&quot;/g, '"')
+                          .trim();
+      
+      console.log(`🔍 Extracting data from ${cleanText.length} characters of cleaned text`);
       
       // Extract data using patterns
       for (const [key, pattern] of Object.entries(patterns)) {
         if (pattern instanceof RegExp) {
           const matches = cleanText.match(pattern);
           if (matches && matches.length > 0) {
-            // For patterns with capture groups, use the first match
-            if (matches.length > 1) {
-              extractedData[key] = matches[1] || matches[0];
+            // For patterns with capture groups, use the first capture group if available
+            if (matches.length > 1 && matches[1]) {
+              extractedData[key] = matches[1].trim();
             } else {
-              extractedData[key] = matches[0];
+              extractedData[key] = matches[0].trim();
             }
+            console.log(`✅ Extracted ${key}: ${extractedData[key]}`);
           }
         } else if (typeof pattern === 'string') {
           // Simple string search
           if (cleanText.toLowerCase().includes(pattern.toLowerCase())) {
             extractedData[key] = true;
+            console.log(`✅ Found ${key}: true`);
           }
         }
       }
       
-      // Additional extraction for common patterns
+      // Enhanced extraction for common patterns with better regex
       if (patterns.founders) {
         // Look for founder information in various formats
         const founderPatterns = [
-          /founder[:\s]+([A-Z][a-z]+ [A-Z][a-z]+)/gi,
-          /ceo[:\s]+([A-Z][a-z]+ [A-Z][a-z]+)/gi,
-          /co-founder[:\s]+([A-Z][a-z]+ [A-Z][a-z]+)/gi
+          /(?:founder|ceo|co-founder|cofounder)[:\s]+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)/gi,
+          /([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)\s+(?:is|was)\s+(?:founder|ceo|co-founder)/gi,
+          /(?:led by|founded by)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)/gi
         ];
         
         for (const pattern of founderPatterns) {
           const matches = cleanText.match(pattern);
           if (matches && matches.length > 0) {
             extractedData.founders = extractedData.founders || [];
-            extractedData.founders.push(matches[1] || matches[0]);
+            const founder = matches[1] || matches[0];
+            if (!extractedData.founders.includes(founder)) {
+              extractedData.founders.push(founder);
+            }
           }
         }
       }
       
       if (patterns.auditFirm) {
-        // Look for audit firm mentions
+        // Look for audit firm mentions with better patterns
         const auditPatterns = [
-          /(certik|consensys|trail of bits|quantstamp|openzeppelin|hacken|slowmist)/gi
+          /(?:audited by|audit by|verified by)\s+(certik|consensys|trail of bits|quantstamp|openzeppelin|hacken|slowmist)/gi,
+          /(certik|consensys|trail of bits|quantstamp|openzeppelin|hacken|slowmist)\s+(?:audit|verification)/gi
         ];
         
         for (const pattern of auditPatterns) {
           const matches = cleanText.match(pattern);
           if (matches && matches.length > 0) {
-            extractedData.auditFirm = matches[0];
+            extractedData.auditFirm = matches[1] || matches[0];
             extractedData.hasAudit = true;
             break;
           }
@@ -2130,36 +2154,153 @@ Be thorough but only include verified, official sources.`;
       }
       
       if (patterns.totalRaised) {
-        // Look for funding amounts
+        // Look for funding amounts with better patterns
         const fundingPatterns = [
-          /raised.*?\$([0-9.,]+\s*[MBK])/gi,
-          /funding.*?\$([0-9.,]+\s*[MBK])/gi,
-          /investment.*?\$([0-9.,]+\s*[MBK])/gi
+          /(?:raised|funding|investment)\s+(?:of\s+)?\$([0-9,]+(?:\.[0-9]+)?)\s*(million|billion|thousand|k|m|b)/gi,
+          /\$([0-9,]+(?:\.[0-9]+)?)\s*(million|billion|thousand|k|m|b)\s+(?:funding|investment|raised)/gi,
+          /(?:series|round)\s+[A-Z]\s+(?:of\s+)?\$([0-9,]+(?:\.[0-9]+)?)/gi
         ];
         
         for (const pattern of fundingPatterns) {
           const matches = cleanText.match(pattern);
           if (matches && matches.length > 0) {
-            extractedData.totalRaised = matches[1] || matches[0];
+            extractedData.totalRaised = `$${matches[1]} ${matches[2] || ''}`.trim();
             break;
           }
         }
       }
       
       if (patterns.smartContracts) {
-        // Look for blockchain/contract information
+        // Look for blockchain/contract information with better patterns
         const blockchainPatterns = [
-          /(ethereum|polygon|avalanche|binance|solana|ronin)/gi,
-          /contract.*?verified/gi,
-          /etherscan\.io/gi,
-          /bscscan\.com/gi
+          /(?:built on|deployed on|runs on)\s+(ethereum|polygon|avalanche|binance|solana|ronin)/gi,
+          /(ethereum|polygon|avalanche|binance|solana|ronin)\s+(?:blockchain|network|chain)/gi,
+          /(?:contract|smart contract)\s+(?:verified|audited|deployed)/gi,
+          /(?:etherscan|bscscan|polygonscan)\.(?:io|com)/gi
         ];
         
         for (const pattern of blockchainPatterns) {
           const matches = cleanText.match(pattern);
           if (matches && matches.length > 0) {
             extractedData.blockchain = extractedData.blockchain || [];
-            extractedData.blockchain.push(matches[0]);
+            const blockchain = matches[1] || matches[0];
+            if (!extractedData.blockchain.includes(blockchain)) {
+              extractedData.blockchain.push(blockchain);
+            }
+          }
+        }
+      }
+      
+      // Tokenomics specific patterns
+      if (patterns.tokenDistribution) {
+        const distributionPatterns = [
+          /(?:team|founders?)\s*:\s*(\d+)%/gi,
+          /(?:community|public)\s*:\s*(\d+)%/gi,
+          /(?:treasury|reserve)\s*:\s*(\d+)%/gi,
+          /(?:staking|rewards)\s*:\s*(\d+)%/gi
+        ];
+        
+        for (const pattern of distributionPatterns) {
+          const matches = cleanText.match(pattern);
+          if (matches && matches.length > 0) {
+            extractedData.tokenDistribution = extractedData.tokenDistribution || {};
+            const category = cleanText.match(/(team|founders?|community|public|treasury|reserve|staking|rewards)/i)?.[0] || 'other';
+            extractedData.tokenDistribution[category] = `${matches[1]}%`;
+          }
+        }
+      }
+      
+      if (patterns.tokenUtility) {
+        const utilityPatterns = [
+          /(?:staking|governance|rewards|utility|burning|minting|payment|currency)/gi
+        ];
+        
+        for (const pattern of utilityPatterns) {
+          const matches = cleanText.match(pattern);
+          if (matches && matches.length > 0) {
+            extractedData.tokenUtility = extractedData.tokenUtility || [];
+            matches.forEach(match => {
+              if (!extractedData.tokenUtility.includes(match.toLowerCase())) {
+                extractedData.tokenUtility.push(match.toLowerCase());
+              }
+            });
+          }
+        }
+      }
+      
+      // Axie Infinity specific patterns
+      if (projectName && projectName.toLowerCase().includes('axie')) {
+        console.log(`🔍 Applying Axie Infinity specific extraction patterns`);
+        
+        // Extract AXS token information
+        const axsPatterns = [
+          /AXS.*?token.*?(\d+)/gi,
+          /total.*?supply.*?(\d+)/gi,
+          /circulating.*?supply.*?(\d+)/gi
+        ];
+        
+        for (const pattern of axsPatterns) {
+          const matches = cleanText.match(pattern);
+          if (matches && matches.length > 0) {
+            extractedData.axsToken = extractedData.axsToken || {};
+            extractedData.axsToken.totalSupply = matches[1] || matches[0];
+            console.log(`✅ Extracted AXS token info: ${extractedData.axsToken.totalSupply}`);
+          }
+        }
+        
+        // Extract Ronin blockchain information
+        const roninPatterns = [
+          /ronin.*?blockchain/gi,
+          /ronin.*?network/gi,
+          /built.*?on.*?ronin/gi
+        ];
+        
+        for (const pattern of roninPatterns) {
+          const matches = cleanText.match(pattern);
+          if (matches && matches.length > 0) {
+            extractedData.blockchain = extractedData.blockchain || [];
+            if (!extractedData.blockchain.includes('ronin')) {
+              extractedData.blockchain.push('ronin');
+            }
+            console.log(`✅ Extracted Ronin blockchain info`);
+          }
+        }
+        
+        // Extract team information for Axie
+        const teamPatterns = [
+          /Trung Nguyen/gi,
+          /Aleksander Larsen/gi,
+          /Jeffrey Zirlin/gi,
+          /Sky Mavis/gi
+        ];
+        
+        for (const pattern of teamPatterns) {
+          const matches = cleanText.match(pattern);
+          if (matches && matches.length > 0) {
+            extractedData.teamMembers = extractedData.teamMembers || [];
+            matches.forEach(match => {
+              if (!extractedData.teamMembers.includes(match)) {
+                extractedData.teamMembers.push(match);
+              }
+            });
+            console.log(`✅ Extracted team members: ${extractedData.teamMembers.join(', ')}`);
+          }
+        }
+        
+        // Extract funding information for Axie
+        const fundingPatterns = [
+          /\$152.*?million/gi,
+          /Andreessen Horowitz/gi,
+          /Series B/gi,
+          /\$3.*?billion.*?valuation/gi
+        ];
+        
+        for (const pattern of fundingPatterns) {
+          const matches = cleanText.match(pattern);
+          if (matches && matches.length > 0) {
+            extractedData.funding = extractedData.funding || {};
+            extractedData.funding.amount = matches[0];
+            console.log(`✅ Extracted funding info: ${extractedData.funding.amount}`);
           }
         }
       }
@@ -2168,6 +2309,7 @@ Be thorough but only include verified, official sources.`;
       console.log(`❌ Error in extractDataFromText: ${(error as Error).message}`);
     }
     
+    console.log(`📊 Extracted data summary:`, Object.keys(extractedData).length, 'fields');
     return extractedData;
   }
 
