@@ -40,6 +40,61 @@ function App() {
   const [useEnhancedResearch, setUseEnhancedResearch] = useState(false);
   const [feedback, setFeedback] = useState('');
 
+  // Export functionality
+  const exportReport = () => {
+    if (!research) return;
+    
+    const reportData = {
+      projectName: research.projectName,
+      projectType: research.projectType,
+      timestamp: new Date().toISOString(),
+      aiSummary: research.aiSummary,
+      keyFindings: research.keyFindings,
+      financialData: research.financialData,
+      teamAnalysis: research.teamAnalysis,
+      technicalAssessment: research.technicalAssessment,
+      communityHealth: research.communityHealth,
+      confidence: research.confidence,
+      sourcesUsed: research.sourcesUsed
+    };
+    
+    const blob = new Blob([JSON.stringify(reportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${research.projectName}_DYOR_Report_${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const exportData = () => {
+    if (!research) return;
+    
+    const csvData = [
+      ['Project Name', research.projectName],
+      ['Project Type', research.projectType],
+      ['AI Summary', research.aiSummary || ''],
+      ['Confidence Score', research.confidence?.overall.score || ''],
+      ['Sources Used', research.sourcesUsed?.join('; ') || ''],
+      ['Positive Findings', research.keyFindings.positives.join('; ') || ''],
+      ['Negative Findings', research.keyFindings.negatives.join('; ') || ''],
+      ['Red Flags', research.keyFindings.redFlags.join('; ') || '']
+    ];
+    
+    const csvContent = csvData.map(row => row.map(cell => `"${cell}"`).join(',')).join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${research.projectName}_DYOR_Data_${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     setResearchLoading(true);
@@ -134,21 +189,27 @@ function App() {
               </form>
             </div>
 
-            {/* Sources Used */}
+            {/* Gathered Links */}
             {research.sourcesUsed && research.sourcesUsed.length > 0 && (
               <div className="sources-section">
-                <div className="search-input-title">SOURCES USED</div>
-                <div className="search-suggestions">
-                  {research.sourcesUsed.slice(0, 5).map((source, index) => (
-                    <div key={index} className="suggestion-item">
-                      {source.length > 30 ? source.substring(0, 30) + '...' : source}
+                <div className="search-input-title">GATHERED LINKS</div>
+                <div className="links-container">
+                  {research.sourcesUsed.map((source, index) => (
+                    <div key={index} className="link-item">
+                      <div className="link-icon">🔗</div>
+                      <div className="link-content">
+                        <div className="link-url">
+                          {source.length > 50 ? source.substring(0, 50) + '...' : source}
+                        </div>
+                        <div className="link-domain">
+                          {new URL(source).hostname}
+                        </div>
+                      </div>
                     </div>
                   ))}
-                  {research.sourcesUsed.length > 5 && (
-                    <div className="suggestion-item">
-                      +{research.sourcesUsed.length - 5} more sources
-                    </div>
-                  )}
+                </div>
+                <div className="links-summary">
+                  {research.sourcesUsed.length} data sources gathered
                 </div>
               </div>
             )}
@@ -443,10 +504,10 @@ function App() {
             {/* Export Buttons */}
             <div className="export-section">
               <div className="signal-title">EXPORT OPTIONS</div>
-              <button className="glitch-button export">
+              <button className="glitch-button export" onClick={exportReport}>
                 EXPORT REPORT
               </button>
-              <button className="glitch-button export">
+              <button className="glitch-button export" onClick={exportData}>
                 EXPORT DATA ▼
               </button>
             </div>

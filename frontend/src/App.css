@@ -240,6 +240,65 @@
   width: 100%;
 }
 
+.links-container {
+  max-height: 300px;
+  overflow-y: auto;
+  margin-top: 10px;
+}
+
+.link-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px;
+  margin-bottom: 8px;
+  background: #000;
+  border: 1px solid #333;
+  border-radius: 6px;
+  transition: all 0.3s ease;
+}
+
+.link-item:hover {
+  border-color: #00ff41;
+  box-shadow: 0 0 10px rgba(0, 255, 65, 0.3);
+}
+
+.link-icon {
+  font-size: 16px;
+  margin-top: 2px;
+  color: #00ff41;
+}
+
+.link-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.link-url {
+  color: #00ff41;
+  font-size: 12px;
+  word-break: break-all;
+  margin-bottom: 4px;
+}
+
+.link-domain {
+  color: #666;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.links-summary {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #333;
+  color: #00ff41;
+  font-size: 12px;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
 /* Middle Panel - Research Results */
 .middle-panel {
   background: #000;
