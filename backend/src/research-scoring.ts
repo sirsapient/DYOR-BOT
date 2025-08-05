@@ -96,9 +96,9 @@ export class ResearchScoringEngine {
   // Enhanced threshold for established projects
   private readonly ESTABLISHED_PROJECT_THRESHOLD = 70;
   
-  public calculateResearchScore(findings: ResearchFindings): ResearchScore {
+  public calculateResearchScore(findings: ResearchFindings, projectName?: string): ResearchScore {
     // Check if this is an established project
-    const isEstablishedProject = this.isEstablishedProject(findings);
+    const isEstablishedProject = this.isEstablishedProject(findings, projectName);
     
     const breakdown = {
       dataCoverage: this.calculateDataCoverage(findings, isEstablishedProject),
@@ -269,7 +269,12 @@ export class ResearchScoringEngine {
   }
 
   // Helper method to get project name from findings
-  private getProjectNameFromFindings(findings: ResearchFindings): string | null {
+  private getProjectNameFromFindings(findings: ResearchFindings, projectName?: string): string | null {
+    // If project name is provided, use it
+    if (projectName) {
+      return projectName;
+    }
+    
     // Try to extract project name from findings data
     for (const [sourceName, finding] of Object.entries(findings)) {
       if (finding?.data?.projectName) {
@@ -381,18 +386,18 @@ export class ResearchScoringEngine {
   }
 
   // Helper method to detect established projects
-  private isEstablishedProject(findings: ResearchFindings): boolean {
+  private isEstablishedProject(findings: ResearchFindings, projectName?: string): boolean {
     // Check if this is an established project based on score characteristics
-    const projectName = this.getProjectNameFromFindings(findings);
+    const extractedProjectName = this.getProjectNameFromFindings(findings, projectName);
     
     // Well-known projects that should be considered established
     const wellKnownProjects = ['axie infinity', 'axie', 'axs', 'sky mavis'];
-    const isWellKnownProject = projectName && wellKnownProjects.some(name => 
-      projectName.toLowerCase().includes(name.toLowerCase())
+    const isWellKnownProject = extractedProjectName && wellKnownProjects.some(name => 
+      extractedProjectName.toLowerCase().includes(name.toLowerCase())
     );
     
     if (isWellKnownProject) {
-      console.log(`🔍 Well-known project detected: ${projectName}, considering as established`);
+      console.log(`🔍 Well-known project detected: ${extractedProjectName}, considering as established`);
       return true;
     }
     
@@ -406,7 +411,7 @@ export class ResearchScoringEngine {
     const isEstablished = (hasHighQualityData) || (hasOnchainData && hasOfficialSource && hasTeamInfo);
     
     if (isEstablished) {
-      console.log(`🔍 Established project detected: ${projectName}`);
+      console.log(`🔍 Established project detected: ${extractedProjectName}`);
       console.log(`  - High quality data: ${hasHighQualityData}`);
       console.log(`  - Onchain data: ${hasOnchainData}`);
       console.log(`  - Official source: ${hasOfficialSource}`);
@@ -562,12 +567,12 @@ export class ResearchScoringEngine {
   }
 
   // Helper method to check if research should proceed to AI analysis
-  public shouldProceedWithAnalysis(findings: ResearchFindings): {
+  public shouldProceedWithAnalysis(findings: ResearchFindings, projectName?: string): {
     proceed: boolean;
     reason?: string;
     score: ResearchScore;
   } {
-    const score = this.calculateResearchScore(findings);
+    const score = this.calculateResearchScore(findings, projectName);
     
     if (score.passesThreshold) {
       return { proceed: true, score };

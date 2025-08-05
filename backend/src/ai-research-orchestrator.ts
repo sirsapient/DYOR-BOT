@@ -565,9 +565,10 @@ class AIResearchOrchestrator {
   async adaptResearchStrategy(
     originalPlan: ResearchPlan,
     currentFindings: ResearchFindings,
-    timeElapsed: number
+    timeElapsed: number,
+    projectName?: string
   ): Promise<AdaptiveResearchState> {
-    const currentScore = this.calculateCurrentScore(currentFindings);
+    const currentScore = this.calculateCurrentScore(currentFindings, projectName);
     const gapAnalysis = this.identifyInformationGaps(originalPlan, currentFindings);
     
     const adaptationPrompt = this.buildAdaptationPrompt(
@@ -592,7 +593,8 @@ class AIResearchOrchestrator {
   // Phase 3: Final research quality assessment
   async assessResearchCompleteness(
     plan: ResearchPlan,
-    finalFindings: ResearchFindings
+    finalFindings: ResearchFindings,
+    projectName?: string
   ): Promise<{
     isComplete: boolean;
     confidence: number;
@@ -602,7 +604,7 @@ class AIResearchOrchestrator {
     const gateResult = this.qualityGates.checkQualityGates(finalFindings, {
       type: plan.projectClassification.type,
       confidence: plan.projectClassification.confidence
-    });
+    }, projectName);
 
     const assessmentPrompt = this.buildCompletenessPrompt(plan, finalFindings, gateResult);
 
@@ -872,9 +874,9 @@ Consider:
     }
   }
 
-  private calculateCurrentScore(findings: ResearchFindings): number {
+  private calculateCurrentScore(findings: ResearchFindings, projectName?: string): number {
     // Use the existing scoring engine
-    const score = this.scoringEngine.calculateResearchScore(findings);
+    const score = this.scoringEngine.calculateResearchScore(findings, projectName);
     return score.totalScore;
   }
 
@@ -3220,7 +3222,8 @@ export async function conductAIOrchestratedResearch(
       adaptiveState = await orchestrator.adaptResearchStrategy(
         researchPlan, 
         findings, 
-        timeElapsed
+        timeElapsed,
+        projectName
       );
       
       shouldContinue = adaptiveState.shouldContinue;
@@ -3234,7 +3237,7 @@ export async function conductAIOrchestratedResearch(
   
   // Phase 3: Final completeness check with confidence threshold
   console.log(`📋 Phase 3: Assessing research completeness for ${projectName}`);
-  const completeness = await orchestrator.assessResearchCompleteness(researchPlan, findings);
+  const completeness = await orchestrator.assessResearchCompleteness(researchPlan, findings, projectName);
   const thresholdCheck = orchestrator.shouldPassToSecondAI(findings);
   
   console.log(`📊 Final assessment - Confidence: ${(thresholdCheck.confidenceScore * 100).toFixed(2)}%, Complete: ${completeness.isComplete}`);

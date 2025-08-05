@@ -27,14 +27,15 @@ export class QualityGatesEngine {
   // Main quality gate checker - call this before AI analysis
   public checkQualityGates(
     findings: ResearchFindings, 
-    projectType?: ProjectType
+    projectType?: ProjectType,
+    projectName?: string
   ): QualityGateResult {
     const failedGates: string[] = [];
     const recommendations: string[] = [];
     const manualSuggestions: string[] = [];
 
     // Get research score first
-    const score = this.scoringEngine.calculateResearchScore(findings);
+    const score = this.scoringEngine.calculateResearchScore(findings, projectName);
 
     // Gate 1: Minimum Score Threshold
     if (!this.checkMinimumScore(score)) {

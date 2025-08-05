@@ -1659,7 +1659,7 @@ app.post('/api/research-enhanced', async (req: any, res: any) => {
     // NEW: Enhanced confidence and quality assessment
     const confidenceCheck = enhancedOrchestrator.shouldPassToSecondAI(aiResult.findings);
     const qualityGates = new QualityGatesEngine();
-    const gateResult = qualityGates.checkQualityGates(aiResult.findings);
+    const gateResult = qualityGates.checkQualityGates(aiResult.findings, undefined, projectName);
 
     // NEW: Generate comprehensive response with all new features
     const enhancedResponse = {
@@ -2487,7 +2487,7 @@ Provide a balanced analysis highlighting both strengths and potential concerns.`
     officialSourcesData
   });
   
-  const confidence = await generateConfidenceMetrics(findings, scoringEngine.calculateResearchScore(findings), {
+  const confidence = await generateConfidenceMetrics(findings, scoringEngine.calculateResearchScore(findings, projectName), {
     projectClassification: {
       type: 'web3_game',
       confidence: 0.8,
@@ -2509,7 +2509,7 @@ Provide a balanced analysis highlighting both strengths and potential concerns.`
   const gateResult = qualityGates.checkQualityGates(findings, {
     type: 'web3_game',
     confidence: 0.8
-  });
+  }, projectName);
 
   // --- Generate research report ---
   const researchReport = {

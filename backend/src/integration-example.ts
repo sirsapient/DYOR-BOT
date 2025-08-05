@@ -129,7 +129,8 @@ export async function researchWithCustomDataCollection(
       const adaptiveState = await orchestrator.adaptResearchStrategy(
         researchPlan,
         findings,
-        timeElapsed
+        timeElapsed,
+        projectName
       );
 
       if (!adaptiveState.shouldContinue) {
@@ -139,7 +140,7 @@ export async function researchWithCustomDataCollection(
   }
 
   // Step 3: Final assessment
-  const completeness = await orchestrator.assessResearchCompleteness(researchPlan, findings);
+  const completeness = await orchestrator.assessResearchCompleteness(researchPlan, findings, projectName);
 
   return {
     success: completeness.isComplete,
