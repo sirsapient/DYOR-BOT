@@ -2951,21 +2951,6 @@ async function collectFromSourceWithRealFunctions(
         } else {
           console.log(`❌ Missing social media URL or fetchTwitterProfileAndTweets function`);
         }
-        
-        // Fallback: For Axie Infinity, provide known community data
-        if (projectName.toLowerCase().includes('axie')) {
-          console.log(`🔄 Using fallback community data for Axie Infinity`);
-          return {
-            bio: 'Official Axie Infinity Twitter account',
-            followers: '2.1M',
-            pinned: 'Welcome to the Axie Infinity community!',
-            tweets: ['Latest Axie Infinity updates', 'Community announcements', 'Game updates'],
-            likes: ['1000', '500', '750'],
-            rts: ['200', '150', '300'],
-            sentiment: { pos: 3, neg: 0 },
-            source: 'Fallback data for Axie Infinity'
-          };
-        }
         break;
         
       case 'team_info':
@@ -2988,19 +2973,6 @@ async function collectFromSourceWithRealFunctions(
           }
         } else {
           console.log(`❌ Missing website URL or fetchWebsiteAboutSection function`);
-        }
-        
-        // Fallback: For Axie Infinity, provide known team data
-        if (projectName.toLowerCase().includes('axie')) {
-          console.log(`🔄 Using fallback team data for Axie Infinity`);
-          return {
-            aboutSection: 'Axie Infinity is developed by Sky Mavis, a Vietnamese game studio.',
-            website: 'axieinfinity.com',
-            teamInfo: 'Team information extracted from website',
-            founders: ['Trung Nguyen', 'Aleksander Larsen', 'Jeffrey Zirlin'],
-            company: 'Sky Mavis',
-            source: 'Fallback data for Axie Infinity'
-          };
         }
         break;
         
@@ -3061,29 +3033,6 @@ async function collectFromSourceWithRealFunctions(
           }
         } else {
           console.log(`❌ Missing Ronin data collection functions`);
-        }
-        
-        // Fallback: For Axie Infinity, provide known on-chain data
-        if (projectName.toLowerCase().includes('axie')) {
-          console.log(`🔄 Using fallback on-chain data for Axie Infinity`);
-          return {
-            blockchain: 'Ronin',
-            contractAddress: '0x97a9107C1793BC407d6F527b77e7fff4D812bece',
-            tokenData: {
-              symbol: 'AXS',
-              name: 'Axie Infinity Shards',
-              totalSupply: '270000000',
-              decimals: 18,
-              network: 'Ronin'
-            },
-            transactionHistory: {
-              totalTransactions: '1000000+',
-              activeWallets: '500000+',
-              dailyVolume: '$5000000+'
-            },
-            onchainMetrics: 'On-chain data collected',
-            source: 'Fallback data for Axie Infinity'
-          };
         }
         break;
           
