@@ -2858,12 +2858,12 @@ export async function conductAIOrchestratedResearch(
     }
     
     if (extractedData.securityAudits && Object.keys(extractedData.securityAudits).length > 0) {
-      findings.security_audit = {
+      findings.security_audits = {
         found: true,
-        data: { ...findings.security_audit?.data, ...extractedData.securityAudits },
+        data: { ...findings.security_audits?.data, ...extractedData.securityAudits },
         quality: 'high' as const,
         timestamp: new Date(),
-        dataPoints: (findings.security_audit?.dataPoints || 0) + Object.keys(extractedData.securityAudits).length
+        dataPoints: (findings.security_audits?.dataPoints || 0) + Object.keys(extractedData.securityAudits).length
       };
       console.log(`✅ Found security audit data:`, extractedData.securityAudits);
     }
