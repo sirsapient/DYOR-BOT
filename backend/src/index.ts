@@ -1603,6 +1603,128 @@ async function getFinancialDataFromAlternativeSources(projectName: string): Prom
   }
 }
 
+// Add this function before the /api/research endpoint
+function transformAIOrchestratorDataToFrontendFormat(
+  aiResult: any,
+  projectName: string
+): any {
+  console.log(`🔄 Transforming AI orchestrator data for ${projectName}`);
+  
+  // Extract key findings from the AI results
+  const keyFindings = {
+    positives: [] as string[],
+    negatives: [] as string[],
+    redFlags: [] as string[]
+  };
+
+  // Extract financial data
+  const financialData = {
+    marketCap: null,
+    tokenDistribution: null,
+    fundingInfo: null,
+    roninTokenInfo: null,
+    avalancheTokenInfo: null
+  };
+
+  // Extract team analysis
+  const teamAnalysis = {
+    studioAssessment: [],
+    linkedinSummary: '',
+    glassdoorSummary: ''
+  };
+
+  // Extract technical assessment
+  const technicalAssessment = {
+    securitySummary: '',
+    reviewSummary: '',
+    githubRepo: null,
+    githubStats: null
+  };
+
+  // Extract community health
+  const communityHealth = {
+    twitterSummary: '',
+    steamReviewSummary: '',
+    discordData: null,
+    redditSummary: ''
+  };
+
+  // Process findings from AI orchestrator
+  if (aiResult.findings) {
+    Object.keys(aiResult.findings).forEach(sourceName => {
+      const finding = aiResult.findings[sourceName];
+      if (finding.found && finding.data) {
+        const data = finding.data;
+        
+        // Extract financial data
+        if (sourceName === 'financial_data' || sourceName === 'onchain_data') {
+          if (data.marketCap) financialData.marketCap = data.marketCap;
+          if (data.tokenDistribution) financialData.tokenDistribution = data.tokenDistribution;
+          if (data.fundingInfo) financialData.fundingInfo = data.fundingInfo;
+          if (data.roninTokenInfo) financialData.roninTokenInfo = data.roninTokenInfo;
+          if (data.avalancheTokenInfo) financialData.avalancheTokenInfo = data.avalancheTokenInfo;
+        }
+        
+        // Extract team analysis
+        if (sourceName === 'team_info') {
+          if (data.studioAssessment) teamAnalysis.studioAssessment = data.studioAssessment;
+          if (data.linkedinSummary) teamAnalysis.linkedinSummary = data.linkedinSummary;
+          if (data.glassdoorSummary) teamAnalysis.glassdoorSummary = data.glassdoorSummary;
+        }
+        
+        // Extract technical assessment
+        if (sourceName === 'security_audit' || sourceName === 'documentation') {
+          if (data.securitySummary) technicalAssessment.securitySummary = data.securitySummary;
+          if (data.reviewSummary) technicalAssessment.reviewSummary = data.reviewSummary;
+          if (data.githubRepo) technicalAssessment.githubRepo = data.githubRepo;
+          if (data.githubStats) technicalAssessment.githubStats = data.githubStats;
+        }
+        
+        // Extract community health
+        if (sourceName === 'community_health' || sourceName === 'media_coverage') {
+          if (data.twitterSummary) communityHealth.twitterSummary = data.twitterSummary;
+          if (data.steamReviewSummary) communityHealth.steamReviewSummary = data.steamReviewSummary;
+          if (data.discordData) communityHealth.discordData = data.discordData;
+          if (data.redditSummary) communityHealth.redditSummary = data.redditSummary;
+        }
+        
+        // Extract key findings
+        if (data.positives) keyFindings.positives.push(...data.positives);
+        if (data.negatives) keyFindings.negatives.push(...data.negatives);
+        if (data.redFlags) keyFindings.redFlags.push(...data.redFlags);
+      }
+    });
+  }
+
+  // If no key findings were extracted, add a default
+  if (keyFindings.positives.length === 0) {
+    keyFindings.positives.push('AI research completed');
+  }
+
+  // Create sources used list
+  const sourcesUsed = aiResult.findings ? 
+    Object.keys(aiResult.findings).filter(key => aiResult.findings[key].found) : 
+    ['AI-Orchestrated'];
+
+  // Fix the confidence display - multiply by 100 to show as percentage
+  const confidencePercentage = aiResult.confidence ? (aiResult.confidence * 100).toFixed(1) : '0';
+  
+  return {
+    projectName,
+    projectType: 'Web3Game',
+    keyFindings,
+    financialData,
+    teamAnalysis,
+    technicalAssessment,
+    communityHealth,
+    sourcesUsed,
+    aiSummary: `AI Analysis: ${confidencePercentage}% confidence. Research completed.`,
+    whitepaper: null,
+    confidence: null, // Will be generated separately
+    qualityGates: null // Will be generated separately
+  };
+}
+
 app.post('/api/research', async (req: any, res: any) => {
   console.log(`\n🚀 RESEARCH REQUEST RECEIVED`);
   console.log(`📝 Project: ${req.body.projectName}`);
@@ -1674,40 +1796,10 @@ app.post('/api/research', async (req: any, res: any) => {
       console.log(`🔄 Using AI-extracted data for ${projectName} despite AI orchestration failure`);
       
       // Transform AI-extracted data to match expected response format
+      const transformedData = transformAIOrchestratorDataToFrontendFormat(aiResult, projectName);
+      
       const researchReport = {
-        projectName,
-        projectType: 'Web3Game',
-              keyFindings: {
-        positives: ['AI research completed'],
-        negatives: [],
-        redFlags: [],
-      },
-      financialData: {
-        marketCap: null,
-        tokenDistribution: null,
-        fundingInfo: null,
-      },
-      teamAnalysis: {
-        studioAssessment: [],
-        linkedinSummary: '',
-        glassdoorSummary: '',
-      },
-      technicalAssessment: {
-        securitySummary: '',
-        reviewSummary: '',
-        githubRepo: null,
-        githubStats: null,
-      },
-      communityHealth: {
-        twitterSummary: '',
-        steamReviewSummary: '',
-        discordData: null,
-        redditSummary: '',
-      },
-      sourcesUsed: ['AI-Orchestrated'],
-      aiSummary: `AI Analysis: ${aiResult.confidence || 0}% confidence. Research completed.`,
-      // NEW: Include whitepaper data from AI research results
-      whitepaper: null,
+        ...transformedData,
       confidence: await generateConfidenceMetrics({
         whitepaper: { found: true, data: {}, quality: 'high' as const, timestamp: new Date(), dataPoints: 1 },
         onchain_data: { found: true, data: {}, quality: 'high' as const, timestamp: new Date(), dataPoints: 1 },
@@ -1759,40 +1851,10 @@ app.post('/api/research', async (req: any, res: any) => {
 
 
     // Transform AI result to match expected response format
+    const transformedData = transformAIOrchestratorDataToFrontendFormat(aiResult, projectName);
+    
     const researchReport = {
-      projectName: projectName,
-      projectType: 'Web3Game',
-      keyFindings: {
-        positives: ['AI research completed'],
-        negatives: [],
-        redFlags: [],
-      },
-      financialData: {
-        marketCap: null,
-        tokenDistribution: null,
-        fundingInfo: null,
-      },
-      teamAnalysis: {
-        studioAssessment: [],
-        linkedinSummary: '',
-        glassdoorSummary: '',
-      },
-      technicalAssessment: {
-        securitySummary: '',
-        reviewSummary: '',
-        githubRepo: null,
-        githubStats: null,
-      },
-      communityHealth: {
-        twitterSummary: '',
-        steamReviewSummary: '',
-        discordData: null,
-        redditSummary: '',
-      },
-      sourcesUsed: ['AI-Orchestrated'],
-      aiSummary: `AI Analysis: ${aiResult.confidence || 0}% confidence. Research completed.`,
-      // NEW: Include whitepaper data from AI research results
-      whitepaper: null,
+      ...transformedData,
       confidence: await generateConfidenceMetrics({
         whitepaper: { found: true, data: {}, quality: 'high' as const, timestamp: new Date(), dataPoints: 1 },
         onchain_data: { found: true, data: {}, quality: 'high' as const, timestamp: new Date(), dataPoints: 1 },
