@@ -661,39 +661,6 @@ export class AIResearchOrchestrator {
       console.log(`🔄 Generating fallback research plan for ${projectName}...`);
       const fallbackPlan = this.generateFallbackPlan();
       
-      // Customize the fallback plan for the specific project
-      if (projectName.toLowerCase().includes('axie') || projectName.toLowerCase().includes('axie infinity')) {
-        fallbackPlan.projectClassification = {
-          type: 'web3_game',
-          confidence: 0.9,
-          reasoning: 'Axie Infinity is a well-known Web3 gaming project'
-        };
-        fallbackPlan.prioritySources = [
-          {
-            source: 'whitepaper',
-            priority: 'critical',
-            reasoning: 'Axie Infinity has comprehensive documentation',
-            searchTerms: ['axie infinity whitepaper', 'axie infinity documentation'],
-            expectedDataPoints: ['tokenomics', 'game mechanics', 'team info']
-          },
-          {
-            source: 'onchain_data',
-            priority: 'high',
-            reasoning: 'Axie Infinity has significant on-chain activity',
-            searchTerms: ['axie infinity contract', 'AXS token', 'ronin blockchain'],
-            expectedDataPoints: ['token data', 'transaction history', 'contract info']
-          },
-          {
-            source: 'team_info',
-            priority: 'medium',
-            reasoning: 'Team information is important for established projects',
-            searchTerms: ['axie infinity team', 'sky mavis', 'axie founders'],
-            expectedDataPoints: ['team members', 'company info', 'background']
-          }
-        ];
-        fallbackPlan.searchAliases = ['axie', 'axie infinity', 'AXS', 'sky mavis'];
-      }
-      
       console.log(`✅ Fallback research plan generated for ${projectName}`);
       return fallbackPlan;
     }
@@ -3439,6 +3406,76 @@ async function collectFromSourceWithRealFunctions(
           }
         } else {
           console.log(`❌ Missing website URL or fetchWebsiteAboutSection function`);
+        }
+        break;
+        
+      case 'official_resources':
+        console.log(`📚 Attempting to collect official resources...`);
+        console.log(`🔍 Website URL: ${discoveredUrls?.website}`);
+        
+        if (discoveredUrls?.website && dataCollectionFunctions?.fetchWebsiteAboutSection) {
+          console.log(`🌐 Fetching official resources from: ${discoveredUrls.website}`);
+          const aboutSection = await dataCollectionFunctions.fetchWebsiteAboutSection(discoveredUrls.website);
+          if (aboutSection) {
+            console.log(`✅ Official resources fetched successfully`);
+            return {
+              resourcesUrl: discoveredUrls.website,
+              resourcesType: 'Official Website',
+              extractedContent: aboutSection,
+              source: 'Official resources extraction'
+            };
+          } else {
+            console.log(`❌ Official resources fetch returned empty`);
+          }
+        } else {
+          console.log(`❌ Missing website URL or fetchWebsiteAboutSection function`);
+        }
+        break;
+        
+      case 'blockchain_data':
+        console.log(`⛓️ Attempting to collect blockchain data...`);
+        console.log(`🔍 Contract address: ${basicInfo?.contractAddress || basicInfo?.roninContractAddress}`);
+        
+        if (dataCollectionFunctions?.fetchRoninTokenData && dataCollectionFunctions?.fetchRoninTransactionHistory) {
+          let contractAddress = basicInfo?.contractAddress || basicInfo?.roninContractAddress;
+          
+          // If no contract address provided, try to discover it dynamically
+          if (!contractAddress && dataCollectionFunctions?.searchContractAddressWithLLM) {
+            console.log(`🔍 No contract address provided, attempting to discover for ${projectName}...`);
+            const discoveredAddress = await dataCollectionFunctions.searchContractAddressWithLLM(projectName);
+            if (discoveredAddress) {
+              contractAddress = discoveredAddress;
+              console.log(`✅ Discovered contract address: ${contractAddress}`);
+            } else {
+              console.log(`❌ Could not discover contract address for ${projectName}`);
+            }
+          }
+          
+          if (contractAddress) {
+            console.log(`🔍 Attempting to fetch blockchain data for contract: ${contractAddress}`);
+            const tokenData = await dataCollectionFunctions.fetchRoninTokenData(contractAddress);
+            const transactionHistory = await dataCollectionFunctions.fetchRoninTransactionHistory(contractAddress);
+            
+            console.log(`🔍 Token data result:`, tokenData);
+            console.log(`🔍 Transaction history result:`, transactionHistory);
+            
+            if (tokenData || transactionHistory) {
+              console.log(`✅ Blockchain data collected successfully`);
+              return {
+                blockchain: 'Ronin',
+                contractAddress,
+                tokenData,
+                transactionHistory,
+                blockchainMetrics: 'Blockchain data collected'
+              };
+            } else {
+              console.log(`❌ Both token data and transaction history returned null`);
+            }
+          } else {
+            console.log(`⚠️ Blockchain data collection requires contract address, not found in basicInfo or discoverable.`);
+          }
+        } else {
+          console.log(`❌ Missing blockchain data collection functions`);
         }
         break;
           
