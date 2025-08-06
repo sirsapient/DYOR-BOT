@@ -66,6 +66,20 @@ interface RetryConfig {
   backoffMultiplier: number;
 }
 
+// NEW: Circuit breaker configuration for API overload prevention
+interface CircuitBreakerConfig {
+  failureThreshold: number; // Number of failures before opening circuit
+  recoveryTimeout: number; // milliseconds to wait before trying again
+  monitoringWindow: number; // milliseconds to monitor for failures
+}
+
+// NEW: Request throttling configuration
+interface ThrottlingConfig {
+  maxRequestsPerMinute: number;
+  maxConcurrentRequests: number;
+  requestInterval: number; // milliseconds between requests
+}
+
 // NEW: Universal source discovery patterns for ALL projects
 const UNIVERSAL_SOURCE_PATTERNS = {
   
@@ -543,11 +557,26 @@ export class AIResearchOrchestrator {
   private qualityGates: QualityGatesEngine;
   private scoringEngine: ResearchScoringEngine;
   
-  // NEW: Enhanced features
+  // Caching and confidence management
   private sourceCache: Map<string, CachedSourceData> = new Map();
   private confidenceThresholds: ConfidenceThresholds;
   private retryConfig: RetryConfig;
   private feedbackHistory: Map<string, SecondAIFeedback[]> = new Map();
+  
+  // NEW: Circuit breaker state for API overload prevention
+  private circuitBreakerState: 'CLOSED' | 'OPEN' | 'HALF_OPEN' = 'CLOSED';
+  private circuitBreakerConfig: CircuitBreakerConfig;
+  private failureCount: number = 0;
+  private lastFailureTime: number = 0;
+  private circuitOpenTime: number = 0;
+  
+  // NEW: Request throttling for API overload prevention
+  private throttlingConfig: ThrottlingConfig;
+  private requestQueue: Array<() => Promise<any>> = [];
+  private activeRequests: number = 0;
+  private lastRequestTime: number = 0;
+  private requestCount: number = 0;
+  private requestWindowStart: number = Date.now();
 
   constructor(apiKey: string, options?: {
     confidenceThresholds?: Partial<ConfidenceThresholds>;
@@ -570,18 +599,32 @@ export class AIResearchOrchestrator {
       this.confidenceThresholds = { ...this.confidenceThresholds, ...options.confidenceThresholds };
     }
     
-    // Default retry configuration
+    // Enhanced retry configuration for better overload handling
     this.retryConfig = {
-      maxRetries: 3,
-      baseDelay: 1000,
-      maxDelay: 10000,
-      backoffMultiplier: 2
+      maxRetries: 5, // Increased from 3 to 5
+      baseDelay: 2000, // Increased from 1000 to 2000ms
+      maxDelay: 30000, // Increased from 10000 to 30000ms
+      backoffMultiplier: 2.5 // Increased from 2 to 2.5 for more aggressive backoff
     };
     
     // Override with custom retry config if provided
     if (options?.retryConfig) {
       this.retryConfig = { ...this.retryConfig, ...options.retryConfig };
     }
+    
+    // NEW: Initialize circuit breaker configuration
+    this.circuitBreakerConfig = {
+      failureThreshold: 3, // Open circuit after 3 failures
+      recoveryTimeout: 60000, // Wait 60 seconds before trying again
+      monitoringWindow: 300000 // Monitor failures over 5 minutes
+    };
+    
+    // NEW: Initialize throttling configuration
+    this.throttlingConfig = {
+      maxRequestsPerMinute: 30, // Limit to 30 requests per minute
+      maxConcurrentRequests: 3, // Limit to 3 concurrent requests
+      requestInterval: 2000 // Wait 2 seconds between requests
+    };
   }
 
   // Phase 1: Generate initial research strategy
@@ -2770,7 +2813,25 @@ Be thorough but only include verified, official sources.`;
     
     for (let attempt = 1; attempt <= this.retryConfig.maxRetries; attempt++) {
       try {
-        return await operation();
+        // NEW: Check circuit breaker before making request
+        const circuitBreakerAllowed = await this.checkCircuitBreaker();
+        if (!circuitBreakerAllowed) {
+          throw new Error('Circuit breaker is OPEN - request blocked');
+        }
+        
+        // NEW: Apply request throttling
+        await this.throttleRequest();
+        
+        try {
+          const result = await operation();
+          this.recordSuccess();
+          this.releaseRequest();
+          return result;
+        } catch (error: any) {
+          this.recordFailure();
+          this.releaseRequest();
+          throw error;
+        }
       } catch (error: any) {
         lastError = error as Error;
         console.log(`❌ ${operationName} attempt ${attempt} failed: ${lastError.message}`);
@@ -2865,6 +2926,115 @@ Be thorough but only include verified, official sources.`;
     
     console.log(`🧹 Cleaned ${cleanedCount} expired cache entries`);
     return cleanedCount;
+  }
+
+  // NEW: Circuit breaker methods for API overload prevention
+  private async checkCircuitBreaker(): Promise<boolean> {
+    const now = Date.now();
+    
+    // Check if circuit is open and recovery timeout has passed
+    if (this.circuitBreakerState === 'OPEN') {
+      if (now - this.circuitOpenTime >= this.circuitBreakerConfig.recoveryTimeout) {
+        console.log(`🔄 Circuit breaker transitioning from OPEN to HALF_OPEN`);
+        this.circuitBreakerState = 'HALF_OPEN';
+        this.failureCount = 0;
+        return true; // Allow one test request
+      } else {
+        console.log(`🚫 Circuit breaker is OPEN, request blocked`);
+        return false; // Block request
+      }
+    }
+    
+    // Check if we should open the circuit based on failure count
+    if (this.circuitBreakerState === 'CLOSED' && this.failureCount >= this.circuitBreakerConfig.failureThreshold) {
+      console.log(`🚫 Circuit breaker opening due to ${this.failureCount} failures`);
+      this.circuitBreakerState = 'OPEN';
+      this.circuitOpenTime = now;
+      return false; // Block request
+    }
+    
+    return true; // Allow request
+  }
+
+  private recordSuccess(): void {
+    if (this.circuitBreakerState === 'HALF_OPEN') {
+      console.log(`✅ Circuit breaker test successful, closing circuit`);
+      this.circuitBreakerState = 'CLOSED';
+      this.failureCount = 0;
+    }
+  }
+
+  private recordFailure(): void {
+    const now = Date.now();
+    this.failureCount++;
+    this.lastFailureTime = now;
+    
+    // Reset failure count if outside monitoring window
+    if (now - this.requestWindowStart > this.circuitBreakerConfig.monitoringWindow) {
+      this.failureCount = 1;
+      this.requestWindowStart = now;
+    }
+    
+    console.log(`❌ Circuit breaker failure recorded: ${this.failureCount}/${this.circuitBreakerConfig.failureThreshold}`);
+  }
+
+  // NEW: Request throttling methods for API overload prevention
+  private async throttleRequest(): Promise<void> {
+    const now = Date.now();
+    
+    // Check rate limiting
+    if (now - this.requestWindowStart >= 60000) { // Reset window every minute
+      this.requestCount = 0;
+      this.requestWindowStart = now;
+    }
+    
+    if (this.requestCount >= this.throttlingConfig.maxRequestsPerMinute) {
+      const waitTime = 60000 - (now - this.requestWindowStart);
+      console.log(`⏳ Rate limit reached, waiting ${waitTime}ms`);
+      await new Promise(resolve => setTimeout(resolve, waitTime));
+      this.requestCount = 0;
+      this.requestWindowStart = Date.now();
+    }
+    
+    // Check concurrent request limit
+    if (this.activeRequests >= this.throttlingConfig.maxConcurrentRequests) {
+      console.log(`⏳ Concurrent request limit reached, queuing request`);
+      await new Promise<void>((resolve) => {
+        this.requestQueue.push(async () => {
+          this.activeRequests++;
+          try {
+            await this.throttleRequest();
+          } finally {
+            this.activeRequests--;
+            resolve();
+          }
+        });
+      });
+    }
+    
+    // Check request interval
+    const timeSinceLastRequest = now - this.lastRequestTime;
+    if (timeSinceLastRequest < this.throttlingConfig.requestInterval) {
+      const waitTime = this.throttlingConfig.requestInterval - timeSinceLastRequest;
+      console.log(`⏳ Request interval not met, waiting ${waitTime}ms`);
+      await new Promise(resolve => setTimeout(resolve, waitTime));
+    }
+    
+    this.lastRequestTime = Date.now();
+    this.requestCount++;
+    this.activeRequests++;
+  }
+
+  private releaseRequest(): void {
+    this.activeRequests--;
+    
+    // Process queued requests
+    if (this.requestQueue.length > 0 && this.activeRequests < this.throttlingConfig.maxConcurrentRequests) {
+      const nextRequest = this.requestQueue.shift();
+      if (nextRequest) {
+        nextRequest();
+      }
+    }
   }
 }
 
@@ -3230,21 +3400,19 @@ async function collectFromSourceWithRealFunctions(
               contractAddress = discoveredAddress;
               console.log(`✅ Discovered contract address: ${contractAddress}`);
             } else {
-              console.log(`❌ Could not discover contract address for ${projectName}`);
+              console.log(`❌ Failed to discover contract address for ${projectName}`);
             }
           }
           
           if (contractAddress) {
-            console.log(`✅ Smart contract information collected`);
+            // For now, just return the discovered address.
+            // More detailed smart contract analysis would go here.
             return {
-              contractAddress,
-              network: 'Ronin',
-              contractType: 'Token Contract',
-              verificationStatus: 'Verified',
-              source: 'Smart contract discovery'
+              contractAddress: contractAddress,
+              source: 'LLM Discovery/Basic Info'
             };
           } else {
-            console.log(`❌ No contract address available for smart contract data`);
+            console.log(`❌ No contract address available for smart_contracts collection`);
           }
         } else {
           console.log(`❌ Missing searchContractAddressWithLLM function`);
