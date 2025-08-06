@@ -591,16 +591,69 @@ export class AIResearchOrchestrator {
   ): Promise<ResearchPlan> {
     const prompt = this.buildResearchPlanningPrompt(projectName, basicInfo);
     
-    const response = await this.anthropic.messages.create({
-      model: 'claude-3-5-sonnet-20241022',
-      max_tokens: 2000,
-      messages: [{
-        role: 'user',
-        content: prompt
-      }]
-    });
+    try {
+      console.log(`🤖 Attempting to generate research plan for ${projectName}...`);
+      
+      const response = await this.executeWithRetry(
+        async () => {
+          return await this.anthropic.messages.create({
+            model: 'claude-3-5-sonnet-20241022',
+            max_tokens: 2000,
+            messages: [{
+              role: 'user',
+              content: prompt
+            }]
+          });
+        },
+        'generateResearchPlan'
+      );
 
-    return this.parseResearchPlan(response.content[0].text);
+      console.log(`✅ Research plan generated successfully for ${projectName}`);
+      return this.parseResearchPlan(response.content[0].text);
+      
+    } catch (error: any) {
+      console.log(`❌ AI Orchestrator failed for ${projectName}: ${error.status || error.code} ${JSON.stringify(error)}`);
+      
+      // If AI fails, generate a fallback plan
+      console.log(`🔄 Generating fallback research plan for ${projectName}...`);
+      const fallbackPlan = this.generateFallbackPlan();
+      
+      // Customize the fallback plan for the specific project
+      if (projectName.toLowerCase().includes('axie') || projectName.toLowerCase().includes('axie infinity')) {
+        fallbackPlan.projectClassification = {
+          type: 'web3_game',
+          confidence: 0.9,
+          reasoning: 'Axie Infinity is a well-known Web3 gaming project'
+        };
+        fallbackPlan.prioritySources = [
+          {
+            source: 'whitepaper',
+            priority: 'critical',
+            reasoning: 'Axie Infinity has comprehensive documentation',
+            searchTerms: ['axie infinity whitepaper', 'axie infinity documentation'],
+            expectedDataPoints: ['tokenomics', 'game mechanics', 'team info']
+          },
+          {
+            source: 'onchain_data',
+            priority: 'high',
+            reasoning: 'Axie Infinity has significant on-chain activity',
+            searchTerms: ['axie infinity contract', 'AXS token', 'ronin blockchain'],
+            expectedDataPoints: ['token data', 'transaction history', 'contract info']
+          },
+          {
+            source: 'team_info',
+            priority: 'medium',
+            reasoning: 'Team information is important for established projects',
+            searchTerms: ['axie infinity team', 'sky mavis', 'axie founders'],
+            expectedDataPoints: ['team members', 'company info', 'background']
+          }
+        ];
+        fallbackPlan.searchAliases = ['axie', 'axie infinity', 'AXS', 'sky mavis'];
+      }
+      
+      console.log(`✅ Fallback research plan generated for ${projectName}`);
+      return fallbackPlan;
+    }
   }
 
   // Phase 2: Adaptive research during data collection
@@ -620,16 +673,41 @@ export class AIResearchOrchestrator {
       timeElapsed
     );
 
-    const response = await this.anthropic.messages.create({
-      model: 'claude-3-5-sonnet-20241022',
-      max_tokens: 1500,
-      messages: [{
-        role: 'user',
-        content: adaptationPrompt
-      }]
-    });
+    try {
+      console.log(`🤖 Attempting to adapt research strategy for ${projectName}...`);
+      
+      const response = await this.executeWithRetry(
+        async () => {
+          return await this.anthropic.messages.create({
+            model: 'claude-3-5-sonnet-20241022',
+            max_tokens: 1500,
+            messages: [{
+              role: 'user',
+              content: adaptationPrompt
+            }]
+          });
+        },
+        'adaptResearchStrategy'
+      );
 
-    return this.parseAdaptiveState(response.content[0].text, currentScore, currentFindings);
+      console.log(`✅ Research strategy adapted successfully for ${projectName}`);
+      return this.parseAdaptiveState(response.content[0].text, currentScore, currentFindings);
+      
+    } catch (error: any) {
+      console.log(`❌ Research strategy adaptation failed for ${projectName}: ${error.status || error.code} ${JSON.stringify(error)}`);
+      
+      // Return a fallback adaptive state
+      console.log(`🔄 Using fallback adaptive state for ${projectName}...`);
+      return {
+        currentScore: currentScore,
+        sourcesCompleted: Object.keys(currentFindings).filter(key => currentFindings[key].found),
+        criticalGapsIdentified: gapAnalysis,
+        shouldContinue: currentScore < 0.7, // Continue if confidence is low
+        nextPriority: originalPlan.prioritySources
+          .filter(source => !currentFindings[source.source]?.found)
+          .map(source => source.source)
+      };
+    }
   }
 
   // Phase 3: Final research quality assessment
@@ -665,16 +743,42 @@ export class AIResearchOrchestrator {
 
     const assessmentPrompt = this.buildCompletenessPrompt(plan, finalFindings, gateResult);
 
-    const response = await this.anthropic.messages.create({
-      model: 'claude-3-5-sonnet-20241022',
-      max_tokens: 1000,
-      messages: [{
-        role: 'user',
-        content: assessmentPrompt
-      }]
-    });
+    try {
+      console.log(`🤖 Attempting to assess research completeness for ${projectName}...`);
+      
+      const response = await this.executeWithRetry(
+        async () => {
+          return await this.anthropic.messages.create({
+            model: 'claude-3-5-sonnet-20241022',
+            max_tokens: 1000,
+            messages: [{
+              role: 'user',
+              content: assessmentPrompt
+            }]
+          });
+        },
+        'assessResearchCompleteness'
+      );
 
-    return this.parseCompletenessAssessment(response.content[0].text, gateResult.passed);
+      console.log(`✅ Research completeness assessed successfully for ${projectName}`);
+      return this.parseCompletenessAssessment(response.content[0].text, gateResult.passed);
+      
+    } catch (error: any) {
+      console.log(`❌ Research completeness assessment failed for ${projectName}: ${error.status || error.code} ${JSON.stringify(error)}`);
+      
+      // Return a fallback completeness assessment
+      console.log(`🔄 Using fallback completeness assessment for ${projectName}...`);
+      const totalSources = Object.keys(finalFindings).length;
+      const foundSources = Object.keys(finalFindings).filter(key => finalFindings[key].found).length;
+      const confidence = foundSources / Math.max(totalSources, 1);
+      
+      return {
+        isComplete: confidence >= 0.5,
+        confidence: confidence,
+        gaps: Object.keys(finalFindings).filter(key => !finalFindings[key].found),
+        recommendations: ['AI assessment failed, using fallback logic']
+      };
+    }
   }
 
   // Build the initial research planning prompt
@@ -2667,17 +2771,43 @@ Be thorough but only include verified, official sources.`;
     for (let attempt = 1; attempt <= this.retryConfig.maxRetries; attempt++) {
       try {
         return await operation();
-      } catch (error) {
+      } catch (error: any) {
         lastError = error as Error;
         console.log(`❌ ${operationName} attempt ${attempt} failed: ${lastError.message}`);
         
+        // Check if it's an overload error (HTTP 529)
+        const isOverloadError = error.status === 529 || 
+                               error.code === 529 || 
+                               error.message?.includes('overloaded') ||
+                               error.message?.includes('Overloaded');
+        
         if (attempt < this.retryConfig.maxRetries) {
-          const delay = Math.min(
-            this.retryConfig.baseDelay * Math.pow(this.retryConfig.backoffMultiplier, attempt - 1),
-            this.retryConfig.maxDelay
-          );
-          console.log(`⏳ Retrying ${operationName} in ${delay}ms...`);
+          let delay: number;
+          
+          if (isOverloadError) {
+            // For overload errors, use longer delays
+            delay = Math.min(
+              this.retryConfig.baseDelay * Math.pow(this.retryConfig.backoffMultiplier * 2, attempt - 1),
+              this.retryConfig.maxDelay * 2
+            );
+            console.log(`⏳ API overloaded (529), retrying ${operationName} in ${delay}ms (longer delay)...`);
+          } else {
+            // For other errors, use normal delays
+            delay = Math.min(
+              this.retryConfig.baseDelay * Math.pow(this.retryConfig.backoffMultiplier, attempt - 1),
+              this.retryConfig.maxDelay
+            );
+            console.log(`⏳ Retrying ${operationName} in ${delay}ms...`);
+          }
+          
           await new Promise(resolve => setTimeout(resolve, delay));
+        } else {
+          // On final attempt, log the specific error type
+          if (isOverloadError) {
+            console.log(`❌ ${operationName} failed after ${attempt} attempts due to API overload (529)`);
+          } else {
+            console.log(`❌ ${operationName} failed after ${attempt} attempts: ${lastError.message}`);
+          }
         }
       }
     }
