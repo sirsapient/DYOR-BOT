@@ -49,6 +49,10 @@ export interface ProjectResearch {
     timestamp?: Date;
     dataPoints?: number;
   };
+  // NEW: Enhanced data from AI orchestrator
+  discoveredUrls?: { [key: string]: string };
+  collectedData?: { [key: string]: any };
+  totalDataPoints?: number;
 }
 
 export interface ConfidenceMetrics {

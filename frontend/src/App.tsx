@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { ProjectResearch } from './types';
-import { ConfidenceIndicator } from './components/ConfidenceIndicator';
 import './App.css';
 import ReactMarkdown from 'react-markdown';
 
@@ -18,7 +17,7 @@ function LoadingModal({ show }: { show: boolean }) {
       setIndex(i => (i + 1) % images.length);
     }, 1500);
     return () => clearInterval(interval);
-  }, [show]);
+  }, [show, images.length]);
   if (!show) return null;
   return (
     <div className="loading-modal">
@@ -33,12 +32,6 @@ function App() {
   const [research, setResearch] = useState<ProjectResearch | null>(null);
   const [researchLoading, setResearchLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [selectedNetwork, setSelectedNetwork] = useState<'auto' | 'ethereum' | 'ronin' | 'avalanche'>('auto');
-  const [contractAddress, setContractAddress] = useState('');
-  const [roninContractAddress, setRoninContractAddress] = useState('');
-  const [avalancheContractAddress, setAvalancheContractAddress] = useState('');
-  const [useEnhancedResearch, setUseEnhancedResearch] = useState(false);
-  const [feedback, setFeedback] = useState('');
 
   // Export functionality
   const exportReport = () => {
@@ -102,39 +95,14 @@ function App() {
     setError(null);
     try {
       const apiUrl = process.env.REACT_APP_API_URL || 'https://dyor-bot.onrender.com';
-      const endpoint = useEnhancedResearch ? '/api/research-enhanced' : '/api/research';
-      const fullUrl = `${apiUrl}${endpoint}`;
+      const fullUrl = `${apiUrl}/api/research`;
       
-      const requestBody: any = { 
-        projectName,
-        selectedNetwork
+      const requestBody = { 
+        projectName
       };
-      
-      if (selectedNetwork === 'ethereum' && contractAddress) {
-        requestBody.contractAddress = contractAddress;
-      } else if (selectedNetwork === 'ronin' && roninContractAddress) {
-        requestBody.roninContractAddress = roninContractAddress;
-      } else if (selectedNetwork === 'avalanche' && avalancheContractAddress) {
-        requestBody.avalancheContractAddress = avalancheContractAddress;
-      } else if (selectedNetwork === 'auto') {
-        if (contractAddress) requestBody.contractAddress = contractAddress;
-        if (roninContractAddress) requestBody.roninContractAddress = roninContractAddress;
-        if (avalancheContractAddress) requestBody.avalancheContractAddress = avalancheContractAddress;
-      }
       
       // Debug: Log what we're sending
       console.log('🔍 Sending request with data:', requestBody);
-      
-      if (useEnhancedResearch && feedback) {
-        requestBody.feedback = {
-          needsMoreData: true,
-          missingDataTypes: ['whitepaper', 'team_info'],
-          confidenceLevel: 'medium',
-          specificRequests: [feedback],
-          analysisReadiness: false,
-          recommendations: ['Need more comprehensive data']
-        };
-      }
       
       const res = await fetch(fullUrl, {
         method: 'POST',
@@ -143,7 +111,6 @@ function App() {
       });
       
       if (!res.ok) {
-        const errorText = await res.text();
         throw new Error(`API error: ${res.status} ${res.statusText}`);
       }
       
@@ -192,33 +159,69 @@ function App() {
               </form>
         </div>
 
+            {/* Data Collection Summary */}
+            {research.totalDataPoints && (
+              <div className="data-summary-section">
+                <div className="search-input-title">DATA COLLECTION</div>
+                <div className="data-summary">
+                  <div className="data-point">
+                    <div className="data-icon">📊</div>
+                    <div className="data-content">
+                      <div className="data-value">{research.totalDataPoints}</div>
+                      <div className="data-label">Data Points</div>
+                    </div>
+                  </div>
+                  <div className="data-point">
+                    <div className="data-icon">🔗</div>
+                    <div className="data-content">
+                      <div className="data-value">{research.sourcesUsed?.length || 0}</div>
+                      <div className="data-label">Sources</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Gathered Links */}
-            {research.sourcesUsed && Array.isArray(research.sourcesUsed) && research.sourcesUsed.length > 0 && (
+            {research.discoveredUrls && Object.keys(research.discoveredUrls).length > 0 && (
               <div className="sources-section">
-                <div className="search-input-title">GATHERED LINKS</div>
+                <div className="search-input-title">DISCOVERED SOURCES</div>
                 <div className="links-container">
-                  {research.sourcesUsed.map((source, index) => (
+                  {Object.entries(research.discoveredUrls).map(([sourceType, url], index) => (
                     <div key={index} className="link-item">
-                      <div className="link-icon">🔗</div>
+                      <div className="link-icon">
+                        {sourceType === 'whitepaper' ? '📄' :
+                         sourceType === 'documentation' ? '📚' :
+                         sourceType === 'github' ? '💻' :
+                         sourceType === 'security_audit' ? '🔒' :
+                         sourceType === 'team_info' ? '🏢' :
+                         sourceType === 'blog' ? '📝' :
+                         sourceType === 'social_media' ? '🐦' :
+                         sourceType === 'website' ? '🌐' : '🔗'}
+                      </div>
                       <div className="link-content">
+                        <div className="link-type">{sourceType.replace('_', ' ').toUpperCase()}</div>
                         <div className="link-url">
-                          {source && source.length > 50 ? source.substring(0, 50) + '...' : source}
+                          {url && url.length > 40 ? url.substring(0, 40) + '...' : url}
                         </div>
                         <div className="link-domain">
                           {(() => {
                             try {
-                              return source && new URL(source).hostname;
+                              return url && new URL(url).hostname;
                             } catch (error) {
                               return 'Invalid URL';
                             }
                           })()}
                         </div>
                       </div>
+                      <a href={url} target="_blank" rel="noopener noreferrer" className="link-visit">
+                        VISIT →
+                      </a>
                     </div>
                   ))}
                 </div>
                 <div className="links-summary">
-                  {research.sourcesUsed.length} data sources gathered
+                  {Object.keys(research.discoveredUrls).length} official sources discovered
                 </div>
               </div>
             )}

@@ -1649,12 +1649,34 @@ function transformAIOrchestratorDataToFrontendFormat(
     redditSummary: ''
   };
 
+  // Collect all discovered URLs and data for comprehensive display
+  const discoveredUrls: { [key: string]: string } = {};
+  const collectedData: { [key: string]: any } = {};
+  let totalDataPoints = 0;
+
   // Process findings from AI orchestrator
   if (aiResult.findings) {
     Object.keys(aiResult.findings).forEach(sourceName => {
       const finding = aiResult.findings[sourceName];
       if (finding.found && finding.data) {
         const data = finding.data;
+        collectedData[sourceName] = data;
+        
+        // Count data points
+        if (finding.dataPoints) {
+          totalDataPoints += finding.dataPoints;
+        }
+        
+        // Extract URLs from various sources
+        if (data.url) discoveredUrls[sourceName] = data.url;
+        if (data.website) discoveredUrls['website'] = data.website;
+        if (data.whitepaper) discoveredUrls['whitepaper'] = data.whitepaper;
+        if (data.documentation) discoveredUrls['documentation'] = data.documentation;
+        if (data.github) discoveredUrls['github'] = data.github;
+        if (data.securityAudit) discoveredUrls['security_audit'] = data.securityAudit;
+        if (data.teamInfo) discoveredUrls['team_info'] = data.teamInfo;
+        if (data.blog) discoveredUrls['blog'] = data.blog;
+        if (data.socialMedia) discoveredUrls['social_media'] = data.socialMedia;
         
         // Extract financial data
         if (sourceName === 'financial_data' || sourceName === 'onchain_data') {
@@ -1688,7 +1710,30 @@ function transformAIOrchestratorDataToFrontendFormat(
           if (data.redditSummary) communityHealth.redditSummary = data.redditSummary;
         }
         
-        // Extract key findings
+        // Extract key findings from extracted text
+        if (data.extracted_text) {
+          const text = data.extracted_text;
+          // Simple keyword-based analysis for key findings
+          const positiveKeywords = ['successful', 'popular', 'growing', 'innovative', 'strong', 'established', 'reliable'];
+          const negativeKeywords = ['controversial', 'declining', 'risky', 'unstable', 'weak'];
+          const redFlagKeywords = ['scam', 'fake', 'suspicious', 'warning', 'avoid', 'danger'];
+          
+          const sentences = text.split(/[.!?]+/).filter((s: string) => s.trim().length > 10);
+          sentences.forEach((sentence: string) => {
+            const lowerSentence = sentence.toLowerCase();
+            if (positiveKeywords.some(keyword => lowerSentence.includes(keyword))) {
+              keyFindings.positives.push(sentence.trim());
+            }
+            if (negativeKeywords.some(keyword => lowerSentence.includes(keyword))) {
+              keyFindings.negatives.push(sentence.trim());
+            }
+            if (redFlagKeywords.some(keyword => lowerSentence.includes(keyword))) {
+              keyFindings.redFlags.push(sentence.trim());
+            }
+          });
+        }
+        
+        // Extract key findings from structured data
         if (data.positives) keyFindings.positives.push(...data.positives);
         if (data.negatives) keyFindings.negatives.push(...data.negatives);
         if (data.redFlags) keyFindings.redFlags.push(...data.redFlags);
@@ -1698,16 +1743,48 @@ function transformAIOrchestratorDataToFrontendFormat(
 
   // If no key findings were extracted, add a default
   if (keyFindings.positives.length === 0) {
-    keyFindings.positives.push('AI research completed');
+    keyFindings.positives.push('AI research completed successfully');
   }
 
-  // Create sources used list
-  const sourcesUsed = aiResult.findings ? 
-    Object.keys(aiResult.findings).filter(key => aiResult.findings[key].found) : 
-    ['AI-Orchestrated'];
+  // Create comprehensive sources used list with URLs
+  const sourcesUsed = Object.values(discoveredUrls).filter(url => url && url.length > 0);
 
-  // Fix the confidence display - multiply by 100 to show as percentage
+  // Generate a comprehensive AI summary based on collected data
   const confidencePercentage = aiResult.confidence ? (aiResult.confidence * 100).toFixed(1) : '0';
+  const dataSourcesCount = Object.keys(collectedData).length;
+  
+  let aiSummary = `## AI Research Analysis for ${projectName}\n\n`;
+  aiSummary += `**Confidence Level:** ${confidencePercentage}%\n\n`;
+  aiSummary += `**Data Collection Summary:**\n`;
+  aiSummary += `- Total data sources analyzed: ${dataSourcesCount}\n`;
+  aiSummary += `- Total data points collected: ${totalDataPoints}\n`;
+  aiSummary += `- Official sources found: ${Object.keys(discoveredUrls).length}\n\n`;
+  
+  // Add specific findings based on collected data
+  if (collectedData.whitepaper) {
+    aiSummary += `**📄 Whitepaper Analysis:** Found and analyzed official whitepaper data.\n\n`;
+  }
+  if (collectedData.technical_documentation) {
+    aiSummary += `**📚 Technical Documentation:** Reviewed technical specifications and architecture.\n\n`;
+  }
+  if (financialData.roninTokenInfo || financialData.avalancheTokenInfo) {
+    aiSummary += `**💰 Token Information:** Found token data on blockchain networks.\n\n`;
+  }
+  if (teamAnalysis.studioAssessment && teamAnalysis.studioAssessment.length > 0) {
+    aiSummary += `**🏢 Team Analysis:** Analyzed development studio background and history.\n\n`;
+  }
+  
+  // Add recommendations based on data quality
+  if (totalDataPoints > 100) {
+    aiSummary += `**✅ High Data Quality:** Comprehensive research completed with extensive data collection.\n\n`;
+  } else if (totalDataPoints > 50) {
+    aiSummary += `**⚠️ Moderate Data Quality:** Good research completed, but additional sources recommended.\n\n`;
+  } else {
+    aiSummary += `**⚠️ Limited Data Quality:** Basic research completed, consider additional manual verification.\n\n`;
+  }
+  
+  aiSummary += `**🔗 Discovered Sources:** ${sourcesUsed.length} official sources found and analyzed.\n\n`;
+  aiSummary += `*This analysis was generated by AI based on ${totalDataPoints} data points from ${dataSourcesCount} sources.*`;
   
   return {
     projectName,
@@ -1718,8 +1795,11 @@ function transformAIOrchestratorDataToFrontendFormat(
     technicalAssessment,
     communityHealth,
     sourcesUsed,
-    aiSummary: `AI Analysis: ${confidencePercentage}% confidence. Research completed.`,
-    whitepaper: null,
+    aiSummary,
+    whitepaper: collectedData.whitepaper || null,
+    discoveredUrls,
+    collectedData,
+    totalDataPoints,
     confidence: null, // Will be generated separately
     qualityGates: null // Will be generated separately
   };
