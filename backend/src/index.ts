@@ -1328,19 +1328,43 @@ async function fetchWebsiteAboutSection(url: string): Promise<string> {
   try {
     console.log(`🌐 Fetching website content from: ${url}`);
     
-    // Add headers to mimic a real browser
+    // Enhanced headers to better mimic a real browser
     const headers = {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-      'Accept-Language': 'en-US,en;q=0.5',
-      'Accept-Encoding': 'gzip, deflate',
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+      'Accept-Language': 'en-US,en;q=0.9',
+      'Accept-Encoding': 'gzip, deflate, br',
       'Connection': 'keep-alive',
       'Upgrade-Insecure-Requests': '1',
+      'Sec-Fetch-Dest': 'document',
+      'Sec-Fetch-Mode': 'navigate',
+      'Sec-Fetch-Site': 'none',
+      'Sec-Fetch-User': '?1',
+      'Cache-Control': 'max-age=0',
+      'DNT': '1',
+      'Sec-CH-UA': '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
+      'Sec-CH-UA-Mobile': '?0',
+      'Sec-CH-UA-Platform': '"Windows"'
     };
 
-    const res = await fetch(url, { headers });
+    // Add a small delay to avoid being flagged as a bot
+    await new Promise(resolve => setTimeout(resolve, Math.random() * 2000 + 1000));
+
+    const res = await fetch(url, { 
+      headers,
+      redirect: 'follow',
+      timeout: 30000
+    });
+    
     if (!res.ok) {
       console.log(`❌ HTTP ${res.status}: ${res.statusText} for ${url}`);
+      
+      // If we get a 403, try with different headers
+      if (res.status === 403) {
+        console.log(`🔄 Attempting alternative approach for 403 error...`);
+        return await fetchWebsiteAboutSectionAlternative(url);
+      }
+      
       return '';
     }
     
@@ -1407,6 +1431,178 @@ async function fetchWebsiteAboutSection(url: string): Promise<string> {
   }
 }
 
+// Alternative approach for websites that block standard requests
+async function fetchWebsiteAboutSectionAlternative(url: string): Promise<string> {
+  try {
+    console.log(`🔄 Trying alternative approach for: ${url}`);
+    
+    // Try different User-Agent strings
+    const userAgents = [
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/121.0',
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Safari/605.1.15'
+    ];
+    
+    for (const userAgent of userAgents) {
+      try {
+        console.log(`🔄 Trying User-Agent: ${userAgent.substring(0, 50)}...`);
+        
+        const headers = {
+          'User-Agent': userAgent,
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.5',
+          'Accept-Encoding': 'gzip, deflate',
+          'Connection': 'keep-alive',
+          'Upgrade-Insecure-Requests': '1'
+        };
+        
+        // Add longer delay for alternative attempts
+        await new Promise(resolve => setTimeout(resolve, Math.random() * 3000 + 2000));
+        
+        const res = await fetch(url, { 
+          headers,
+          redirect: 'follow',
+          timeout: 30000
+        });
+        
+        if (res.ok) {
+          console.log(`✅ Alternative approach succeeded with User-Agent: ${userAgent.substring(0, 30)}...`);
+          const html = await res.text();
+          const $ = cheerio.load(html);
+          
+          // Remove script and style tags
+          $('script, style').remove();
+          
+          // Extract text content
+          let about = $('body').text();
+          
+          // Clean up the text
+          const cleanedText = about
+            .replace(/\s+/g, ' ')
+            .replace(/\n+/g, ' ')
+            .trim()
+            .substring(0, 3000);
+          
+          console.log(`📄 Alternative approach extracted ${cleanedText.length} characters`);
+          return cleanedText;
+        }
+      } catch (e) {
+        console.log(`❌ Alternative approach failed with User-Agent: ${userAgent.substring(0, 30)}...`);
+        continue;
+      }
+    }
+    
+    console.log(`❌ All alternative approaches failed for: ${url}`);
+    return '';
+    
+  } catch (e) {
+    console.log(`❌ Error in alternative approach: ${(e as Error).message}`);
+    return '';
+  }
+}
+
+// Get financial data from alternative sources when website is blocked
+async function getFinancialDataFromAlternativeSources(projectName: string): Promise<any> {
+  try {
+    console.log(`💰 Attempting to get financial data from alternative sources for: ${projectName}`);
+    
+    const financialData: any = {
+      funding: 'Alternative sources used',
+      investors: ['Alternative data sources'],
+      valuation: 'Alternative valuation data',
+      website: null,
+      extractedAbout: null
+    };
+    
+    // Try to get data from CoinGecko if we have a token symbol
+    try {
+      // Search for the project on CoinGecko
+      const searchUrl = `https://api.coingecko.com/api/v3/search?query=${encodeURIComponent(projectName)}`;
+      const searchRes = await fetch(searchUrl);
+      
+      if (searchRes.ok) {
+        const searchData = await searchRes.json();
+        if (searchData.coins && searchData.coins.length > 0) {
+          const firstCoin = searchData.coins[0];
+          console.log(`✅ Found CoinGecko data for: ${firstCoin.name}`);
+          
+          // Get detailed data for the first match
+          const detailUrl = `https://api.coingecko.com/api/v3/coins/${firstCoin.id}`;
+          const detailRes = await fetch(detailUrl);
+          
+          if (detailRes.ok) {
+            const coinData = await detailRes.json();
+            financialData.coinGeckoData = {
+              name: coinData.name,
+              symbol: coinData.symbol,
+              marketCap: coinData.market_data?.market_cap?.usd,
+              currentPrice: coinData.market_data?.current_price?.usd,
+              totalVolume: coinData.market_data?.total_volume?.usd,
+              description: coinData.description?.en?.substring(0, 500)
+            };
+            console.log(`✅ Retrieved detailed CoinGecko data`);
+          }
+        }
+      }
+    } catch (e) {
+      console.log(`❌ CoinGecko alternative failed: ${(e as Error).message}`);
+    }
+    
+    // Try to get data from GitHub if available
+    try {
+      const githubUrl = `https://api.github.com/search/repositories?q=${encodeURIComponent(projectName)}`;
+      const githubRes = await fetch(githubUrl, {
+        headers: {
+          'Accept': 'application/vnd.github.v3+json',
+          'User-Agent': 'DYOR-BOT/1.0'
+        }
+      });
+      
+      if (githubRes.ok) {
+        const githubData = await githubRes.json();
+        if (githubData.items && githubData.items.length > 0) {
+          const firstRepo = githubData.items[0];
+          financialData.githubData = {
+            name: firstRepo.name,
+            description: firstRepo.description,
+            stars: firstRepo.stargazers_count,
+            forks: firstRepo.forks_count,
+            language: firstRepo.language,
+            url: firstRepo.html_url
+          };
+          console.log(`✅ Retrieved GitHub data for: ${firstRepo.name}`);
+        }
+      }
+    } catch (e) {
+      console.log(`❌ GitHub alternative failed: ${(e as Error).message}`);
+    }
+    
+    // Try to get data from social media mentions
+    try {
+      // This would require a social media API, but for now we'll add a placeholder
+      financialData.socialData = {
+        mentions: 'Social media data unavailable',
+        sentiment: 'neutral'
+      };
+    } catch (e) {
+      console.log(`❌ Social media alternative failed: ${(e as Error).message}`);
+    }
+    
+    if (financialData.coinGeckoData || financialData.githubData) {
+      console.log(`✅ Alternative financial data collected successfully`);
+      return financialData;
+    } else {
+      console.log(`❌ No alternative financial data sources succeeded`);
+      return null;
+    }
+    
+  } catch (e) {
+    console.log(`❌ Error getting alternative financial data: ${(e as Error).message}`);
+    return null;
+  }
+}
+
 app.post('/api/research', async (req: any, res: any) => {
   console.log(`\n🚀 RESEARCH REQUEST RECEIVED`);
   console.log(`📝 Project: ${req.body.projectName}`);
@@ -1460,7 +1656,8 @@ app.post('/api/research', async (req: any, res: any) => {
         fetchRoninTransactionHistory,
         discoverOfficialUrlsWithAI,
         findOfficialSourcesForEstablishedProject,
-        searchContractAddressWithLLM
+        searchContractAddressWithLLM,
+        getFinancialDataFromAlternativeSources
       }
     );
 
@@ -1786,7 +1983,8 @@ app.post('/api/research-enhanced', async (req: any, res: any) => {
       fetchRoninTransactionHistory,
       discoverOfficialUrlsWithAI,
       findOfficialSourcesForEstablishedProject,
-      searchContractAddressWithLLM
+      searchContractAddressWithLLM,
+      getFinancialDataFromAlternativeSources
     };
 
     // Conduct enhanced research

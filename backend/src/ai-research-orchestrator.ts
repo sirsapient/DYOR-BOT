@@ -22,6 +22,7 @@ interface DataCollectionFunctions {
   discoverOfficialUrlsWithAI: (projectName: string, aliases: string[]) => Promise<any>;
   findOfficialSourcesForEstablishedProject: (projectName: string, aliases: string[]) => Promise<any>;
   searchContractAddressWithLLM: (projectName: string) => Promise<string | null>;
+  getFinancialDataFromAlternativeSources: (projectName: string) => Promise<any>;
 }
 
 // NEW: Feedback interface for second AI communication
@@ -3216,17 +3217,43 @@ async function collectFromSourceWithRealFunctions(
         break;
         
       case 'financial_data':
+        console.log(`💰 Attempting to collect financial data...`);
+        console.log(`🔍 Website URL: ${discoveredUrls?.website}`);
+        
         if (discoveredUrls?.website && dataCollectionFunctions?.fetchWebsiteAboutSection) {
           console.log(`💰 Fetching financial data from website: ${discoveredUrls.website}`);
           const aboutSection = await dataCollectionFunctions.fetchWebsiteAboutSection(discoveredUrls.website);
-          return {
-            funding: 'Funding information extracted',
-            investors: ['Investor information'],
-            valuation: 'Valuation data',
-            website: discoveredUrls.website,
-            extractedAbout: aboutSection
-          };
+          
+          if (aboutSection) {
+            console.log(`✅ Financial data fetched successfully from website`);
+            return {
+              funding: 'Funding information extracted',
+              investors: ['Investor information'],
+              valuation: 'Valuation data',
+              website: discoveredUrls.website,
+              extractedAbout: aboutSection
+            };
+          } else {
+            console.log(`❌ Website financial data fetch returned empty, trying alternative sources...`);
+          }
         }
+        
+        // If website approach failed, try alternative sources
+        if (dataCollectionFunctions?.getFinancialDataFromAlternativeSources) {
+          console.log(`🔄 Trying alternative financial data sources...`);
+          const alternativeData = await dataCollectionFunctions.getFinancialDataFromAlternativeSources(projectName);
+          
+          if (alternativeData) {
+            console.log(`✅ Alternative financial data collected successfully`);
+            return alternativeData;
+          } else {
+            console.log(`❌ Alternative financial data sources also failed`);
+          }
+        } else {
+          console.log(`❌ Missing getFinancialDataFromAlternativeSources function`);
+        }
+        
+        console.log(`❌ No financial data could be collected`);
         break;
         
       case 'community_metrics':
