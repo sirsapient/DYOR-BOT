@@ -399,31 +399,38 @@ if (missingVars.length > 0) {
   console.warn('Server will start but some features may not work properly.');
 }
 
-const serpApiKey = process.env.SERPAPI_KEY;
+import { freeSearchService } from './search-service';
 
 async function searchContractAddressWithLLM(projectName: string): Promise<string | null> {
-  if (!serpApiKey || !process.env.ANTHROPIC_API_KEY) return null;
+  if (!process.env.ANTHROPIC_API_KEY) return null;
   
-  // Enhanced search terms for better contract discovery
+  console.log(`🔍 Searching for contract address for: ${projectName}`);
+  
+  // Use free search service instead of SerpAPI
+  const contractAddress = await freeSearchService.searchForContractAddress(projectName);
+  
+  if (contractAddress) {
+    console.log(`✅ Found contract address via free search: ${contractAddress}`);
+    return contractAddress;
+  }
+  
+  // Fallback: Use AI to extract from general search results
   const searchTerms = [
     `${projectName} token contract address`,
     `${projectName} smart contract address`,
     `${projectName} token address ronin`,
-    `${projectName} AXS token contract`,
-    `${projectName} blockchain address`
+    `${projectName} AXS token contract`
   ];
   
   let allSnippets = '';
   
-  // Try multiple search terms
+  // Try multiple search terms using free search
   for (const searchTerm of searchTerms) {
     try {
       console.log(`🔍 Searching for contract address with term: ${searchTerm}`);
-      const serpRes = await fetch(`https://serpapi.com/search.json?q=${encodeURIComponent(searchTerm)}&api_key=${serpApiKey}`);
-      if (!serpRes.ok) continue;
+      const results = await freeSearchService.search(searchTerm, 3);
       
-      const serpJson = await serpRes.json();
-      const snippets = (serpJson.organic_results || []).map((r: any) => r.snippet || r.title || '').filter(Boolean).join('\n');
+      const snippets = results.map(r => r.snippet || r.title || '').filter(Boolean).join('\n');
       if (snippets) {
         allSnippets += snippets + '\n';
       }
@@ -800,47 +807,43 @@ async function findOfficialSourcesForEstablishedProject(projectName: string, ali
       searchTerms.push(`"${alias}" github official`);
     }
     
-    for (const term of searchTerms.slice(0, 6)) {
-      try {
-        const serpRes = await fetch(`https://serpapi.com/search.json?q=${encodeURIComponent(term)}&api_key=${serpApiKey}`);
-        if (serpRes.ok) {
-          const serpJson = await serpRes.json();
-          const results = serpJson.organic_results || [];
+    // Use free search service instead of SerpAPI
+    const searchResults = await freeSearchService.searchForOfficialSources(projectName);
+    
+    // Update official sources with found results
+    if (searchResults.whitepaper) {
+      officialSources.whitepaper = searchResults.whitepaper;
+    }
+    if (searchResults.documentation) {
+      officialSources.documentation = searchResults.documentation;
+    }
+    if (searchResults.github) {
+      officialSources.github = searchResults.github;
+    }
+    if (searchResults.website) {
+      officialSources.website = searchResults.website;
+    }
+    
+    // Fallback: Try additional search terms if we're missing sources
+    const missingSources = [];
+    if (!officialSources.whitepaper) missingSources.push('whitepaper');
+    if (!officialSources.documentation) missingSources.push('documentation');
+    if (!officialSources.github) missingSources.push('github');
+    
+    for (const missingSource of missingSources) {
+      for (const alias of aliases.slice(0, 3)) {
+        const searchTerm = `${alias} ${missingSource}`;
+        try {
+          const results = await freeSearchService.search(searchTerm, 2);
           
-          for (const result of results.slice(0, 3)) {
+          for (const result of results) {
             const url = result.link;
-            if (url && !officialSources.whitepaper && (term.includes('whitepaper') || term.includes('technical paper'))) {
+            if (url && !officialSources[missingSource]) {
               try {
                 const res = await fetch(url, { method: 'HEAD', timeout: 3000 });
                 if (res.ok) {
-                  officialSources.whitepaper = url;
-                  console.log(`✅ Found whitepaper via search: ${url}`);
-                  break;
-                }
-              } catch (e) {
-                // Continue to next result
-              }
-            }
-            
-            if (url && !officialSources.documentation && (term.includes('documentation') || term.includes('developer docs') || term.includes('api'))) {
-              try {
-                const res = await fetch(url, { method: 'HEAD', timeout: 3000 });
-                if (res.ok) {
-                  officialSources.documentation = url;
-                  console.log(`✅ Found documentation via search: ${url}`);
-                  break;
-                }
-              } catch (e) {
-                // Continue to next result
-              }
-            }
-            
-            if (url && !officialSources.github && term.includes('github')) {
-              try {
-                const res = await fetch(url, { method: 'HEAD', timeout: 3000 });
-                if (res.ok) {
-                  officialSources.github = url;
-                  console.log(`✅ Found GitHub via search: ${url}`);
+                  officialSources[missingSource] = url;
+                  console.log(`✅ Found ${missingSource} via fallback search: ${url}`);
                   break;
                 }
               } catch (e) {
@@ -848,9 +851,9 @@ async function findOfficialSourcesForEstablishedProject(projectName: string, ali
               }
             }
           }
+        } catch (e) {
+          // Continue with next search term
         }
-      } catch (e) {
-        // Continue with next search term
       }
     }
   }
@@ -892,7 +895,7 @@ async function findOfficialSourcesForEstablishedProject(projectName: string, ali
 
 // New AI-powered function to discover official URLs for any project
 async function discoverOfficialUrlsWithAI(projectName: string, aliases: string[]): Promise<any> {
-  if (!serpApiKey || !process.env.ANTHROPIC_API_KEY) return null;
+  if (!process.env.ANTHROPIC_API_KEY) return null;
   
   console.log(`🤖 AI-powered URL discovery for ${projectName}`);
   
@@ -918,21 +921,17 @@ async function discoverOfficialUrlsWithAI(projectName: string, aliases: string[]
   let searchContext = '';
   let foundUrls: string[] = [];
   
-  // Get search results for context
+  // Get search results for context using free search service
   for (const term of searchTerms.slice(0, 5)) {
     try {
-      const serpRes = await fetch(`https://serpapi.com/search.json?q=${encodeURIComponent(term)}&api_key=${serpApiKey}`);
-      if (serpRes.ok) {
-        const serpJson = await serpRes.json();
-        const results = (serpJson.organic_results || []).slice(0, 5);
-        const snippets = results.map((r: any) => `${r.title}: ${r.snippet}`).join('\n');
-        searchContext += snippets + '\n';
-        
-        // Collect URLs for validation
-        results.forEach((r: any) => {
-          if (r.link) foundUrls.push(r.link);
-        });
-      }
+      const results = await freeSearchService.search(term, 5);
+      const snippets = results.map((r: any) => `${r.title}: ${r.snippet}`).join('\n');
+      searchContext += snippets + '\n';
+      
+      // Collect URLs for validation
+      results.forEach((r: any) => {
+        if (r.link) foundUrls.push(r.link);
+      });
     } catch (e) {
       console.log(`❌ Search failed for term: ${term}`);
     }
@@ -1171,7 +1170,7 @@ function extractSocialLinksFromHtml(html: string): {discord?: string, twitter?: 
 }
 
 async function searchProjectSpecificTokenomics(projectName: string, aliases: string[]): Promise<any | null> {
-  if (!serpApiKey || !process.env.ANTHROPIC_API_KEY) return null;
+  if (!process.env.ANTHROPIC_API_KEY) return null;
   
   // Enhanced search for project-specific tokenomics information
   const searchTerms = [
@@ -1203,12 +1202,9 @@ async function searchProjectSpecificTokenomics(projectName: string, aliases: str
   // Search each term
   for (const term of searchTerms.slice(0, 4)) { // Limit to first 4 terms
     try {
-      const serpRes = await fetch(`https://serpapi.com/search.json?q=${encodeURIComponent(term)}&api_key=${serpApiKey}`);
-      if (serpRes.ok) {
-        const serpJson = await serpRes.json();
-        const snippets = (serpJson.organic_results || []).map((r: any) => r.snippet || r.title || '').filter(Boolean).join('\n');
-        allSnippets += snippets + '\n';
-      }
+      const results = await freeSearchService.search(term, 3);
+      const snippets = results.map(r => r.snippet || r.title || '').filter(Boolean).join('\n');
+      allSnippets += snippets + '\n';
     } catch (e) {
       // Continue with next search term
     }

@@ -5,6 +5,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { QualityGatesEngine } from './quality-gates';
 import { ResearchFindings } from './research-scoring';
 import { ResearchScoringEngine } from './research-scoring';
+import { freeSearchService } from './search-service';
 
 // Import the actual data collection functions from index.ts
 // We'll need to pass these as parameters since we can't import from the same file
@@ -1483,71 +1484,64 @@ Be thorough but only include verified, official sources.`;
     for (const term of searchTerms.slice(0, 5)) {
       try {
         console.log(`🔍 Web searching for: ${term}`);
-        const serpRes = await this.executeWithRetry(
-          () => fetch(`https://serpapi.com/search.json?q=${encodeURIComponent(term)}&api_key=${process.env.SERP_API_KEY}`),
-          `SerpAPI search for ${term}`
-        );
+        // Use free search service instead of SerpAPI
+        const freeSearchResults = await freeSearchService.search(term, 3);
         
-        if (serpRes.ok) {
-          const serpJson = await serpRes.json();
-          const results = (serpJson.organic_results || []).slice(0, 3);
-          
-          for (const result of results) {
-            if (result.link) {
-              try {
-                const linkRes = await this.executeWithRetry(
-                  () => fetch(result.link, { method: 'HEAD' }),
-                  `Checking web search result ${result.link}`
+        for (const result of freeSearchResults) {
+          if (result.link) {
+            try {
+              const linkRes = await this.executeWithRetry(
+                () => fetch(result.link, { method: 'HEAD' }),
+                `Checking web search result ${result.link}`
+              );
+              if (linkRes.ok) {
+                // Enhanced classification of search results
+                const title = result.title.toLowerCase();
+                const snippet = result.snippet.toLowerCase();
+                const url = result.link.toLowerCase();
+                
+                // Documentation keywords
+                const docKeywords = [
+                  'whitepaper', 'white paper', 'litepaper', 'lite paper',
+                  'docs', 'documentation', 'technical', 'developer',
+                  'tokenomics', 'economics', 'governance', 'architecture',
+                  'api', 'sdk', 'integration', 'guide', 'manual',
+                  'technical documentation', 'developer docs'
+                ];
+                
+                // Company/team keywords
+                const companyKeywords = [
+                  'about', 'team', 'company', 'founders', 'leadership',
+                  'careers', 'contact', 'press', 'news', 'blog',
+                  'medium', 'linkedin', 'twitter', 'discord', 'telegram'
+                ];
+                
+                const isDoc = docKeywords.some(keyword => 
+                  title.includes(keyword) || 
+                  snippet.includes(keyword) ||
+                  url.includes(keyword)
                 );
-                if (linkRes.ok) {
-                  // Enhanced classification of search results
-                  const title = result.title.toLowerCase();
-                  const snippet = result.snippet.toLowerCase();
-                  const url = result.link.toLowerCase();
-                  
-                  // Documentation keywords
-                  const docKeywords = [
-                    'whitepaper', 'white paper', 'litepaper', 'lite paper',
-                    'docs', 'documentation', 'technical', 'developer',
-                    'tokenomics', 'economics', 'governance', 'architecture',
-                    'api', 'sdk', 'integration', 'guide', 'manual',
-                    'technical documentation', 'developer docs'
-                  ];
-                  
-                  // Company/team keywords
-                  const companyKeywords = [
-                    'about', 'team', 'company', 'founders', 'leadership',
-                    'careers', 'contact', 'press', 'news', 'blog',
-                    'medium', 'linkedin', 'twitter', 'discord', 'telegram'
-                  ];
-                  
-                  const isDoc = docKeywords.some(keyword => 
-                    title.includes(keyword) || 
-                    snippet.includes(keyword) ||
-                    url.includes(keyword)
-                  );
-                  
-                  const isCompany = companyKeywords.some(keyword => 
-                    title.includes(keyword) || 
-                    snippet.includes(keyword) ||
-                    url.includes(keyword)
-                  );
-                  
-                  if (isDoc) {
-                    searchResults.documentation.push(result.link);
-                    console.log(`✅ Found documentation via web search: ${result.link}`);
-                  } else if (isCompany) {
-                    searchResults.company.push(result.link);
-                    console.log(`✅ Found company info via web search: ${result.link}`);
-                  } else {
-                    // Default to company if unclear
-                    searchResults.company.push(result.link);
-                    console.log(`✅ Found potential company info via web search: ${result.link}`);
-                  }
+                
+                const isCompany = companyKeywords.some(keyword => 
+                  title.includes(keyword) || 
+                  snippet.includes(keyword) ||
+                  url.includes(keyword)
+                );
+                
+                if (isDoc) {
+                  searchResults.documentation.push(result.link);
+                  console.log(`✅ Found documentation via web search: ${result.link}`);
+                } else if (isCompany) {
+                  searchResults.company.push(result.link);
+                  console.log(`✅ Found company info via web search: ${result.link}`);
+                } else {
+                  // Default to company if unclear
+                  searchResults.company.push(result.link);
+                  console.log(`✅ Found potential company info via web search: ${result.link}`);
                 }
-              } catch (e) {
-                console.log(`❌ Failed to check web search result ${result.link}: ${(e as Error).message}`);
               }
+            } catch (e) {
+              console.log(`❌ Failed to check web search result ${result.link}: ${(e as Error).message}`);
             }
           }
         }
