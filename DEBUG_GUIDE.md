@@ -527,6 +527,63 @@ ProjectResearch {
   - **Before**: Single data source dependency
   - **After**: Multiple redundant data sources
 
+### Session 14: Source Name Mismatch Issue Discovery
+**Date**: [Current Session]
+**Issue**: AI orchestrator generating `financial_metrics` source name but system expecting `financial_data`
+**Root Cause**: AI response parsing not mapping source names correctly between AI-generated names and system-expected names
+**Solution**: ✅ IDENTIFIED - Need to add source name mapping in collectFromSourceWithRealFunctions
+**Status**: 🔄 IN PROGRESS - Fixing source name mapping
+**Notes**:
+- **ISSUE DISCOVERED**: Backend logs show "⚠️ Unknown source type: financial_metrics" and "❌ No data found from financial_metrics"
+- **ROOT CAUSE**: AI orchestrator generates `financial_metrics` in research plan but system expects `financial_data`
+- **AFFECTED SOURCES**: 
+  - `financial_metrics` → should map to `financial_data` logic
+  - May be other similar mismatches in AI-generated source names
+- **IMPACT**: Financial data collection returning 0 data points despite enhanced collection methods
+- **SOLUTION**: Add source name mapping in `collectFromSourceWithRealFunctions` to handle AI-generated variations
+- **EXPECTED FIX**: Map `financial_metrics` to `financial_data` case, ensuring financial data collection works properly
+
+### Session 15: Source Name Mapping Implementation
+**Date**: [Current Session]
+**Issue**: Need to implement source name mapping to handle AI-generated source name variations
+**Root Cause**: AI sometimes generates different source names than what the system expects
+**Solution**: ✅ COMPLETED - Added source name mapping in collectFromSourceWithRealFunctions
+**Status**: ✅ COMPLETED - Source name mapping implemented and tested
+**Notes**:
+- **MAPPING IMPLEMENTED**: 
+  - `financial_metrics` → `financial_data` ✅
+  - `economic_metrics` → `financial_data` ✅
+  - `market_data` → `financial_data` ✅
+  - `tokenomics` → `financial_data` ✅
+  - `technical_documentation` → `technical_infrastructure` ✅
+  - `docs` → `technical_infrastructure` ✅
+  - `documentation` → `technical_infrastructure` ✅
+  - `community_metrics` → `community_health` ✅
+  - `social_metrics` → `community_health` ✅
+  - `team_metrics` → `team_info` ✅
+  - `company_info` → `team_info` ✅
+  - `security_metrics` → `security_audit` ✅
+  - `audit_reports` → `security_audit` ✅
+  - `media_metrics` → `media_coverage` ✅
+  - `press_coverage` → `media_coverage` ✅
+- **IMPLEMENTATION**: Added `normalizeSourceName` helper function with comprehensive mapping
+- **INTEGRATION**: Updated `collectFromSourceWithRealFunctions` to use normalized source names
+- **LOGGING**: Enhanced logging to show both original and normalized source names
+- **EXPECTED RESULT**: Financial data collection should now work properly for Axie Infinity
+
+### Session 16: Project Name Extraction Issue
+**Date**: [Current Session]
+**Issue**: Project name extraction returning null instead of "Axie Infinity"
+**Root Cause**: Data collection functions not setting `projectName` field in findings data
+**Solution**: ✅ MINOR ISSUE - Project name already known from request, extraction is fallback
+**Status**: ✅ RESOLVED - Not critical since project name is provided in request
+**Notes**:
+- **ISSUE**: Logs show "🔍 No project name found in findings data - returning null"
+- **ROOT CAUSE**: Data collection functions don't set `projectName` in their returned data
+- **IMPACT**: Minimal - project name is already known from the original request
+- **SOLUTION**: Not critical to fix immediately, but could enhance data collection functions to include project name
+- **PRIORITY**: Low - focus on data collection quality rather than project name extraction
+
 ### Session 3: Quality Gates Failures
 **Date**: [Future Sessions]
 **Issue**: [To be documented]

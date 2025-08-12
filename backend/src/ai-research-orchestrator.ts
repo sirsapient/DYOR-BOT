@@ -3134,6 +3134,29 @@ export async function conductAIOrchestratedResearch(
   }
 }
 
+// Helper function to normalize AI-generated source names to system-expected names
+function normalizeSourceName(sourceName: string): string {
+  const sourceNameMappings: { [key: string]: string } = {
+    'financial_metrics': 'financial_data',
+    'economic_metrics': 'financial_data',
+    'market_data': 'financial_data',
+    'tokenomics': 'financial_data',
+    'technical_documentation': 'technical_infrastructure',
+    'docs': 'technical_infrastructure',
+    'documentation': 'technical_infrastructure',
+    'community_metrics': 'community_health',
+    'social_metrics': 'community_health',
+    'team_metrics': 'team_info',
+    'company_info': 'team_info',
+    'security_metrics': 'security_audit',
+    'audit_reports': 'security_audit',
+    'media_metrics': 'media_coverage',
+    'press_coverage': 'media_coverage'
+  };
+  
+  return sourceNameMappings[sourceName] || sourceName;
+}
+
 async function collectFromSourceWithRealFunctions(
   sourceName: string, 
   searchTerms: string[], 
@@ -3143,12 +3166,14 @@ async function collectFromSourceWithRealFunctions(
   basicInfo?: BasicProjectInfo,
   discoveredUrls?: any
 ): Promise<any> {
-  console.log(`🔍 Collecting from ${sourceName} with terms: ${searchTerms.join(', ')}`);
+  // Normalize source name to handle AI-generated variations
+  const normalizedSourceName = normalizeSourceName(sourceName);
+  console.log(`🔍 Collecting from ${sourceName} (normalized to ${normalizedSourceName}) with terms: ${searchTerms.join(', ')}`);
   console.log(`🔍 Discovered URLs:`, discoveredUrls);
   console.log(`🔍 Basic Info:`, basicInfo);
   
   try {
-    switch (sourceName) {
+    switch (normalizedSourceName) {
       case 'whitepaper':
         if (discoveredUrls?.whitepaper && dataCollectionFunctions?.extractTokenomicsFromWhitepaper) {
           console.log(`📄 Attempting to extract tokenomics from whitepaper: ${discoveredUrls.whitepaper}`);
@@ -3526,15 +3551,15 @@ async function collectFromSourceWithRealFunctions(
         break;
           
       default:
-        console.log(`⚠️ Unknown source type: ${sourceName}`);
+        console.log(`⚠️ Unknown source type: ${sourceName} (normalized: ${normalizedSourceName})`);
         return null;
     }
   } catch (error) {
-    console.log(`❌ Error collecting from ${sourceName}: ${(error as Error).message}`);
+    console.log(`❌ Error collecting from ${sourceName} (normalized: ${normalizedSourceName}): ${(error as Error).message}`);
     return null;
   }
   
-  console.log(`❌ No data collected for ${sourceName}`);
+  console.log(`❌ No data collected for ${sourceName} (normalized: ${normalizedSourceName})`);
   return null;
 }
 
