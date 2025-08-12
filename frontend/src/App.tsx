@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ProjectResearch } from './types';
 import './App.css';
-import ReactMarkdown from 'react-markdown';
 
 function LoadingModal({ show }: { show: boolean }) {
   const images = [
@@ -239,8 +238,10 @@ function App() {
             {research.aiSummary && (
               <div className="research-section">
                 <div className="section-title">AI ANALYSIS SUMMARY</div>
-                <div className="markdown-content">
-                  <ReactMarkdown>{research.aiSummary}</ReactMarkdown>
+                <div className="ai-summary-content">
+                  <p className="ai-summary-paragraph">
+                    {research.aiSummary.replace(/\n\n/g, ' ').replace(/\n/g, ' ').replace(/\*\*/g, '').replace(/#{1,6}\s*/g, '').replace(/\*\s+/g, '').replace(/- /g, '').trim()}
+                  </p>
                 </div>
               </div>
             )}
