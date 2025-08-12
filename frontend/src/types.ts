@@ -49,6 +49,8 @@ export interface ProjectResearch {
     timestamp?: Date;
     dataPoints?: number;
   };
+  // NEW: Game Data for download links
+  gameData?: GameData;
   // NEW: Enhanced data from AI orchestrator
   discoveredUrls?: { [key: string]: string };
   collectedData?: { [key: string]: any };
@@ -114,9 +116,26 @@ export interface FundingInfo {
   [key: string]: any;
 }
 export interface TeamAnalysis {
-  studioAssessment?: any[];
+  studioAssessment?: StudioInfo[];
+  teamMembers?: TeamMember[];
   linkedinSummary?: string;
   glassdoorSummary?: string;
+}
+
+export interface StudioInfo {
+  companyName: string;
+  isDeveloper?: boolean;
+  isPublisher?: boolean;
+  firstProjectDate?: string;
+  website?: string;
+  linkedinUrl?: string;
+}
+
+export interface TeamMember {
+  name: string;
+  role?: string;
+  linkedinUrl?: string;
+  previousExperience?: string;
 }
 export interface TechnicalAssessment {
   securitySummary?: string;
@@ -159,4 +178,19 @@ export interface AvalancheTokenInfo {
     decimals?: number;
   };
   error?: string;
+} 
+
+export interface GameData {
+  downloadLinks: GameDownloadLink[];
+  found: boolean;
+  dataPoints: number;
+}
+
+export interface GameDownloadLink {
+  platform: 'steam' | 'epic' | 'website' | 'appstore' | 'googleplay' | 'itchio' | 'gog' | 'humble' | 'other';
+  url: string;
+  title?: string;
+  price?: string;
+  rating?: number;
+  reviews?: number;
 } 

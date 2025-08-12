@@ -238,13 +238,100 @@ function App() {
             {research.aiSummary && (
               <div className="research-section">
                 <div className="section-title">AI ANALYSIS SUMMARY</div>
-                <div className="ai-summary-content">
-                  <p className="ai-summary-paragraph">
-                    {research.aiSummary.replace(/\n\n/g, ' ').replace(/\n/g, ' ').replace(/\*\*/g, '').replace(/#{1,6}\s*/g, '').replace(/\*\s+/g, '').replace(/- /g, '').trim()}
-                  </p>
+                <div className="ai-summary-container">
+                  <div className="ai-summary-content collapsed" id="ai-summary-content">
+                    <div className="ai-summary-paragraphs">
+                      {research.aiSummary
+                        .replace(/\*\*/g, '') // Remove bold formatting
+                        .replace(/#{1,6}\s*/g, '') // Remove headers
+                        .replace(/\*\s+/g, '') // Remove bullet points
+                        .replace(/- /g, '') // Remove dashes
+                        .split('\n\n') // Split into paragraphs
+                        .filter(paragraph => paragraph.trim().length > 0) // Remove empty paragraphs
+                        .map((paragraph, index) => (
+                          <p key={index} className="ai-summary-paragraph">
+                            {paragraph.trim()}
+                          </p>
+                        ))}
+                    </div>
+                  </div>
+                  <button 
+                    className="ai-summary-toggle" 
+                    onClick={() => {
+                      const content = document.getElementById('ai-summary-content');
+                      if (content) {
+                        content.classList.toggle('expanded');
+                      }
+                    }}
+                  >
+                    <span className="toggle-text">CLICK TO EXPAND</span>
+                    <span className="toggle-icon">▼</span>
+                  </button>
                 </div>
               </div>
             )}
+
+            {/* Game Data */}
+            <div className="research-section">
+              <div className="section-title">GAME DATA</div>
+              <div className="game-data-container">
+                <div className="game-data-content collapsed" id="game-data-content">
+                  <div className="game-data-links">
+                    {research.gameData && research.gameData.downloadLinks && research.gameData.downloadLinks.length > 0 ? (
+                      research.gameData.downloadLinks.map((link, index) => (
+                        <div key={index} className="game-link-item">
+                          <div className="game-link-icon">
+                            {link.platform === 'steam' ? '🎮' :
+                             link.platform === 'epic' ? '🎯' :
+                             link.platform === 'website' ? '🌐' :
+                             link.platform === 'appstore' ? '📱' :
+                             link.platform === 'googleplay' ? '🤖' :
+                             link.platform === 'itchio' ? '🎲' :
+                             link.platform === 'gog' ? '💎' :
+                             link.platform === 'humble' ? '🎁' : '🔗'}
+                          </div>
+                          <div className="game-link-content">
+                            <div className="game-link-platform">{link.platform.toUpperCase()}</div>
+                            <div className="game-link-url">
+                              {link.url && link.url.length > 40 ? link.url.substring(0, 40) + '...' : link.url}
+                            </div>
+                            <div className="game-link-domain">
+                              {(() => {
+                                try {
+                                  return link.url && new URL(link.url).hostname;
+                                } catch (error) {
+                                  return 'Invalid URL';
+                                }
+                              })()}
+                            </div>
+                          </div>
+                          <a href={link.url} target="_blank" rel="noopener noreferrer" className="game-link-visit">
+                            DOWNLOAD →
+                          </a>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="no-game-data">
+                        <div className="no-game-data-icon">❌</div>
+                        <div className="no-game-data-text">Could not find download links for game</div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <button 
+                  className="game-data-toggle" 
+                  onClick={() => {
+                    const content = document.getElementById('game-data-content');
+                    if (content) {
+                      content.classList.toggle('expanded');
+                    }
+                  }}
+                >
+                  <span className="toggle-text">CLICK TO EXPAND</span>
+                  <span className="toggle-icon">▼</span>
+                </button>
+              </div>
+            </div>
 
             {/* Key Findings */}
             {(research.keyFindings.positives.length > 0 || 
@@ -343,34 +430,92 @@ function App() {
               <div className="research-section">
                 <div className="section-title">TEAM ANALYSIS</div>
                 <div className="team-content">
+                  {/* Studio Information */}
                   {research.teamAnalysis.studioAssessment && Array.isArray(research.teamAnalysis.studioAssessment) && research.teamAnalysis.studioAssessment.length > 0 && (
                     <div className="team-item">
-                      <div className="team-label">🏢 Studio Background</div>
-                      <ul>
+                      <div className="team-label">🏢 STUDIO BACKGROUND</div>
+                      <div className="studio-list">
                         {research.teamAnalysis.studioAssessment.map((studio: any, i: number) => (
-                          <li key={i}>
-                            <strong>{studio.companyName}</strong>
-                            {studio.isDeveloper ? ' (Developer)' : ''}
-                            {studio.isPublisher ? ' (Publisher)' : ''}
-                            {studio.firstProjectDate && studio.firstProjectDate !== 'N/A' ? 
-                              ` | First project: ${studio.firstProjectDate}` : ''}
-                          </li>
+                          <div key={i} className="studio-item">
+                            <div className="studio-name">
+                              <strong>{studio.companyName}</strong>
+                              {studio.isDeveloper && <span className="studio-role"> (Developer)</span>}
+                              {studio.isPublisher && <span className="studio-role"> (Publisher)</span>}
+                            </div>
+                            {studio.firstProjectDate && studio.firstProjectDate !== 'N/A' && (
+                              <div className="studio-detail">First project: {studio.firstProjectDate}</div>
+                            )}
+                            {studio.website && (
+                              <div className="studio-detail">
+                                <a href={studio.website} target="_blank" rel="noopener noreferrer" className="studio-link">
+                                  🌐 Visit Studio Website →
+                                </a>
+                              </div>
+                            )}
+                            {studio.linkedinUrl && (
+                              <div className="studio-detail">
+                                <a href={studio.linkedinUrl} target="_blank" rel="noopener noreferrer" className="studio-link">
+                                  💼 View on LinkedIn →
+                                </a>
+                              </div>
+                            )}
+                          </div>
                         ))}
-                      </ul>
+                      </div>
                     </div>
                   )}
                   
+                  {/* Team Members */}
+                  {research.teamAnalysis.teamMembers && Array.isArray(research.teamAnalysis.teamMembers) && research.teamAnalysis.teamMembers.length > 0 && (
+                    <div className="team-item">
+                      <div className="team-label">👥 TEAM MEMBERS</div>
+                      <div className="team-members-list">
+                        {research.teamAnalysis.teamMembers.map((member: any, i: number) => (
+                          <div key={i} className="team-member-item">
+                            <div className="member-name">
+                              <strong>{member.name}</strong>
+                              {member.role && <span className="member-role"> - {member.role}</span>}
+                            </div>
+                            {member.linkedinUrl && (
+                              <div className="member-detail">
+                                <a href={member.linkedinUrl} target="_blank" rel="noopener noreferrer" className="member-link">
+                                  💼 View LinkedIn Profile →
+                                </a>
+                              </div>
+                            )}
+                            {member.previousExperience && (
+                              <div className="member-detail">Previous: {member.previousExperience}</div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* LinkedIn Summary */}
                   {research.teamAnalysis.linkedinSummary && (
                     <div className="team-item">
-                      <div className="team-label">💼 LinkedIn Insights</div>
-                      <p>{research.teamAnalysis.linkedinSummary}</p>
+                      <div className="team-label">💼 LINKEDIN INSIGHTS</div>
+                      <p className="team-summary">{research.teamAnalysis.linkedinSummary}</p>
                     </div>
                   )}
                   
+                  {/* Company Reviews */}
                   {research.teamAnalysis.glassdoorSummary && (
                     <div className="team-item">
-                      <div className="team-label">🏢 Company Reviews</div>
-                      <p>{research.teamAnalysis.glassdoorSummary}</p>
+                      <div className="team-label">🏢 COMPANY REVIEWS</div>
+                      <p className="team-summary">{research.teamAnalysis.glassdoorSummary}</p>
+                    </div>
+                  )}
+                  
+                  {/* No Team Data */}
+                  {(!research.teamAnalysis.studioAssessment || research.teamAnalysis.studioAssessment.length === 0) &&
+                   (!research.teamAnalysis.teamMembers || research.teamAnalysis.teamMembers.length === 0) &&
+                   !research.teamAnalysis.linkedinSummary &&
+                   !research.teamAnalysis.glassdoorSummary && (
+                    <div className="no-team-data">
+                      <div className="no-team-data-icon">❌</div>
+                      <div className="no-team-data-text">Could not find team information</div>
                     </div>
                   )}
                 </div>
