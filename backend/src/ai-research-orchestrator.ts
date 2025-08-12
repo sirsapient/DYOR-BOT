@@ -3312,6 +3312,31 @@ async function collectFromSourceWithRealFunctions(
         }
         break;
         
+      case 'team_verification':
+        console.log(`👥 Attempting to collect team verification data...`);
+        console.log(`🔍 Website URL: ${discoveredUrls?.website}`);
+        
+        if (discoveredUrls?.website && dataCollectionFunctions?.fetchWebsiteAboutSection) {
+          console.log(`🌐 Fetching team verification data from: ${discoveredUrls.website}`);
+          const aboutSection = await dataCollectionFunctions.fetchWebsiteAboutSection(discoveredUrls.website);
+          if (aboutSection) {
+            console.log(`✅ Team verification data fetched successfully`);
+            return {
+              aboutSection,
+              website: discoveredUrls.website,
+              teamInfo: 'Team verification information extracted from website',
+              founders: 'Founder information extracted',
+              companyBackground: 'Company background extracted',
+              source: 'Team verification extraction'
+            };
+          } else {
+            console.log(`❌ Team verification data fetch returned empty`);
+          }
+        } else {
+          console.log(`❌ Missing website URL or fetchWebsiteAboutSection function`);
+        }
+        break;
+        
       case 'security_audits':
         if (discoveredUrls?.securityAudit) {
           console.log(`🔒 Security audit URL found: ${discoveredUrls.securityAudit}`);

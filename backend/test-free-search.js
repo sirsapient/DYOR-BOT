@@ -16,23 +16,57 @@ async function testFreeSearch() {
     });
     console.log('');
     
-    // Test 2: Contract address search
+    // Test 2: Contract address search for Axie Infinity
     console.log('Test 2: Contract address search for "Axie Infinity"');
     const contractAddress = await freeSearchService.searchForContractAddress('Axie Infinity');
     console.log(`Contract address found: ${contractAddress || 'None'}`);
     console.log('');
     
-    // Test 3: Official sources search
-    console.log('Test 3: Official sources search for "Axie Infinity"');
+    // Test 3: Contract address search for a different project
+    console.log('Test 3: Contract address search for "Decentraland"');
+    const decentralandAddress = await freeSearchService.searchForContractAddress('Decentraland');
+    console.log(`Contract address found: ${decentralandAddress || 'None'}`);
+    console.log('');
+    
+    // Test 4: Official sources search for Axie Infinity
+    console.log('Test 4: Official sources search for "Axie Infinity"');
     const sources = await freeSearchService.searchForOfficialSources('Axie Infinity');
     console.log('Sources found:');
     Object.entries(sources).forEach(([type, url]) => {
-      console.log(`  ${type}: ${url || 'None'}`);
+      if (Array.isArray(url)) {
+        console.log(`  ${type}: ${url.length > 0 ? url.join(', ') : 'None'}`);
+      } else {
+        console.log(`  ${type}: ${url || 'None'}`);
+      }
     });
     console.log('');
     
-    // Test 4: Cache stats
-    console.log('Test 4: Cache statistics');
+    // Test 5: Official sources search for "Decentraland"
+    console.log('\nTest 5: Official sources search for "Decentraland"');
+    const decentralandSources = await freeSearchService.searchForOfficialSources('Decentraland');
+    console.log('Sources found:');
+    Object.entries(decentralandSources).forEach(([key, value]) => {
+      if (Array.isArray(value)) {
+        console.log(`  ${key}: ${value.join(', ')}`);
+      } else {
+        console.log(`  ${key}: ${value}`);
+      }
+    });
+
+    // Test 6: Official sources search for "The Sandbox"
+    console.log('\nTest 6: Official sources search for "The Sandbox"');
+    const sandboxSources = await freeSearchService.searchForOfficialSources('The Sandbox');
+    console.log('Sources found:');
+    Object.entries(sandboxSources).forEach(([key, value]) => {
+      if (Array.isArray(value)) {
+        console.log(`  ${key}: ${value.join(', ')}`);
+      } else {
+        console.log(`  ${key}: ${value}`);
+      }
+    });
+
+    // Test 7: Cache statistics
+    console.log('Test 7: Cache statistics');
     const cacheStats = freeSearchService.getCacheStats();
     console.log(`Cache size: ${cacheStats.size}`);
     console.log(`Cache entries: ${cacheStats.entries.length}`);
