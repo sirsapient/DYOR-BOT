@@ -122,37 +122,76 @@ export class FreeSearchService {
   private async getWebScrapingResults(query: string, maxResults: number): Promise<SearchResult[]> {
     console.log(`🔍 Starting web scraping for: ${query}`);
     try {
-      // Try multiple search engines for better results
+      // Enhanced search engines with better success rates
       const searchUrls = [
-        `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`,
-        `https://www.google.com/search?q=${encodeURIComponent(query)}`,
-        `https://www.bing.com/search?q=${encodeURIComponent(query)}`
+        `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}&t=h_&ia=web`,
+        `https://searx.be/search?q=${encodeURIComponent(query)}&format=json`,
+        `https://search.brave.com/search?q=${encodeURIComponent(query)}`,
+        `https://www.qwant.com/?q=${encodeURIComponent(query)}&t=web`
       ];
 
       for (const searchUrl of searchUrls) {
         try {
+          // Add longer delay between requests to avoid rate limiting
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          
           const response = await fetch(searchUrl, {
             headers: {
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-              'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-              'Accept-Language': 'en-US,en;q=0.5',
-              'Accept-Encoding': 'gzip, deflate',
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+              'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+              'Accept-Language': 'en-US,en;q=0.9',
+              'Accept-Encoding': 'gzip, deflate, br',
               'Connection': 'keep-alive',
-              'Upgrade-Insecure-Requests': '1'
+              'Upgrade-Insecure-Requests': '1',
+              'Sec-Fetch-Dest': 'document',
+              'Sec-Fetch-Mode': 'navigate',
+              'Sec-Fetch-Site': 'none',
+              'Cache-Control': 'max-age=0'
             }
           });
 
-          if (!response.ok) continue;
+          if (!response.ok) {
+            console.log(`❌ Search engine ${searchUrl} returned status: ${response.status}`);
+            continue;
+          }
 
           const html = await response.text();
           const results: SearchResult[] = [];
 
           // Enhanced regex patterns for different search engines
-          const linkMatches = html.match(/href="([^"]*)"[^>]*>([^<]*)</g) || [];
+          let linkMatches: string[] = [];
+          
+          // Try multiple regex patterns for different search engines
+          const patterns = [
+            /href="([^"]*)"[^>]*>([^<]*)</g,
+            /<a[^>]*href="([^"]*)"[^>]*>([^<]*)</g,
+            /"url":"([^"]*)"[^}]*"title":"([^"]*)"/g,
+            /href="([^"]*)"[^>]*title="([^"]*)"/g
+          ];
 
-          for (const match of linkMatches.slice(0, maxResults * 2)) { // Get more to filter
-            const hrefMatch = match.match(/href="([^"]*)"/);
-            const titleMatch = match.match(/>([^<]*)</);
+          for (const pattern of patterns) {
+            const matches = html.match(pattern);
+            if (matches && matches.length > 0) {
+              linkMatches = matches;
+              break;
+            }
+          }
+
+          for (const match of linkMatches.slice(0, maxResults * 3)) { // Get more to filter
+            let hrefMatch, titleMatch;
+            
+            // Handle different match formats
+            if (match.includes('"url"')) {
+              // JSON format
+              const urlMatch = match.match(/"url":"([^"]*)"/);
+              const titleMatch2 = match.match(/"title":"([^"]*)"/);
+              hrefMatch = urlMatch;
+              titleMatch = titleMatch2;
+            } else {
+              // HTML format
+              hrefMatch = match.match(/href="([^"]*)"/);
+              titleMatch = match.match(/>([^<]*)</) || match.match(/title="([^"]*)"/);
+            }
             
             if (hrefMatch && titleMatch) {
               const link = hrefMatch[1];
@@ -163,11 +202,15 @@ export class FreeSearchService {
                   !link.includes('duckduckgo.com') && 
                   !link.includes('google.com') &&
                   !link.includes('bing.com') &&
+                  !link.includes('brave.com') &&
+                  !link.includes('qwant.com') &&
+                  !link.includes('searx.be') &&
                   !link.includes('javascript:') &&
                   !link.includes('mailto:') &&
-                  title.length > 10 &&
+                  title.length > 5 &&
                   !title.includes('Search') &&
-                  !title.includes('Results')) {
+                  !title.includes('Results') &&
+                  !title.includes('Loading')) {
                 
                 results.push({
                   title: title.trim(),
@@ -188,11 +231,62 @@ export class FreeSearchService {
         }
       }
 
+      // If all search engines fail, try direct URL testing for common patterns
+      console.log(`🔍 Trying direct URL testing for: ${query}`);
+      const directResults = await this.testDirectUrls(query, maxResults);
+      if (directResults.length > 0) {
+        console.log(`✅ Direct URL testing found ${directResults.length} results`);
+        return directResults;
+      }
+
       return [];
     } catch (error) {
       console.log(`❌ All web scraping fallbacks failed: ${(error as Error).message}`);
       return [];
     }
+  }
+
+  private async testDirectUrls(query: string, maxResults: number): Promise<SearchResult[]> {
+    const results: SearchResult[] = [];
+    const projectName = query.toLowerCase().replace(/\s+/g, '');
+    
+    // Common URL patterns to test
+    const urlPatterns = [
+      `https://${projectName}.com`,
+      `https://www.${projectName}.com`,
+      `https://${projectName}.org`,
+      `https://${projectName}.io`,
+      `https://${projectName}.app`,
+      `https://${projectName}.xyz`,
+      `https://docs.${projectName}.com`,
+      `https://whitepaper.${projectName}.com`,
+      `https://github.com/${projectName}`,
+      `https://github.com/${projectName.replace(/[^a-z0-9]/g, '')}`
+    ];
+
+    for (const url of urlPatterns.slice(0, maxResults)) {
+      try {
+        const response = await fetch(url, {
+          method: 'HEAD',
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+          }
+        });
+
+        if (response.ok) {
+          results.push({
+            title: `${query} - Official Site`,
+            link: url,
+            snippet: `Official website for ${query}`
+          });
+        }
+      } catch (error) {
+        // URL doesn't exist, continue to next
+        continue;
+      }
+    }
+
+    return results;
   }
 
   private getFallbackResults(query: string): SearchResult[] {

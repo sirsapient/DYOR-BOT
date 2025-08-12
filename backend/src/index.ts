@@ -1498,56 +1498,79 @@ async function fetchWebsiteAboutSectionAlternative(url: string): Promise<string>
   }
 }
 
-// Get financial data from alternative sources when website is blocked
+// Enhanced financial data collection from multiple sources
 async function getFinancialDataFromAlternativeSources(projectName: string): Promise<any> {
   try {
-    console.log(`💰 Attempting to get financial data from alternative sources for: ${projectName}`);
+    console.log(`💰 Enhanced financial data collection for: ${projectName}`);
     
     const financialData: any = {
-      funding: 'Alternative sources used',
-      investors: ['Alternative data sources'],
-      valuation: 'Alternative valuation data',
+      funding: 'Enhanced data sources used',
+      investors: ['Multiple data sources'],
+      valuation: 'Enhanced valuation data',
       website: null,
-      extractedAbout: null
+      extractedAbout: null,
+      sources: []
     };
     
-    // Try to get data from CoinGecko if we have a token symbol
+    // Enhanced CoinGecko integration with better matching
     try {
-      // Search for the project on CoinGecko
+      console.log(`🔍 Searching CoinGecko for: ${projectName}`);
       const searchUrl = `https://api.coingecko.com/api/v3/search?query=${encodeURIComponent(projectName)}`;
       const searchRes = await fetch(searchUrl);
       
       if (searchRes.ok) {
         const searchData = await searchRes.json();
         if (searchData.coins && searchData.coins.length > 0) {
-          const firstCoin = searchData.coins[0];
-          console.log(`✅ Found CoinGecko data for: ${firstCoin.name}`);
+          // Find the best match using scoring
+          let bestMatch = null;
+          let bestScore = 0;
           
-          // Get detailed data for the first match
-          const detailUrl = `https://api.coingecko.com/api/v3/coins/${firstCoin.id}`;
-          const detailRes = await fetch(detailUrl);
+          for (const coin of searchData.coins.slice(0, 5)) {
+            const score = calculateMatchScore(projectName, coin.name, coin.symbol);
+            if (score > bestScore) {
+              bestScore = score;
+              bestMatch = coin;
+            }
+          }
           
-          if (detailRes.ok) {
-            const coinData = await detailRes.json();
-            financialData.coinGeckoData = {
-              name: coinData.name,
-              symbol: coinData.symbol,
-              marketCap: coinData.market_data?.market_cap?.usd,
-              currentPrice: coinData.market_data?.current_price?.usd,
-              totalVolume: coinData.market_data?.total_volume?.usd,
-              description: coinData.description?.en?.substring(0, 500)
-            };
-            console.log(`✅ Retrieved detailed CoinGecko data`);
+          if (bestMatch && bestScore > 0.3) {
+            console.log(`✅ Found best CoinGecko match: ${bestMatch.name} (score: ${bestScore.toFixed(2)})`);
+            
+            // Get detailed data for the best match
+            const detailUrl = `https://api.coingecko.com/api/v3/coins/${bestMatch.id}`;
+            const detailRes = await fetch(detailUrl);
+            
+            if (detailRes.ok) {
+              const coinData = await detailRes.json();
+              financialData.coinGeckoData = {
+                name: coinData.name,
+                symbol: coinData.symbol,
+                marketCap: coinData.market_data?.market_cap?.usd,
+                currentPrice: coinData.market_data?.current_price?.usd,
+                totalVolume: coinData.market_data?.total_volume?.usd,
+                priceChange24h: coinData.market_data?.price_change_percentage_24h,
+                circulatingSupply: coinData.market_data?.circulating_supply,
+                totalSupply: coinData.market_data?.total_supply,
+                maxSupply: coinData.market_data?.max_supply,
+                description: coinData.description?.en?.substring(0, 1000),
+                categories: coinData.categories,
+                platforms: coinData.platforms,
+                links: coinData.links
+              };
+              financialData.sources.push('CoinGecko');
+              console.log(`✅ Retrieved detailed CoinGecko data`);
+            }
           }
         }
       }
     } catch (e) {
-      console.log(`❌ CoinGecko alternative failed: ${(e as Error).message}`);
+      console.log(`❌ CoinGecko enhanced failed: ${(e as Error).message}`);
     }
     
-    // Try to get data from GitHub if available
+    // Enhanced GitHub integration
     try {
-      const githubUrl = `https://api.github.com/search/repositories?q=${encodeURIComponent(projectName)}`;
+      console.log(`🔍 Searching GitHub for: ${projectName}`);
+      const githubUrl = `https://api.github.com/search/repositories?q=${encodeURIComponent(projectName)}&sort=stars&order=desc`;
       const githubRes = await fetch(githubUrl, {
         headers: {
           'Accept': 'application/vnd.github.v3+json',
@@ -1558,45 +1581,141 @@ async function getFinancialDataFromAlternativeSources(projectName: string): Prom
       if (githubRes.ok) {
         const githubData = await githubRes.json();
         if (githubData.items && githubData.items.length > 0) {
-          const firstRepo = githubData.items[0];
-          financialData.githubData = {
-            name: firstRepo.name,
-            description: firstRepo.description,
-            stars: firstRepo.stargazers_count,
-            forks: firstRepo.forks_count,
-            language: firstRepo.language,
-            url: firstRepo.html_url
-          };
-          console.log(`✅ Retrieved GitHub data for: ${firstRepo.name}`);
+          // Find the best GitHub match
+          let bestRepo = null;
+          let bestScore = 0;
+          
+          for (const repo of githubData.items.slice(0, 5)) {
+            const score = calculateMatchScore(projectName, repo.name, repo.full_name);
+            if (score > bestScore) {
+              bestScore = score;
+              bestRepo = repo;
+            }
+          }
+          
+          if (bestRepo && bestScore > 0.3) {
+            financialData.githubData = {
+              name: bestRepo.name,
+              fullName: bestRepo.full_name,
+              description: bestRepo.description,
+              stars: bestRepo.stargazers_count,
+              forks: bestRepo.forks_count,
+              language: bestRepo.language,
+              url: bestRepo.html_url,
+              createdAt: bestRepo.created_at,
+              updatedAt: bestRepo.updated_at,
+              topics: bestRepo.topics || []
+            };
+            financialData.sources.push('GitHub');
+            console.log(`✅ Retrieved GitHub data for: ${bestRepo.name}`);
+          }
         }
       }
     } catch (e) {
-      console.log(`❌ GitHub alternative failed: ${(e as Error).message}`);
+      console.log(`❌ GitHub enhanced failed: ${(e as Error).message}`);
     }
     
-    // Try to get data from social media mentions
+    // Try to get data from alternative crypto APIs
     try {
-      // This would require a social media API, but for now we'll add a placeholder
-      financialData.socialData = {
-        mentions: 'Social media data unavailable',
-        sentiment: 'neutral'
-      };
+      console.log(`🔍 Searching alternative crypto APIs for: ${projectName}`);
+      
+      // Try CoinMarketCap alternative (using free tier)
+      const cmcUrl = `https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest?symbol=${projectName.split(' ')[0].toUpperCase()}`;
+      if (process.env.COINMARKETCAP_API_KEY) {
+        const cmcRes = await fetch(cmcUrl, {
+          headers: {
+            'X-CMC_PRO_API_KEY': process.env.COINMARKETCAP_API_KEY
+          }
+        });
+        
+        if (cmcRes.ok) {
+          const cmcData = await cmcRes.json();
+          if (cmcData.data) {
+            const firstSymbol = Object.keys(cmcData.data)[0];
+            const tokenData = cmcData.data[firstSymbol];
+            financialData.coinMarketCapData = {
+              name: tokenData.name,
+              symbol: tokenData.symbol,
+              marketCap: tokenData.quote.USD.market_cap,
+              currentPrice: tokenData.quote.USD.price,
+              volume24h: tokenData.quote.USD.volume_24h,
+              percentChange24h: tokenData.quote.USD.percent_change_24h
+            };
+            financialData.sources.push('CoinMarketCap');
+            console.log(`✅ Retrieved CoinMarketCap data`);
+          }
+        }
+      }
     } catch (e) {
-      console.log(`❌ Social media alternative failed: ${(e as Error).message}`);
+      console.log(`❌ Alternative crypto APIs failed: ${(e as Error).message}`);
     }
     
-    if (financialData.coinGeckoData || financialData.githubData) {
-      console.log(`✅ Alternative financial data collected successfully`);
+    // Try to get data from blockchain explorers
+    try {
+      console.log(`🔍 Searching blockchain explorers for: ${projectName}`);
+      
+      // Try Etherscan for Ethereum tokens
+      if (process.env.ETHERSCAN_API_KEY) {
+        const etherscanUrl = `https://api.etherscan.io/api?module=stats&action=tokensupply&contractaddress=${projectName}&apikey=${process.env.ETHERSCAN_API_KEY}`;
+        const etherscanRes = await fetch(etherscanUrl);
+        
+        if (etherscanRes.ok) {
+          const etherscanData = await etherscanRes.json();
+          if (etherscanData.status === '1') {
+            financialData.etherscanData = {
+              totalSupply: etherscanData.result,
+              network: 'Ethereum'
+            };
+            financialData.sources.push('Etherscan');
+            console.log(`✅ Retrieved Etherscan data`);
+          }
+        }
+      }
+    } catch (e) {
+      console.log(`❌ Blockchain explorers failed: ${(e as Error).message}`);
+    }
+    
+    if (financialData.sources.length > 0) {
+      console.log(`✅ Enhanced financial data collected from ${financialData.sources.length} sources: ${financialData.sources.join(', ')}`);
       return financialData;
     } else {
-      console.log(`❌ No alternative financial data sources succeeded`);
+      console.log(`❌ No enhanced financial data sources succeeded`);
       return null;
     }
     
   } catch (e) {
-    console.log(`❌ Error getting alternative financial data: ${(e as Error).message}`);
+    console.log(`❌ Error getting enhanced financial data: ${(e as Error).message}`);
     return null;
   }
+}
+
+// Helper function to calculate match score between project name and search result
+function calculateMatchScore(projectName: string, resultName: string, resultSymbol?: string): number {
+  const projectLower = projectName.toLowerCase();
+  const resultLower = resultName.toLowerCase();
+  const symbolLower = resultSymbol?.toLowerCase() || '';
+  
+  let score = 0;
+  
+  // Exact name match
+  if (projectLower === resultLower) score += 1.0;
+  
+  // Contains project name
+  if (resultLower.includes(projectLower)) score += 0.8;
+  
+  // Project name contains result
+  if (projectLower.includes(resultLower)) score += 0.6;
+  
+  // Symbol match
+  if (symbolLower && projectLower.includes(symbolLower)) score += 0.4;
+  
+  // Word overlap
+  const projectWords = projectLower.split(/\s+/);
+  const resultWords = resultLower.split(/\s+/);
+  const overlap = projectWords.filter(word => resultWords.includes(word)).length;
+  score += (overlap / Math.max(projectWords.length, resultWords.length)) * 0.3;
+  
+  return Math.min(score, 1.0);
 }
 
 // Add this function before the /api/research endpoint
