@@ -1,0 +1,5 @@
+[33ma0f36d5[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m Frontend improvements: AI Analysis Summary multi-paragraph format, Game Data section with download links, enhanced Team Analysis with studio/member details, collapsible boxes with click-to-expand functionality
+[33m6b28eee[m Debug Guide: Document Session 17 - Frontend Data Display Improvements - Mark AI Analysis Summary reformatting as completed - Document multi-chat approach for ongoing improvements
+[33ma4c6f68[m Frontend: Convert AI Analysis Summary to paragraph format - Remove ReactMarkdown dependency - Add text processing to clean markdown formatting - Add CSS styling for paragraph format - Maintain futuristic/hacker aesthetic
+[33m2025ac1[m Fix source name mapping issue: Add normalizeSourceName function to handle AI-generated source name variations
+[33md1e1006[m Clean up node_modules and add backend README

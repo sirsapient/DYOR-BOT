@@ -3017,41 +3017,84 @@ async function performTraditionalResearch(req: any, res: any) {
   // --- AI Summary generation ---
   if (process.env.ANTHROPIC_API_KEY) {
     try {
-      const prompt = `Analyze this Web3/Gaming project data and provide a comprehensive summary:
+      const prompt = `You are a senior research analyst specializing in Web3 and gaming projects. Write a comprehensive academic report about ${projectName} based on the collected data. Your report should educate readers about the project and provide actionable insights.
 
-Project: ${projectName}
+PROJECT INFORMATION:
+Project Name: ${projectName}
 Token Symbol: ${tokenSymbol || 'N/A'}
 Contract Address: ${contractAddress || 'N/A'}
 
-Data Sources:
-- CoinGecko: ${cgData ? 'Available' : 'Not found'}
-- IGDB: ${igdbData ? 'Available' : 'Not found'}
-- Steam: ${steamData ? 'Available' : 'Not found'}
-- Discord: ${discordData ? 'Available' : 'Not found'}
-- Etherscan: ${etherscanData ? 'Available' : 'Not found'}
-- Snowtrace: ${snowtraceData ? 'Available' : 'Not found'}
-- YouTube: ${youtubeData ? 'Available' : 'Not found'}
+COLLECTED DATA SUMMARY:
+${cgData ? `FINANCIAL DATA:
+- Market Cap: ${cgData.market_data?.market_cap?.usd ? `$${cgData.market_data.market_cap.usd.toLocaleString()}` : 'N/A'}
+- Current Price: ${cgData.market_data?.current_price?.usd ? `$${cgData.market_data.current_price.usd}` : 'N/A'}
+- 24h Volume: ${cgData.market_data?.total_volume?.usd ? `$${cgData.market_data.total_volume.usd.toLocaleString()}` : 'N/A'}
+- Circulating Supply: ${cgData.market_data?.circulating_supply ? cgData.market_data.circulating_supply.toLocaleString() : 'N/A'}
+- Total Supply: ${cgData.market_data?.total_supply ? cgData.market_data.total_supply.toLocaleString() : 'N/A'}` : 'No financial data available'}
 
-Key Data Points:
-${cgData ? `- Market Cap: ${cgData.market_data?.market_cap?.usd ? `$${cgData.market_data.market_cap.usd.toLocaleString()}` : 'N/A'}
-- Price: ${cgData.market_data?.current_price?.usd ? `$${cgData.market_data.current_price.usd}` : 'N/A'}
-- 24h Volume: ${cgData.market_data?.total_volume?.usd ? `$${cgData.market_data.total_volume.usd.toLocaleString()}` : 'N/A'}` : 'No financial data available'}
+${igdbData ? `GAME INFORMATION:
+- Game Name: ${igdbData.name || 'N/A'}
+- Summary: ${igdbData.summary ? igdbData.summary.substring(0, 300) + '...' : 'N/A'}
+- Release Date: ${igdbData.first_release_date ? new Date(igdbData.first_release_date * 1000).toLocaleDateString() : 'N/A'}
+- Platforms: ${igdbData.platforms ? igdbData.platforms.map((p: any) => p.name).join(', ') : 'N/A'}` : 'No game data available'}
 
-${igdbData ? `- Game: ${igdbData.name || 'N/A'}
-- Summary: ${igdbData.summary ? igdbData.summary.substring(0, 200) + '...' : 'N/A'}` : 'No game data available'}
+${steamData ? `STEAM DATA:
+- Steam Rating: ${steamData.metacritic?.score || 'N/A'}
+- User Reviews: ${steamData.reviews ? `${steamData.reviews.positive}% positive` : 'N/A'}
+- Price: ${steamData.price_overview?.final_formatted || 'N/A'}` : 'No Steam data available'}
 
-${steamData ? `- Steam Rating: ${steamData.metacritic?.score || 'N/A'}` : 'No Steam data available'}
+${discordData ? `COMMUNITY DATA:
+- Discord Members: ${discordData.member_count?.toLocaleString() || 'N/A'}
+- Server Name: ${discordData.server_name || 'N/A'}` : 'No Discord data available'}
 
-${discordData ? `- Discord Members: ${discordData.member_count?.toLocaleString() || 'N/A'}` : 'No Discord data available'}
+${etherscanData ? `BLOCKCHAIN DATA:
+- Ethereum Contract: ${etherscanData.contractAddress || 'N/A'}
+- Token Supply: ${etherscanData.totalSupply ? parseInt(etherscanData.totalSupply, 16).toLocaleString() : 'N/A'}` : 'No Ethereum data available'}
 
-Analysis Focus:
-1. Project legitimacy and team background
-2. Technical implementation and security
-3. Community health and engagement
-4. Financial performance and tokenomics
-5. Market position and competitive analysis
+${snowtraceData ? `AVALANCHE DATA:
+- Avalanche Contract: ${snowtraceData.contractAddress || 'N/A'}
+- Token Supply: ${snowtraceData.tokenInfo?.totalSupply ? parseInt(snowtraceData.tokenInfo.totalSupply, 16).toLocaleString() : 'N/A'}` : 'No Avalanche data available'}
 
-Provide a balanced analysis highlighting both strengths and potential concerns.`;
+${youtubeData ? `MEDIA PRESENCE:
+- YouTube Videos Found: ${youtubeData.length || 0}
+- Latest Video: ${youtubeData[0]?.snippet?.title || 'N/A'}` : 'No YouTube data available'}
+
+REPORT REQUIREMENTS:
+Write a comprehensive academic report with the following structure:
+
+1. INTRODUCTION (2-3 paragraphs):
+   - What is ${projectName}? Provide a clear overview of the project's purpose and mission
+   - What type of project is it? (Web3 game, DeFi protocol, NFT platform, etc.)
+   - What problem does it solve or what value does it provide?
+   - Brief historical context and current market position
+
+2. DETAILED ANALYSIS (4-6 paragraphs):
+   - Technical Implementation: Analyze the blockchain technology, smart contracts, and technical architecture
+   - Financial Performance: Evaluate tokenomics, market performance, and economic model
+   - Team & Development: Assess the development team, company background, and development activity
+   - Community & Adoption: Analyze community health, user engagement, and market adoption
+   - Security & Risk Assessment: Evaluate security measures, audits, and potential risks
+   - Competitive Position: Compare to similar projects and market positioning
+
+3. KEY FINDINGS (2-3 paragraphs):
+   - What are the project's main strengths and competitive advantages?
+   - What are the potential risks, challenges, or areas of concern?
+   - What makes this project unique or noteworthy?
+
+4. CONCLUSION (1-2 paragraphs):
+   - Overall assessment and recommendation
+   - Summary of key insights for potential users/investors
+   - Future outlook and considerations
+
+WRITING STYLE:
+- Write in a professional, academic tone
+- Be objective and balanced in your analysis
+- Provide specific insights based on the data
+- Use clear, accessible language that educates readers
+- Include relevant metrics and data points to support your analysis
+- Focus on helping readers understand the project comprehensively
+
+IMPORTANT: This report should be educational and informative. Readers should come away with a thorough understanding of what ${projectName} is, how it works, its current status, and whether it's worth their attention.`;
 
       const aiRes = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
@@ -3062,7 +3105,7 @@ Provide a balanced analysis highlighting both strengths and potential concerns.`
         },
         body: JSON.stringify({
           model: 'claude-opus-4-20250514',
-          max_tokens: 1000,
+          max_tokens: 2500,
           messages: [
             { role: 'user', content: prompt }
           ]
