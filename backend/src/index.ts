@@ -1719,10 +1719,10 @@ function calculateMatchScore(projectName: string, resultName: string, resultSymb
 }
 
 // Add this function before the /api/research endpoint
-function transformAIOrchestratorDataToFrontendFormat(
+async function transformAIOrchestratorDataToFrontendFormat(
   aiResult: any,
   projectName: string
-): any {
+): Promise<any> {
   console.log(`🔄 Transforming AI orchestrator data for ${projectName}`);
   
   // Extract key findings from the AI results
@@ -1864,43 +1864,226 @@ function transformAIOrchestratorDataToFrontendFormat(
   // Create comprehensive sources used list with URLs
   const sourcesUsed = Object.values(discoveredUrls).filter(url => url && url.length > 0);
 
-  // Generate a comprehensive AI summary based on collected data
+  // Generate comprehensive AI summary using academic report format
   const confidencePercentage = aiResult.confidence ? (aiResult.confidence * 100).toFixed(1) : '0';
   const dataSourcesCount = Object.keys(collectedData).length;
   
-  let aiSummary = `## AI Research Analysis for ${projectName}\n\n`;
-  aiSummary += `**Confidence Level:** ${confidencePercentage}%\n\n`;
-  aiSummary += `**Data Collection Summary:**\n`;
-  aiSummary += `- Total data sources analyzed: ${dataSourcesCount}\n`;
-  aiSummary += `- Total data points collected: ${totalDataPoints}\n`;
-  aiSummary += `- Official sources found: ${Object.keys(discoveredUrls).length}\n\n`;
+  // Build comprehensive data context for AI analysis
+  let dataContext = '';
   
-  // Add specific findings based on collected data
   if (collectedData.whitepaper) {
-    aiSummary += `**📄 Whitepaper Analysis:** Found and analyzed official whitepaper data.\n\n`;
+    dataContext += `WHITEPAPER DATA: Found and analyzed official whitepaper with ${collectedData.whitepaper.extracted_text ? collectedData.whitepaper.extracted_text.length : 0} characters of content.\n`;
   }
+  
+  if (collectedData.financial_data) {
+    dataContext += `FINANCIAL DATA: Token information and market data available.\n`;
+  }
+  
+  if (collectedData.team_info) {
+    dataContext += `TEAM DATA: Studio and team information collected.\n`;
+  }
+  
+  if (collectedData.community_health) {
+    dataContext += `COMMUNITY DATA: Social media and community metrics available.\n`;
+  }
+  
+  if (collectedData.security_audit) {
+    dataContext += `SECURITY DATA: Audit reports and security assessments found.\n`;
+  }
+  
   if (collectedData.technical_documentation) {
-    aiSummary += `**📚 Technical Documentation:** Reviewed technical specifications and architecture.\n\n`;
-  }
-  if (financialData.roninTokenInfo || financialData.avalancheTokenInfo) {
-    aiSummary += `**💰 Token Information:** Found token data on blockchain networks.\n\n`;
-  }
-  if (teamAnalysis.studioAssessment && teamAnalysis.studioAssessment.length > 0) {
-    aiSummary += `**🏢 Team Analysis:** Analyzed development studio background and history.\n\n`;
+    dataContext += `TECHNICAL DATA: Documentation and technical specifications available.\n`;
   }
   
-  // Add recommendations based on data quality
-  if (totalDataPoints > 100) {
-    aiSummary += `**✅ High Data Quality:** Comprehensive research completed with extensive data collection.\n\n`;
-  } else if (totalDataPoints > 50) {
-    aiSummary += `**⚠️ Moderate Data Quality:** Good research completed, but additional sources recommended.\n\n`;
+  // Generate AI summary using the same academic report format as traditional research
+  const prompt = `You are a senior research analyst specializing in Web3 and gaming projects. Write a comprehensive academic report about ${projectName} based on the collected data. Your report should educate readers about the project and provide actionable insights.
+
+PROJECT INFORMATION:
+Project Name: ${projectName}
+Data Sources Analyzed: ${dataSourcesCount}
+Total Data Points: ${totalDataPoints}
+Confidence Level: ${confidencePercentage}%
+
+COLLECTED DATA SUMMARY:
+${dataContext}
+
+REPORT REQUIREMENTS:
+Write a comprehensive academic report with the following structure:
+
+1. INTRODUCTION (2-3 paragraphs):
+   - What is ${projectName}? Provide a clear overview of the project's purpose and mission
+   - What type of project is it? (Web3 game, DeFi protocol, NFT platform, etc.)
+   - What problem does it solve or what value does it provide?
+   - Brief historical context and current market position
+
+2. DETAILED ANALYSIS (4-6 paragraphs):
+   - Technical Implementation: Analyze the blockchain technology, smart contracts, and technical architecture
+   - Financial Performance: Evaluate tokenomics, market performance, and economic model
+   - Team & Development: Assess the development team, company background, and development activity
+   - Community & Adoption: Analyze community health, user engagement, and market adoption
+   - Security & Risk Assessment: Evaluate security measures, audits, and potential risks
+   - Competitive Position: Compare to similar projects and market positioning
+
+3. KEY FINDINGS (2-3 paragraphs):
+   - What are the project's main strengths and competitive advantages?
+   - What are the potential risks, challenges, or areas of concern?
+   - What makes this project unique or noteworthy?
+
+4. CONCLUSION (1-2 paragraphs):
+   - Overall assessment and recommendation
+   - Summary of key insights for potential users/investors
+   - Future outlook and considerations
+
+WRITING STYLE:
+- Write in a professional, academic tone
+- Be objective and balanced in your analysis
+- Provide specific insights based on the data
+- Use clear, accessible language that educates readers
+- Include relevant metrics and data points to support your analysis
+- Focus on helping readers understand the project comprehensively
+
+IMPORTANT: This report should be educational and informative. Readers should come away with a thorough understanding of what ${projectName} is, how it works, its current status, and whether it's worth their attention.`;
+
+  let aiSummary = '';
+  
+  // Generate AI summary using Claude API
+  if (process.env.ANTHROPIC_API_KEY) {
+    try {
+      const aiRes = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'x-api-key': process.env.ANTHROPIC_API_KEY,
+          'content-type': 'application/json',
+          'anthropic-version': '2023-06-01',
+        },
+        body: JSON.stringify({
+          model: 'claude-opus-4-20250514',
+          max_tokens: 2500,
+          messages: [
+            { role: 'user', content: prompt }
+          ]
+        })
+      });
+      
+      if (aiRes.ok) {
+        const aiJson = await aiRes.json();
+        aiSummary = aiJson.content?.[0]?.text || '';
+      } else {
+        aiSummary = 'AI analysis generation failed';
+      }
+    } catch (e) {
+      aiSummary = 'AI analysis generation failed';
+    }
   } else {
-    aiSummary += `**⚠️ Limited Data Quality:** Basic research completed, consider additional manual verification.\n\n`;
+    aiSummary = 'AI analysis not available';
   }
   
-  aiSummary += `**🔗 Discovered Sources:** ${sourcesUsed.length} official sources found and analyzed.\n\n`;
-  aiSummary += `*This analysis was generated by AI based on ${totalDataPoints} data points from ${dataSourcesCount} sources.*`;
-  
+  // --- Game Download Discovery System ---
+  console.log(`🎮 Starting game download discovery for: ${projectName}`);
+  const gameDownloadLinks = [];
+  let gameDataFound = false;
+
+  // 1. Steam Store Search
+  if (collectedData.community_health?.steamData && !collectedData.community_health.steamData.error) {
+    try {
+      const steamData = collectedData.community_health.steamData;
+      const steamUrl = `https://store.steampowered.com/app/${steamData.id}`;
+      gameDownloadLinks.push({
+        platform: 'steam',
+        url: steamUrl,
+        title: steamData.name,
+        price: steamData.price_overview?.final_formatted || 'Free to Play',
+        rating: steamData.metacritic?.score,
+        reviews: steamData.reviews?.positive
+      });
+      gameDataFound = true;
+      console.log(`✅ Found Steam game: ${steamData.name}`);
+    } catch (e) {
+      console.log(`❌ Failed to process Steam data: ${(e as Error).message}`);
+    }
+  }
+
+  // 2. Website Download Link Discovery
+  if (discoveredUrls.website) {
+    console.log(`🌐 Searching for download links on official website...`);
+    try {
+      const websiteRes = await fetch(discoveredUrls.website, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        }
+      });
+      
+      if (websiteRes.ok) {
+        const websiteHtml = await websiteRes.text();
+        
+        // Look for download/play links
+        const downloadPatterns = [
+          /href=["']([^"']*(?:download|play|get.*game|install|launch)[^"']*)["']/gi,
+          /href=["']([^"']*(?:steam|epic|gog|itch\.io|humblebundle)[^"']*)["']/gi,
+          /href=["']([^"']*(?:app\.store|play\.google\.com)[^"']*)["']/gi
+        ];
+
+        for (const pattern of downloadPatterns) {
+          const matches = websiteHtml.match(pattern);
+          if (matches) {
+            for (const match of matches.slice(0, 3)) {
+              const hrefMatch = match.match(/href=["']([^"']*)["']/);
+              if (hrefMatch) {
+                let downloadUrl = hrefMatch[1];
+                
+                // Convert relative URLs to absolute
+                if (downloadUrl.startsWith('/')) {
+                  const urlObj = new URL(discoveredUrls.website);
+                  downloadUrl = `${urlObj.protocol}//${urlObj.host}${downloadUrl}`;
+                } else if (!downloadUrl.startsWith('http')) {
+                  const urlObj = new URL(discoveredUrls.website);
+                  downloadUrl = `${urlObj.protocol}//${urlObj.host}/${downloadUrl}`;
+                }
+
+                // Determine platform
+                let platform = 'website';
+                if (downloadUrl.includes('steam')) platform = 'steam';
+                else if (downloadUrl.includes('epic')) platform = 'epic';
+                else if (downloadUrl.includes('gog')) platform = 'gog';
+                else if (downloadUrl.includes('itch.io')) platform = 'itchio';
+                else if (downloadUrl.includes('humblebundle')) platform = 'humble';
+                else if (downloadUrl.includes('app.store') || downloadUrl.includes('apps.apple.com')) platform = 'appstore';
+                else if (downloadUrl.includes('play.google.com')) platform = 'googleplay';
+
+                // Check if this URL is already added
+                const existingLink = gameDownloadLinks.find(link => link.url === downloadUrl);
+                if (!existingLink) {
+                  gameDownloadLinks.push({
+                    platform,
+                    url: downloadUrl,
+                    title: `${projectName} on ${platform}`,
+                    price: 'Free to Play',
+                    rating: null,
+                    reviews: null
+                  });
+                  gameDataFound = true;
+                  console.log(`✅ Found ${platform} download link: ${downloadUrl}`);
+                }
+              }
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.log(`❌ Failed to scrape website for download links: ${(e as Error).message}`);
+    }
+  }
+
+  // Create GameData object
+  const gameData = {
+    projectName,
+    found: gameDataFound,
+    downloadLinks: gameDownloadLinks,
+    dataPoints: gameDownloadLinks.length,
+    platforms: gameDownloadLinks.map(link => link.platform),
+    totalLinks: gameDownloadLinks.length
+  };
+
   return {
     projectName,
     projectType: 'Web3Game',
@@ -1915,6 +2098,7 @@ function transformAIOrchestratorDataToFrontendFormat(
     discoveredUrls,
     collectedData,
     totalDataPoints,
+    gameData,
     confidence: null, // Will be generated separately
     qualityGates: null // Will be generated separately
   };
@@ -1991,52 +2175,51 @@ app.post('/api/research', async (req: any, res: any) => {
       console.log(`🔄 Using AI-extracted data for ${projectName} despite AI orchestration failure`);
       
       // Transform AI-extracted data to match expected response format
-      const transformedData = transformAIOrchestratorDataToFrontendFormat(aiResult, projectName);
+      const transformedData = await transformAIOrchestratorDataToFrontendFormat(aiResult, projectName);
       
-      const researchReport = {
-        ...transformedData,
-      confidence: await generateConfidenceMetrics({
-        whitepaper: { found: true, data: {}, quality: 'high' as const, timestamp: new Date(), dataPoints: 1 },
-        onchain_data: { found: true, data: {}, quality: 'high' as const, timestamp: new Date(), dataPoints: 1 },
-        team_info: { found: true, data: {}, quality: 'medium' as const, timestamp: new Date(), dataPoints: 1 },
-        community_health: { found: true, data: {}, quality: 'medium' as const, timestamp: new Date(), dataPoints: 1 },
-        financial_data: { found: true, data: {}, quality: 'high' as const, timestamp: new Date(), dataPoints: 1 },
-        media_coverage: { found: true, data: {}, quality: 'medium' as const, timestamp: new Date(), dataPoints: 1 },
-        documentation: { found: true, data: {}, quality: 'high' as const, timestamp: new Date(), dataPoints: 1 },
-        security_audit: { found: true, data: {}, quality: 'high' as const, timestamp: new Date(), dataPoints: 1 },
-      }, { 
-        totalScore: aiResult.confidence || 75, 
-        grade: 'B' as const, 
-        confidence: 0.8,
-        passesThreshold: true,
+      // Use actual findings from AI orchestrator for confidence generation
+      const actualFindings = aiResult.findings || {};
+      const actualConfidence = aiResult.confidence || 0;
+      
+      // Create proper completeness object from AI result
+      const actualCompleteness = {
+        totalScore: actualConfidence * 100,
+        grade: actualConfidence >= 0.9 ? 'A' as const : 
+               actualConfidence >= 0.8 ? 'B' as const : 
+               actualConfidence >= 0.7 ? 'C' as const : 
+               actualConfidence >= 0.6 ? 'D' as const : 'F' as const,
+        confidence: actualConfidence,
+        passesThreshold: actualConfidence >= 0.6,
+        gatesPassed: actualConfidence >= 0.6 ? ['data_quality', 'source_reliability'] : [],
+        gatesFailed: actualConfidence < 0.6 ? ['data_quality'] : [],
         breakdown: {
-          dataCoverage: 80,
-          sourceReliability: 85,
+          dataCoverage: Math.round(actualConfidence * 100),
+          sourceReliability: Math.round(actualConfidence * 100),
           recencyFactor: 90
         },
         missingCritical: [],
         recommendations: []
-      }, {
-        projectClassification: {
-          type: 'web3_game',
-          confidence: 0.8,
-          reasoning: 'Based on available data'
-        },
-        prioritySources: [],
-        riskAreas: [],
-        searchAliases: [],
-        estimatedResearchTime: 20,
-        successCriteria: {
-          minimumSources: 3,
-          criticalDataPoints: [],
-          redFlagChecks: []
-        }
-      }),
+      };
+      
+      const researchReport = {
+        ...transformedData,
+        confidence: await generateConfidenceMetrics(
+          actualFindings, 
+          actualCompleteness,
+          {
+            projectClassification: { type: 'unknown' as const, confidence: 0, reasoning: '' },
+            prioritySources: [],
+            riskAreas: [],
+            searchAliases: [],
+            estimatedResearchTime: 0,
+            successCriteria: { minimumSources: 0, criticalDataPoints: [], redFlagChecks: [] }
+          }
+        ),
         qualityGates: {
-          passed: true,
-          gatesPassed: ['data_quality', 'source_reliability'],
-          gatesFailed: [],
-          overallScore: 85
+          passed: actualCompleteness.passesThreshold,
+          gatesPassed: actualCompleteness.gatesPassed,
+          gatesFailed: actualCompleteness.gatesFailed,
+          overallScore: actualCompleteness.totalScore
         }
       };
       
@@ -2046,44 +2229,51 @@ app.post('/api/research', async (req: any, res: any) => {
 
 
     // Transform AI result to match expected response format
-    const transformedData = transformAIOrchestratorDataToFrontendFormat(aiResult, projectName);
+    const transformedData = await transformAIOrchestratorDataToFrontendFormat(aiResult, projectName);
+    
+    // Use actual findings from AI orchestrator for confidence generation
+    const actualFindings = aiResult.findings || {};
+    const actualConfidence = aiResult.confidence || 0;
+    
+    // Create proper completeness object from AI result
+    const actualCompleteness = {
+      totalScore: actualConfidence * 100,
+      grade: actualConfidence >= 0.9 ? 'A' as const : 
+             actualConfidence >= 0.8 ? 'B' as const : 
+             actualConfidence >= 0.7 ? 'C' as const : 
+             actualConfidence >= 0.6 ? 'D' as const : 'F' as const,
+      confidence: actualConfidence,
+      passesThreshold: actualConfidence >= 0.6,
+      gatesPassed: actualConfidence >= 0.6 ? ['data_quality', 'source_reliability'] : [],
+      gatesFailed: actualConfidence < 0.6 ? ['data_quality'] : [],
+      breakdown: {
+        dataCoverage: Math.round(actualConfidence * 100),
+        sourceReliability: Math.round(actualConfidence * 100),
+        recencyFactor: 90
+      },
+      missingCritical: [],
+      recommendations: []
+    };
     
     const researchReport = {
       ...transformedData,
-      confidence: await generateConfidenceMetrics({
-        whitepaper: { found: true, data: {}, quality: 'high' as const, timestamp: new Date(), dataPoints: 1 },
-        onchain_data: { found: true, data: {}, quality: 'high' as const, timestamp: new Date(), dataPoints: 1 },
-        team_info: { found: true, data: {}, quality: 'medium' as const, timestamp: new Date(), dataPoints: 1 },
-        community_health: { found: true, data: {}, quality: 'medium' as const, timestamp: new Date(), dataPoints: 1 },
-        financial_data: { found: true, data: {}, quality: 'high' as const, timestamp: new Date(), dataPoints: 1 },
-        media_coverage: { found: true, data: {}, quality: 'medium' as const, timestamp: new Date(), dataPoints: 1 },
-        documentation: { found: true, data: {}, quality: 'high' as const, timestamp: new Date(), dataPoints: 1 },
-        security_audit: { found: true, data: {}, quality: 'high' as const, timestamp: new Date(), dataPoints: 1 },
-      }, { 
-        totalScore: aiResult.confidence || 75, 
-        grade: 'B' as const, 
-        confidence: 0.8,
-        passesThreshold: true,
-        breakdown: {
-          dataCoverage: 80,
-          sourceReliability: 85,
-          recencyFactor: 90
-        },
-        missingCritical: [],
-        recommendations: []
-      }, {
-        projectClassification: { type: 'unknown' as const, confidence: 0, reasoning: '' },
-        prioritySources: [],
-        riskAreas: [],
-        searchAliases: [],
-        estimatedResearchTime: 0,
-        successCriteria: { minimumSources: 0, criticalDataPoints: [], redFlagChecks: [] }
-      }),
+      confidence: await generateConfidenceMetrics(
+        actualFindings, 
+        actualCompleteness,
+        {
+          projectClassification: { type: 'unknown' as const, confidence: 0, reasoning: '' },
+          prioritySources: [],
+          riskAreas: [],
+          searchAliases: [],
+          estimatedResearchTime: 0,
+          successCriteria: { minimumSources: 0, criticalDataPoints: [], redFlagChecks: [] }
+        }
+      ),
       qualityGates: {
-        passed: true,
-        gatesPassed: ['data_quality', 'source_reliability'],
-        gatesFailed: [],
-        overallScore: 85
+        passed: actualCompleteness.passesThreshold,
+        gatesPassed: actualCompleteness.gatesPassed,
+        gatesFailed: actualCompleteness.gatesFailed,
+        overallScore: actualCompleteness.totalScore
       }
     };
 
