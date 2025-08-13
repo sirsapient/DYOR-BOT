@@ -3334,6 +3334,7 @@ IMPORTANT: This report should be educational and informative. Readers should com
 
   // --- Game Download Discovery System ---
   console.log(`🎮 Starting game download discovery for: ${projectName}`);
+  console.log(`🎮 Official sources data:`, JSON.stringify(officialSourcesData, null, 2));
   const gameDownloadLinks = [];
   let gameDataFound = false;
 
@@ -3357,6 +3358,7 @@ IMPORTANT: This report should be educational and informative. Readers should com
   }
 
   // 2. Website Download Link Discovery
+  console.log(`🌐 Checking for official website: ${officialSourcesData?.website || 'undefined'}`);
   if (officialSourcesData?.website) {
     console.log(`🌐 Searching for download links on official website...`);
     try {
