@@ -598,6 +598,7 @@ function isEstablishedProject(projectName: string, aliases: string[]): boolean {
 // Enhanced function to find official sources for established projects
 async function findOfficialSourcesForEstablishedProject(projectName: string, aliases: string[]): Promise<any> {
   const officialSources: any = {
+    website: null,
     whitepaper: null,
     documentation: null,
     github: null,
@@ -2284,88 +2285,12 @@ app.post('/api/research', async (req: any, res: any) => {
     console.log(`🔍 Error details: ${(error as Error).message}`);
     console.log(`🔍 Error stack: ${(error as Error).stack}`);
     
-    // NEW: Final fallback - never return "No data found" error
-    console.log(`🛡️ Providing fallback response for ${projectName} to prevent "No data found" error`);
-    
-    const fallbackReport = {
-      projectName,
-      projectType: 'Web3Game',
-      keyFindings: {
-        positives: [
-          'Research system available',
-          'Fallback data provided'
-        ],
-        negatives: [
-          'AI orchestration failed',
-          'Using fallback response'
-        ],
-        redFlags: []
-      },
-      financialData: {
-        marketCap: null,
-        tokenDistribution: null,
-        fundingInfo: null,
-        roninTokenInfo: null,
-        avalancheTokenInfo: null
-      },
-      teamAnalysis: {
-        studioAssessment: [],
-        linkedinSummary: '',
-        glassdoorSummary: ''
-      },
-      technicalAssessment: {
-        securitySummary: '',
-        reviewSummary: '',
-        githubRepo: null,
-        githubStats: null
-      },
-      communityHealth: {
-        twitterSummary: '',
-        steamReviewSummary: '',
-        discordData: null,
-        redditSummary: ''
-      },
-      sourcesUsed: ['Fallback System'],
-      aiSummary: 'AI orchestration failed, but system provided fallback response',
-      // NEW: Include whitepaper data for general fallback
-      whitepaper: {
-        found: false,
-        data: null,
-        quality: 'low' as const,
-        timestamp: new Date(),
-        dataPoints: 0
-      },
-      confidence: {
-        overall: {
-          score: 50,
-          grade: 'C',
-          level: 'medium',
-          description: 'Fallback response due to system error'
-        },
-        breakdown: {
-          dataCompleteness: { score: 30, found: 1, total: 8, missing: ['Most data sources'] },
-          sourceReliability: { score: 50, official: 0, verified: 0, scraped: 1 },
-          dataFreshness: { score: 100, averageAge: 0, oldestSource: 'Fallback' }
-        },
-        sourceDetails: [],
-        limitations: ['System error occurred', 'Limited data available'],
-        strengths: ['Fallback system provided response'],
-        userGuidance: {
-          trustLevel: 'low',
-          useCase: 'Initial screening only - system encountered error',
-          warnings: ['System error occurred', 'Limited data available'],
-          additionalResearch: ['Retry research when system is stable', 'Check for official project sources']
-        }
-      },
-      qualityGates: {
-        passed: false,
-        gatesFailed: ['system_error'],
-        recommendations: ['System encountered an error, using fallback response'],
-        userMessage: 'Research system encountered an error, but provided fallback response'
-      }
-    };
-    
-    return res.json(fallbackReport);
+    // Dynamic search only - return actual error instead of fallback
+    return res.status(500).json({ 
+      error: 'Research failed', 
+      message: 'Dynamic search encountered an error. Please try again or check if the project exists.',
+      details: (error as Error).message 
+    });
   }
 });
 
@@ -2577,75 +2502,12 @@ app.get('/api/cache-status', async (req: any, res: any) => {
   }
 });
 
-// Traditional research method (fallback)
+// Traditional research method (dynamic only)
 async function performTraditionalResearch(req: any, res: any) {
   const { projectName, tokenSymbol, contractAddress, roninContractAddress, avalancheContractAddress, selectedNetwork } = req.body;
   
-  // NEW: Universal fallback - never return "No data found" error for any project
-  console.log(`🛡️ Traditional research fallback for ${projectName} - preventing "No data found" error`);
-  
-  const fallbackReport = {
-    projectName,
-    projectType: 'Web3Game',
-    keyFindings: {
-      positives: [
-        'Research system available',
-        'Traditional research fallback provided'
-      ],
-      negatives: [
-        'External APIs may be unavailable',
-        'Using fallback response'
-      ],
-      redFlags: []
-    },
-    financialData: {
-      marketCap: null,
-      tokenDistribution: null,
-      fundingInfo: null,
-      roninTokenInfo: null,
-      avalancheTokenInfo: null
-    },
-    teamAnalysis: {
-      studioAssessment: [],
-      linkedinSummary: '',
-      glassdoorSummary: ''
-    },
-    technicalAssessment: {
-      securitySummary: '',
-      reviewSummary: '',
-      githubRepo: null,
-      githubStats: null
-    },
-    communityHealth: {
-      twitterSummary: '',
-      steamReviewSummary: '',
-      discordData: null,
-      redditSummary: ''
-    },
-    sourcesUsed: ['Traditional Research Fallback'],
-    aiSummary: 'Traditional research fallback provided to prevent system error',
-    confidence: {
-      overall: {
-        score: 60,
-        grade: 'C',
-        level: 'medium',
-        description: 'Fallback response from traditional research'
-      },
-      breakdown: {
-        dataCompleteness: { score: 40, found: 2, total: 8, missing: ['Most data sources'] },
-        sourceReliability: { score: 60, official: 0, verified: 1, scraped: 1 },
-        dataFreshness: { score: 100, averageAge: 0, oldestSource: 'Fallback' }
-      }
-    },
-    qualityGates: {
-      passed: false,
-      gatesFailed: ['traditional_research_fallback'],
-      recommendations: ['System using traditional research fallback'],
-      userMessage: 'Traditional research fallback provided'
-    }
-  };
-  
-  return res.json(fallbackReport);
+  // Dynamic search only - no fallback data
+  // System relies purely on discovered data from external sources
   
   // --- Alias collection logic ---
   let aliases = [projectName];
@@ -3163,43 +3025,8 @@ async function performTraditionalResearch(req: any, res: any) {
     }
   }
   
-  // Special fallback for Axie Infinity if no external data found
-  if (projectName.toLowerCase().includes('axie') && (!cgData || cgData.error) && (!igdbData || igdbData.error)) {
-    console.log(`🎯 Providing fallback data for Axie Infinity`);
-    cgData = {
-      id: 'axie-infinity',
-      symbol: 'axs',
-      name: 'Axie Infinity',
-      market_data: {
-        market_cap: { usd: 500000000 },
-        current_price: { usd: 5.50 },
-        total_volume: { usd: 10000000 }
-      },
-      error: null,
-      source: 'Fallback data for Axie Infinity'
-    };
-    
-    igdbData = {
-      name: 'Axie Infinity',
-      summary: 'A blockchain-based game where players collect, breed, raise, battle, and trade creatures called Axies.',
-      error: null,
-      source: 'Fallback data for Axie Infinity'
-    };
-    
-    // Add known official sources
-    officialSourcesData = {
-      whitepaper: 'https://whitepaper.axieinfinity.com',
-      documentation: 'https://docs.axieinfinity.com',
-      github: 'https://github.com/axieinfinity',
-      securityAudit: 'https://skynet.certik.com/projects/axie-infinity',
-      teamInfo: 'https://axieinfinity.com/about',
-      blog: 'https://blog.axieinfinity.com',
-      socialMedia: 'https://twitter.com/AxieInfinity',
-      source: 'Known Axie Infinity sources'
-    };
-    
-    sourcesUsed.push('Fallback Data');
-  }
+  // Dynamic search only - no fallback data
+  // System relies purely on discovered data from external sources
 
 // Helper functions for Ronin Network data
 // Ronin functions are now defined at the top of the file
@@ -3571,24 +3398,8 @@ IMPORTANT: This report should be educational and informative. Readers should com
     dataPoints: gameDownloadLinks.length
   };
 
-  // Fallback: If no game data found, provide basic website link
-  console.log(`🎮 Fallback check - gameDataFound: ${gameDataFound}, officialSourcesData?.website: ${officialSourcesData?.website || 'undefined'}`);
-  if (!gameDataFound && officialSourcesData?.website) {
-    console.log(`🎮 Adding fallback website link for game data...`);
-    gameData.downloadLinks.push({
-      platform: 'website',
-      url: officialSourcesData.website,
-      title: `${projectName} - Official Website`,
-      price: 'Free to Play',
-      rating: undefined,
-      reviews: undefined
-    });
-    gameData.found = true;
-    gameData.dataPoints = 1;
-    console.log(`✅ Added fallback website link: ${officialSourcesData.website}`);
-  } else if (!gameDataFound) {
-    console.log(`❌ Cannot add fallback: gameDataFound=${gameDataFound}, website=${officialSourcesData?.website || 'undefined'}`);
-  }
+  // Dynamic game data only - no fallback links
+  // System relies purely on discovered download links from external sources
 
   console.log(`🎮 Game download discovery completed. Found ${gameDownloadLinks.length} download links.`);
   console.log(`🎮 GameData object:`, JSON.stringify(gameData, null, 2));
@@ -3693,72 +3504,16 @@ IMPORTANT: This report should be educational and informative. Readers should com
   res.json(researchReport);
 }
 
-// Global error handler to catch any unhandled errors
+// Global error handler - dynamic search only
 app.use((error: any, req: any, res: any, next: any) => {
   console.error('❌ Global error handler caught:', error);
   
-  // NEW: Never return "No data found" error - provide fallback response
-  const fallbackResponse = {
-    projectName: req.body?.projectName || 'Unknown Project',
-    projectType: 'Web3Game',
-    keyFindings: {
-      positives: ['Research system available'],
-      negatives: ['System encountered an error'],
-      redFlags: []
-    },
-    financialData: {
-      marketCap: null,
-      tokenDistribution: null,
-      fundingInfo: null,
-      roninTokenInfo: null,
-      avalancheTokenInfo: null
-    },
-    teamAnalysis: {
-      studioAssessment: [],
-      linkedinSummary: '',
-      glassdoorSummary: ''
-    },
-    technicalAssessment: {
-      securitySummary: '',
-      reviewSummary: '',
-      githubRepo: null,
-      githubStats: null
-    },
-    communityHealth: {
-      twitterSummary: '',
-      steamReviewSummary: '',
-      discordData: null,
-      redditSummary: ''
-    },
-    gameData: {
-      downloadLinks: [],
-      found: false,
-      dataPoints: 0
-    },
-    sourcesUsed: ['Global Error Handler'],
-    aiSummary: 'System encountered an error, providing fallback response',
-    confidence: {
-      overall: {
-        score: 40,
-        grade: 'D',
-        level: 'low',
-        description: 'System error occurred'
-      },
-      breakdown: {
-        dataCompleteness: { score: 20, found: 1, total: 8, missing: ['All data sources'] },
-        sourceReliability: { score: 40, official: 0, verified: 0, scraped: 1 },
-        dataFreshness: { score: 100, averageAge: 0, oldestSource: 'Error Handler' }
-      }
-    },
-    qualityGates: {
-      passed: false,
-      gatesFailed: ['system_error'],
-      recommendations: ['System encountered an error'],
-      userMessage: 'System error occurred, fallback response provided'
-    }
-  };
-  
-  return res.json(fallbackResponse);
+  // Dynamic search only - return actual error instead of fallback
+  return res.status(500).json({ 
+    error: 'System error', 
+    message: 'Dynamic search encountered a system error. Please try again.',
+    details: (error as Error).message 
+  });
 });
 
 app.listen(PORT, () => {
