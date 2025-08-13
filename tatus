@@ -8,3 +8,13 @@
 [33md1e1006[m Clean up node_modules and add backend README
 [33m985a208[m Major breakthrough: GitHub false positive reduction implemented - Enhanced GitHub scoring algorithm with strict matching and penalties - Increased quality threshold from 50 to 60 for main GitHub search - Added specific filtering for common false positive patterns - Successfully eliminated false positives for The Sandbox project - Updated debug guide with Session 11 documentation
 [33ma439bf5[m Replace SerpAPI with free DuckDuckGo search service and update debug guide
+[33m61ac618[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m Update debug guide with AI Summary and Game Data integration fix
+[33mb726f77[m Fix AI Summary and Game Data issues - Add game download discovery to AI orchestration path
+[33ma246034[m Session 20: Improve Data Sources section to show only relevant sources - Modified buildSourceDetails to filter sources based on actual data and project relevance - Added game data mapping to findings for proper Data Sources display - Updated DEBUG_GUIDE.md with implementation details
+[33mf15ae09[m Implement comprehensive game download discovery system - Search Steam, Epic, GOG, Itch.io and website download links
+[33m17848b5[m Improve AI analysis quality: Enhanced prompt for academic report format and increased token limit to 2500
+[33ma0f36d5[m Frontend improvements: AI Analysis Summary multi-paragraph format, Game Data section with download links, enhanced Team Analysis with studio/member details, collapsible boxes with click-to-expand functionality
+[33m6b28eee[m Debug Guide: Document Session 17 - Frontend Data Display Improvements - Mark AI Analysis Summary reformatting as completed - Document multi-chat approach for ongoing improvements
+[33ma4c6f68[m Frontend: Convert AI Analysis Summary to paragraph format - Remove ReactMarkdown dependency - Add text processing to clean markdown formatting - Add CSS styling for paragraph format - Maintain futuristic/hacker aesthetic
+[33m2025ac1[m Fix source name mapping issue: Add normalizeSourceName function to handle AI-generated source name variations
+[33md1e1006[m Clean up node_modules and add backend README
