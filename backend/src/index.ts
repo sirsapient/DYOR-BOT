@@ -3561,6 +3561,7 @@ IMPORTANT: This report should be educational and informative. Readers should com
         // Continue to next pattern
       }
     }
+    console.log(`🎮 Web3 game specific discovery completed. gameDataFound: ${gameDataFound}, links found: ${gameDownloadLinks.length}`);
   }
 
   // Create GameData object
@@ -3571,6 +3572,7 @@ IMPORTANT: This report should be educational and informative. Readers should com
   };
 
   // Fallback: If no game data found, provide basic website link
+  console.log(`🎮 Fallback check - gameDataFound: ${gameDataFound}, officialSourcesData?.website: ${officialSourcesData?.website || 'undefined'}`);
   if (!gameDataFound && officialSourcesData?.website) {
     console.log(`🎮 Adding fallback website link for game data...`);
     gameData.downloadLinks.push({
@@ -3584,6 +3586,8 @@ IMPORTANT: This report should be educational and informative. Readers should com
     gameData.found = true;
     gameData.dataPoints = 1;
     console.log(`✅ Added fallback website link: ${officialSourcesData.website}`);
+  } else if (!gameDataFound) {
+    console.log(`❌ Cannot add fallback: gameDataFound=${gameDataFound}, website=${officialSourcesData?.website || 'undefined'}`);
   }
 
   console.log(`🎮 Game download discovery completed. Found ${gameDownloadLinks.length} download links.`);
