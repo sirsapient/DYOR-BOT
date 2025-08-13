@@ -101,64 +101,31 @@ export class ConfidenceCalculator {
     const hasRoninData = findings.ronin_data?.found || false;
     const hasGenericOnchainData = findings.onchain_data?.found || false;
 
-    // Filter sources to only include relevant ones
+    // Filter sources to only include relevant ones with data
     const relevantSourceConfigs = allSourceConfigs.filter(config => {
-      // Always include sources that have data
+      // Only include sources that actually have data
       if (findings[config.key]?.found) {
         return true;
       }
 
-      // For blockchain sources, only include if they have data or if no other blockchain data exists
+      // For blockchain sources, be very selective:
+      // - Only show Avalanche if we have Avalanche data
       if (config.key === 'avalanche_data') {
-        return hasAvalancheData || (!hasRoninData && !hasGenericOnchainData);
+        return hasAvalancheData;
       }
       
+      // - Only show Ronin if we have Ronin data
       if (config.key === 'ronin_data') {
-        return hasRoninData || (!hasAvalancheData && !hasGenericOnchainData);
+        return hasRoninData;
       }
 
+      // - Only show generic blockchain data if we have it and no specific blockchain data
       if (config.key === 'onchain_data') {
-        return hasGenericOnchainData || (!hasAvalancheData && !hasRoninData);
+        return hasGenericOnchainData && !hasAvalancheData && !hasRoninData;
       }
 
-      // For other sources, only include if they're likely to be relevant
-      // (e.g., team_info if we have any team-related data, community_health if we have social data, etc.)
-      if (config.key === 'team_info') {
-        // Include if we have any team-related findings
-        return Object.keys(findings).some(key => 
-          key.includes('team') || key.includes('linkedin') || key.includes('glassdoor')
-        );
-      }
-
-      if (config.key === 'community_health') {
-        // Include if we have any community-related findings
-        return Object.keys(findings).some(key => 
-          key.includes('discord') || key.includes('twitter') || key.includes('telegram') || key.includes('reddit')
-        );
-      }
-
-      if (config.key === 'financial_data') {
-        // Include if we have any financial-related findings
-        return Object.keys(findings).some(key => 
-          key.includes('financial') || key.includes('market') || key.includes('token') || key.includes('funding')
-        );
-      }
-
-      if (config.key === 'product_data') {
-        // Include if we have any product-related findings
-        return Object.keys(findings).some(key => 
-          key.includes('game') || key.includes('product') || key.includes('steam') || key.includes('review')
-        );
-      }
-
-      if (config.key === 'game_specific') {
-        // Include if we have any game-specific findings
-        return Object.keys(findings).some(key => 
-          key.includes('game') || key.includes('steam') || key.includes('epic') || key.includes('download')
-        );
-      }
-
-      // For other sources, be more conservative - only include if we have data
+      // For other sources, only include if they have actual data
+      // Don't show sources that are "not found" - this clutters the display
       return false;
     });
 
