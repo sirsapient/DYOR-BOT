@@ -3439,7 +3439,8 @@ IMPORTANT: This report should be educational and informative. Readers should com
     snowtraceData,
     roninTokenInfo,
     youtubeData,
-    officialSourcesData
+    officialSourcesData,
+    gameData
   });
   
   const confidence = await generateConfidenceMetrics(findings, scoringEngine.calculateResearchScore(findings, projectName), {

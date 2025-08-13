@@ -916,3 +916,53 @@ curl -X POST https://dyor-bot.onrender.com/api/research \
 
 *Last Updated: [Current Date]*
 *Version: 1.0*
+
+## Current Status
+- ✅ Backend API running on Render
+- ✅ Frontend deployed on Vercel  
+- ✅ AI Analysis improved to academic report format
+- ✅ Game download discovery system implemented
+- ✅ Data Sources section improved to show only relevant sources
+
+## Recent Changes
+
+### Session 20: Data Sources Section Improvements
+**Issue**: Data Sources section was showing irrelevant sources (e.g., "Avalanche Network not found" for Axie Infinity which is on Ronin) and sources with no data.
+
+**Root Cause**: The `buildSourceDetails` function in `confidence-indicators.ts` was hardcoded to show ALL predefined sources regardless of relevance or data availability.
+
+**Solution Implemented**:
+1. **Dynamic Source Filtering**: Modified `buildSourceDetails` to only include sources that:
+   - Have actual data (`findings[config.key]?.found`)
+   - Are relevant to the project type (e.g., only show Ronin for Ronin-based projects)
+   - Are likely to have data based on other findings
+
+2. **Blockchain Source Logic**: 
+   - Only show Avalanche Network if project has Avalanche data OR no other blockchain data exists
+   - Only show Ronin Network if project has Ronin data OR no other blockchain data exists
+   - Only show generic Blockchain Data if no specific blockchain data exists
+
+3. **Smart Source Detection**:
+   - Team Information: Only show if any team-related findings exist
+   - Community Health: Only show if any social media findings exist
+   - Financial Data: Only show if any financial-related findings exist
+   - Product Data: Only show if any game/product-related findings exist
+   - Game Data: Only show if any game-specific findings exist
+
+4. **Game Data Integration**: 
+   - Added `gameData` to `mapDataToFindings` function call
+   - Added mapping in `research-scoring.ts` to convert `gameData` to `findings.game_specific`
+   - This ensures game download links are properly recognized in Data Sources
+
+**Expected Results**:
+- Data Sources will only show relevant sources for each project
+- No more "Avalanche Network not found" for Ronin-based projects
+- Game Data section will appear when download links are found
+- Cleaner, more focused Data Sources display
+
+**Technical Changes**:
+- `backend/src/confidence-indicators.ts`: Modified `buildSourceDetails` function
+- `backend/src/research-scoring.ts`: Added game data mapping
+- `backend/src/index.ts`: Added `gameData` to findings mapping
+
+**Status**: ✅ COMPLETED

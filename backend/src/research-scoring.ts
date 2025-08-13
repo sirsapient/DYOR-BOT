@@ -881,6 +881,17 @@ export function mapDataToFindings(data: any): ResearchFindings {
       dataPoints: countDataPoints(mediaData)
     };
   }
+
+  // Map game data to game_specific
+  if (data.gameData && data.gameData.found && data.gameData.downloadLinks && data.gameData.downloadLinks.length > 0) {
+    findings.game_specific = {
+      found: true,
+      data: data.gameData,
+      quality: 'high',
+      timestamp: new Date(),
+      dataPoints: data.gameData.dataPoints || data.gameData.downloadLinks.length
+    };
+  }
   
   // Map whitepaper data (if available from tokenomics or other sources)
   const whitepaperData = {
