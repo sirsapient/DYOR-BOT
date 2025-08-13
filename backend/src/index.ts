@@ -3114,34 +3114,53 @@ async function performTraditionalResearch(req: any, res: any) {
       roninAddress = roninContractAddress;
     } else if (cgData && cgData.platforms && cgData.platforms.ronin) {
       roninAddress = cgData.platforms.ronin;
+    } else if (cgData && !cgData.error) {
+      // Try to find Ronin contract address from CoinGecko data
+      console.log(`🔍 Looking for Ronin contract in CoinGecko data for ${projectName}`);
+      if (cgData.platforms) {
+        console.log(`📊 Available platforms: ${Object.keys(cgData.platforms).join(', ')}`);
+        // Check if there's any Ronin-related platform data
+        for (const [platform, address] of Object.entries(cgData.platforms)) {
+          if (platform.toLowerCase().includes('ronin') || platform.toLowerCase().includes('ronin')) {
+            roninAddress = address as string;
+            console.log(`✅ Found Ronin address from platform ${platform}: ${roninAddress}`);
+            break;
+          }
+        }
+      }
+    }
+
+    // Special handling for Axie Infinity - known Ronin contract
+    if (!roninAddress && projectName.toLowerCase().includes('axie')) {
+      console.log(`🎯 Using known Axie Infinity Ronin contract address`);
+      roninAddress = '0x97a9107c1793bc407d6f527b77e7fff4d812bece'; // AXS token on Ronin
     }
 
     if (roninAddress) {
-    try {
+      console.log(`🔍 Fetching Ronin data for address: ${roninAddress}`);
+      try {
+        // Fetch Ronin token data
+        const roninTokenData = await fetchRoninTokenData(roninAddress);
+        if (roninTokenData && !roninTokenData.error) {
+          roninTokenInfo = roninTokenData;
+          sourcesUsed.push('Ronin');
+          console.log(`✅ Ronin token data fetched successfully`);
+        }
 
-      
-      // Fetch Ronin token data
-      const roninTokenData = await fetchRoninTokenData(roninAddress);
-      if (roninTokenData) {
-        roninTokenInfo = roninTokenData;
-        sourcesUsed.push('Ronin');
-
+        // Fetch Ronin transaction history
+        const roninTxHistory = await fetchRoninTransactionHistory(roninAddress);
+        if (roninTxHistory && !roninTxHistory.error) {
+          if (!roninTokenInfo) roninTokenInfo = {};
+          roninTokenInfo.transactionHistory = roninTxHistory;
+          console.log(`✅ Ronin transaction history fetched successfully`);
+        }
+      } catch (e) {
+        console.log(`❌ Ronin fetch failed: ${(e as Error).message}`);
+        roninTokenInfo = { error: 'Ronin fetch failed' };
       }
-
-      // Fetch Ronin transaction history
-      const roninTxHistory = await fetchRoninTransactionHistory(roninAddress);
-      if (roninTxHistory) {
-        if (!roninTokenInfo) roninTokenInfo = {};
-        roninTokenInfo.transactionHistory = roninTxHistory;
-        
-      }
-
-
-    } catch (e) {
-
-      roninTokenInfo = { error: 'Ronin fetch failed' };
+    } else {
+      console.log(`⚠️ No Ronin contract address found for ${projectName}`);
     }
-  }
   }
   
   // Special fallback for Axie Infinity if no external data found
