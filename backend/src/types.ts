@@ -16,6 +16,7 @@ export interface ProjectResearch {
   teamAnalysis: TeamAnalysis;
   technicalAssessment: TechnicalAssessment;
   communityHealth: CommunityHealth;
+  gameData?: GameData;
   researchQuality?: ResearchQuality;
   // Additional data fields
   studioAssessment?: any[];
@@ -78,6 +79,21 @@ export interface CommunityHealth {
     member_count?: number;
   };
   redditSummary?: string;
+}
+
+export interface GameData {
+  downloadLinks: GameDownloadLink[];
+  found: boolean;
+  dataPoints: number;
+}
+
+export interface GameDownloadLink {
+  platform: 'steam' | 'epic' | 'website' | 'appstore' | 'googleplay' | 'itchio' | 'gog' | 'humble' | 'other';
+  url: string;
+  title?: string;
+  price?: string;
+  rating?: number;
+  reviews?: number;
 }
 
 // @ts-ignore

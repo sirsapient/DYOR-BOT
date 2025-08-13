@@ -2762,6 +2762,313 @@ async function performTraditionalResearch(req: any, res: any) {
   }
   homepageUrls = Array.from(new Set(homepageUrls.filter(Boolean)));
 
+  // --- Game Download Discovery System ---
+  console.log(`🎮 Starting game download discovery for: ${projectName}`);
+  const gameDownloadLinks = [];
+  let gameDataFound = false;
+
+  // 1. Steam Store Search
+  if (steamData && !steamData.error) {
+    try {
+      const steamUrl = `https://store.steampowered.com/app/${steamData.id}`;
+      gameDownloadLinks.push({
+        platform: 'steam',
+        url: steamUrl,
+        title: steamData.name,
+        price: steamData.price_overview?.final_formatted || 'Free to Play',
+        rating: steamData.metacritic?.score,
+        reviews: steamData.reviews?.positive
+      });
+      gameDataFound = true;
+      console.log(`✅ Found Steam game: ${steamData.name}`);
+    } catch (e) {
+      console.log(`❌ Failed to process Steam data: ${(e as Error).message}`);
+    }
+  }
+
+  // 2. Epic Games Store Search
+  try {
+    const epicSearchUrl = `https://store-site-backend-static.ak.epicgames.com/graphql`;
+    const epicQuery = {
+      query: `
+        query searchStoreQuery($category: String, $count: Int, $country: String, $keywords: String, $locale: String!, $sortBy: String, $sortDir: String, $withPrice: Boolean = true) {
+          Catalog {
+            searchStore(category: $category, count: $count, country: $country, keywords: $keywords, locale: $locale, sortBy: $sortBy, sortDir: $sortDir) {
+              elements {
+                title
+                id
+                urlSlug
+                price(country: $country) @include(if: $withPrice) {
+                  totalPrice {
+                    originalPrice
+                    discount
+                    discountPrice
+                    currencyCode
+                    currencyInfo {
+                      decimals
+                    }
+                  }
+                }
+                rating {
+                  average
+                  count
+                }
+              }
+            }
+          }
+        }
+      `,
+      variables: {
+        category: "games/edition/base|bundles/games|editors",
+        count: 5,
+        country: "US",
+        keywords: projectName,
+        locale: "en-US",
+        sortBy: "relevancy",
+        sortDir: "DESC"
+      }
+    };
+
+    const epicRes = await fetch(epicSearchUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(epicQuery)
+    });
+
+    if (epicRes.ok) {
+      const epicJson = await epicRes.json();
+      const epicGames = epicJson.data?.Catalog?.searchStore?.elements || [];
+      
+      // Find best match for project name
+      const bestEpicMatch = epicGames.find((game: any) => 
+        game.title.toLowerCase().includes(projectName.toLowerCase()) ||
+        projectName.toLowerCase().includes(game.title.toLowerCase())
+      );
+
+      if (bestEpicMatch) {
+        const epicUrl = `https://store.epicgames.com/en-US/p/${bestEpicMatch.urlSlug}`;
+        gameDownloadLinks.push({
+          platform: 'epic',
+          url: epicUrl,
+          title: bestEpicMatch.title,
+          price: bestEpicMatch.price?.totalPrice?.discountPrice ? 
+            `$${bestEpicMatch.price.totalPrice.discountPrice / 100}` : 'Free',
+          rating: bestEpicMatch.rating?.average,
+          reviews: bestEpicMatch.rating?.count
+        });
+        gameDataFound = true;
+        console.log(`✅ Found Epic game: ${bestEpicMatch.title}`);
+      }
+    }
+  } catch (e) {
+    console.log(`❌ Epic Games Store search failed: ${(e as Error).message}`);
+  }
+
+  // 3. Website Download Link Discovery
+  if (homepageUrls.length > 0) {
+    console.log(`🌐 Searching for download links on official websites...`);
+    for (const url of homepageUrls.slice(0, 3)) { // Limit to first 3 URLs
+      try {
+        const websiteRes = await fetch(url, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+          }
+        });
+        
+        if (websiteRes.ok) {
+          const websiteHtml = await websiteRes.text();
+          
+          // Look for download/play links
+          const downloadPatterns = [
+            /href=["']([^"']*(?:download|play|get.*game|install|launch)[^"']*)["']/gi,
+            /href=["']([^"']*(?:\.exe|\.dmg|\.pkg|\.apk|\.ipa)[^"']*)["']/gi,
+            /href=["']([^"']*(?:steam|epic|gog|itch\.io|humblebundle)[^"']*)["']/gi,
+            /href=["']([^"']*(?:app\.store|play\.google\.com)[^"']*)["']/gi
+          ];
+
+          for (const pattern of downloadPatterns) {
+            const matches = websiteHtml.match(pattern);
+            if (matches) {
+              for (const match of matches.slice(0, 3)) { // Limit to first 3 matches
+                const hrefMatch = match.match(/href=["']([^"']*)["']/);
+                if (hrefMatch) {
+                  let downloadUrl = hrefMatch[1];
+                  
+                  // Convert relative URLs to absolute
+                  if (downloadUrl.startsWith('/')) {
+                    const urlObj = new URL(url);
+                    downloadUrl = `${urlObj.protocol}//${urlObj.host}${downloadUrl}`;
+                  } else if (!downloadUrl.startsWith('http')) {
+                    const urlObj = new URL(url);
+                    downloadUrl = `${urlObj.protocol}//${urlObj.host}/${downloadUrl}`;
+                  }
+
+                  // Determine platform
+                  let platform = 'website';
+                  if (downloadUrl.includes('steam')) platform = 'steam';
+                  else if (downloadUrl.includes('epic')) platform = 'epic';
+                  else if (downloadUrl.includes('gog')) platform = 'gog';
+                  else if (downloadUrl.includes('itch.io')) platform = 'itchio';
+                  else if (downloadUrl.includes('humblebundle')) platform = 'humble';
+                  else if (downloadUrl.includes('app.store') || downloadUrl.includes('apps.apple.com')) platform = 'appstore';
+                  else if (downloadUrl.includes('play.google.com')) platform = 'googleplay';
+
+                  // Check if this URL is already added
+                  const existingLink = gameDownloadLinks.find(link => link.url === downloadUrl);
+                  if (!existingLink) {
+                    gameDownloadLinks.push({
+                      platform: platform as any,
+                      url: downloadUrl,
+                      title: `${projectName} - ${platform.charAt(0).toUpperCase() + platform.slice(1)}`,
+                      price: 'Check website',
+                      rating: undefined,
+                      reviews: undefined
+                    });
+                    gameDataFound = true;
+                    console.log(`✅ Found ${platform} download link: ${downloadUrl}`);
+                  }
+                }
+              }
+            }
+          }
+
+          // Look for specific game download sections
+          const gameDownloadSections = [
+            /play.*now|download.*game|get.*started|start.*playing/gi
+          ];
+
+          for (const sectionPattern of gameDownloadSections) {
+            const sectionMatches = websiteHtml.match(sectionPattern);
+            if (sectionMatches) {
+              // Extract surrounding text to find download links
+              const downloadSection = websiteHtml.substring(
+                Math.max(0, websiteHtml.indexOf(sectionMatches[0]) - 500),
+                Math.min(websiteHtml.length, websiteHtml.indexOf(sectionMatches[0]) + 500)
+              );
+              
+              const linkMatches = downloadSection.match(/href=["']([^"']*)["']/g);
+              if (linkMatches) {
+                for (const linkMatch of linkMatches.slice(0, 2)) {
+                  const hrefMatch = linkMatch.match(/href=["']([^"']*)["']/);
+                  if (hrefMatch) {
+                    let downloadUrl = hrefMatch[1];
+                    
+                    // Convert relative URLs to absolute
+                    if (downloadUrl.startsWith('/')) {
+                      const urlObj = new URL(url);
+                      downloadUrl = `${urlObj.protocol}//${urlObj.host}${downloadUrl}`;
+                    } else if (!downloadUrl.startsWith('http')) {
+                      const urlObj = new URL(url);
+                      downloadUrl = `${urlObj.protocol}//${urlObj.host}/${downloadUrl}`;
+                    }
+
+                    // Check if this URL is already added
+                    const existingLink = gameDownloadLinks.find(link => link.url === downloadUrl);
+                    if (!existingLink) {
+                      gameDownloadLinks.push({
+                        platform: 'website',
+                        url: downloadUrl,
+                        title: `${projectName} - Play Now`,
+                        price: 'Check website',
+                        rating: undefined,
+                        reviews: undefined
+                      });
+                      gameDataFound = true;
+                      console.log(`✅ Found website play link: ${downloadUrl}`);
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      } catch (e) {
+        console.log(`❌ Failed to search website ${url}: ${(e as Error).message}`);
+      }
+    }
+  }
+
+  // 4. GOG (Good Old Games) Search
+  try {
+    const gogSearchUrl = `https://www.gog.com/games/ajax/filtered?mediaType=game&search=${encodeURIComponent(projectName)}`;
+    const gogRes = await fetch(gogSearchUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      }
+    });
+
+    if (gogRes.ok) {
+      const gogJson = await gogRes.json();
+      const gogGames = gogJson.products || [];
+      
+      // Find best match for project name
+      const bestGogMatch = gogGames.find((game: any) => 
+        game.title.toLowerCase().includes(projectName.toLowerCase()) ||
+        projectName.toLowerCase().includes(game.title.toLowerCase())
+      );
+
+      if (bestGogMatch) {
+        const gogUrl = `https://www.gog.com${bestGogMatch.url}`;
+        gameDownloadLinks.push({
+          platform: 'gog',
+          url: gogUrl,
+          title: bestGogMatch.title,
+          price: bestGogMatch.price?.amount ? `$${bestGogMatch.price.amount}` : 'Check GOG',
+          rating: bestGogMatch.rating,
+          reviews: bestGogMatch.reviewsCount
+        });
+        gameDataFound = true;
+        console.log(`✅ Found GOG game: ${bestGogMatch.title}`);
+      }
+    }
+  } catch (e) {
+    console.log(`❌ GOG search failed: ${(e as Error).message}`);
+  }
+
+  // 5. Itch.io Search
+  try {
+    const itchSearchUrl = `https://itch.io/api/1/games/search?q=${encodeURIComponent(projectName)}`;
+    const itchRes = await fetch(itchSearchUrl);
+
+    if (itchRes.ok) {
+      const itchJson = await itchRes.json();
+      const itchGames = itchJson.games || [];
+      
+      // Find best match for project name
+      const bestItchMatch = itchGames.find((game: any) => 
+        game.title.toLowerCase().includes(projectName.toLowerCase()) ||
+        projectName.toLowerCase().includes(game.title.toLowerCase())
+      );
+
+      if (bestItchMatch) {
+        const itchUrl = `https://${bestItchMatch.user.name}.itch.io/${bestItchMatch.url}`;
+        gameDownloadLinks.push({
+          platform: 'itchio',
+          url: itchUrl,
+          title: bestItchMatch.title,
+          price: bestItchMatch.price ? `$${bestItchMatch.price / 100}` : 'Free',
+          rating: bestItchMatch.rating,
+          reviews: bestItchMatch.reviews_count
+        });
+        gameDataFound = true;
+        console.log(`✅ Found Itch.io game: ${bestItchMatch.title}`);
+      }
+    }
+  } catch (e) {
+    console.log(`❌ Itch.io search failed: ${(e as Error).message}`);
+  }
+
+  // Create GameData object
+  const gameData = {
+    downloadLinks: gameDownloadLinks,
+    found: gameDataFound,
+    dataPoints: gameDownloadLinks.length
+  };
+
+  console.log(`🎮 Game download discovery completed. Found ${gameDownloadLinks.length} download links.`);
+
   // --- Discord extraction ---
   let discordInvite = null;
   // 1. Try CoinGecko chat_url
@@ -3210,6 +3517,7 @@ IMPORTANT: This report should be educational and informative. Readers should com
       discordData,
       redditSummary: redditSummary || ''
     },
+    gameData,
     sourcesUsed,
     aiSummary,
     confidence,
@@ -3255,6 +3563,11 @@ app.use((error: any, req: any, res: any, next: any) => {
       steamReviewSummary: '',
       discordData: null,
       redditSummary: ''
+    },
+    gameData: {
+      downloadLinks: [],
+      found: false,
+      dataPoints: 0
     },
     sourcesUsed: ['Global Error Handler'],
     aiSummary: 'System encountered an error, providing fallback response',
