@@ -6,6 +6,7 @@ import { QualityGatesEngine } from './quality-gates';
 import { ResearchFindings } from './research-scoring';
 import { ResearchScoringEngine } from './research-scoring';
 import { freeSearchService } from './search-service';
+import { GameStoreAPIService } from './game-store-apis';
 
 // Import the actual data collection functions from index.ts
 // We'll need to pass these as parameters since we can't import from the same file
@@ -16,6 +17,11 @@ interface DataCollectionFunctions {
   extractTokenomicsFromWhitepaper: (websiteUrl: string) => Promise<any | null>;
   searchProjectSpecificTokenomics: (projectName: string, aliases: string[]) => Promise<any | null>;
   fetchTwitterProfileAndTweets: (handle: string) => Promise<any>;
+  fetchEnhancedTwitterData: (handle: string) => Promise<any>;
+  fetchDiscordServerData: (inviteCode: string) => Promise<any>;
+  fetchRedditCommunityData: (subreddit: string) => Promise<any>;
+  fetchRedditRecentPosts: (subreddit: string, limit?: number) => Promise<any>;
+  discoverSocialMediaLinks: (projectName: string, websiteUrl?: string) => Promise<any>;
   fetchSteamDescription: (appid: string) => Promise<string>;
   fetchWebsiteAboutSection: (url: string) => Promise<string>;
   fetchRoninTokenData: (contractAddress: string) => Promise<any>;
@@ -24,6 +30,41 @@ interface DataCollectionFunctions {
   findOfficialSourcesForEstablishedProject: (projectName: string, aliases: string[]) => Promise<any>;
   searchContractAddressWithLLM: (projectName: string) => Promise<string | null>;
   getFinancialDataFromAlternativeSources: (projectName: string) => Promise<any>;
+}
+
+// NEW: Query classification interface for hybrid routing
+interface QueryClassification {
+  complexity: 'simple' | 'complex' | 'unknown';
+  needsTokenTransformation: boolean;
+  projectType: 'web3_game' | 'traditional_game' | 'publisher' | 'platform' | 'unknown';
+  confidence: number;
+  reasoning: string;
+  recommendedApproach: 'direct_ai' | 'orchestrated' | 'hybrid';
+  estimatedCost: 'low' | 'medium' | 'high';
+  estimatedTime: number; // seconds
+}
+
+// NEW: Direct AI search interface
+interface DirectAISearchResult {
+  success: boolean;
+  data: any;
+  confidence: number;
+  dataPoints: number;
+  sources: string[];
+  cost: number;
+  timeElapsed: number;
+  limitations: string[];
+}
+
+// NEW: Hybrid search configuration
+interface HybridSearchConfig {
+  enableQueryClassification: boolean;
+  enableDirectAI: boolean;
+  enableOrchestrated: boolean;
+  costThreshold: number; // Maximum cost for direct AI
+  timeThreshold: number; // Maximum time for direct AI (seconds)
+  confidenceThreshold: number; // Minimum confidence for direct AI
+  fallbackToOrchestrated: boolean;
 }
 
 // NEW: Feedback interface for second AI communication
@@ -580,9 +621,13 @@ export class AIResearchOrchestrator {
   private requestCount: number = 0;
   private requestWindowStart: number = Date.now();
 
+  // NEW: Performance optimization - Query classification cache
+  private queryClassificationCache = new Map<string, QueryClassification>();
+
   constructor(apiKey: string, options?: {
     confidenceThresholds?: Partial<ConfidenceThresholds>;
     retryConfig?: Partial<RetryConfig>;
+    hybridConfig?: Partial<HybridSearchConfig>;
   }) {
     this.anthropic = new Anthropic({ apiKey });
     this.qualityGates = new QualityGatesEngine();
@@ -627,6 +672,585 @@ export class AIResearchOrchestrator {
       maxConcurrentRequests: 3, // Limit to 3 concurrent requests
       requestInterval: 2000 // Wait 2 seconds between requests
     };
+  }
+
+  // NEW: Phase 1 - Query Classification System (Optimized)
+  async classifyQuery(projectName: string, tokenSymbol?: string, contractAddress?: string): Promise<QueryClassification> {
+    console.log(`🔍 Classifying query: ${projectName} (${tokenSymbol || 'no token'})`);
+    
+    // Check cache first
+    const cacheKey = `${projectName.toLowerCase()}_${tokenSymbol?.toLowerCase() || 'none'}`;
+    if (this.queryClassificationCache.has(cacheKey)) {
+      console.log(`⚡ Using cached classification for: ${projectName}`);
+      return this.queryClassificationCache.get(cacheKey)!;
+    }
+    
+    // Quick classification for known simple cases
+    const quickClassification = this.quickClassifyQuery(projectName, tokenSymbol);
+    if (quickClassification) {
+      console.log(`⚡ Quick classification: ${quickClassification.recommendedApproach}`);
+      this.queryClassificationCache.set(cacheKey, quickClassification);
+      return quickClassification;
+    }
+    
+    const prompt = `You are an expert at classifying research queries for a Web3/Gaming project analysis system.
+
+PROJECT: "${projectName}"
+TOKEN SYMBOL: "${tokenSymbol || 'None'}"
+CONTRACT ADDRESS: "${contractAddress || 'None'}"
+
+Your task is to classify this query and determine the best research approach:
+
+1. **COMPLEXITY ASSESSMENT**:
+   - Simple: Well-known projects, clear token symbols, established data sources
+   - Complex: New projects, unclear tokens, multiple chains, limited data sources
+   - Unknown: Insufficient information to determine
+
+2. **TOKEN TRANSFORMATION NEEDS**:
+   - Does this query need intelligent token transformation? (e.g., "Axie Infinity" → AXS, SLP tokens)
+   - Are there multiple tokens or chains involved?
+   - Is this a Web3 project requiring blockchain data?
+
+3. **PROJECT TYPE CLASSIFICATION**:
+   - web3_game: Blockchain-based games with tokens
+   - traditional_game: Regular games without blockchain
+   - publisher: Game publishing companies
+   - platform: Gaming platforms or marketplaces
+   - unknown: Cannot determine
+
+4. **APPROACH RECOMMENDATION**:
+   - direct_ai: Simple queries that can be answered quickly with Claude's web search
+   - orchestrated: Complex queries requiring multiple data sources and AI orchestration
+   - hybrid: Start with direct AI, fallback to orchestrated if needed
+
+5. **COST AND TIME ESTIMATION**:
+   - Low cost: <$0.01, Medium: $0.01-$0.05, High: >$0.05
+   - Time in seconds for the recommended approach
+
+Return JSON response:
+{
+  "complexity": "simple|complex|unknown",
+  "needsTokenTransformation": true|false,
+  "projectType": "web3_game|traditional_game|publisher|platform|unknown",
+  "confidence": 0.85,
+  "reasoning": "Detailed explanation of classification...",
+  "recommendedApproach": "direct_ai|orchestrated|hybrid",
+  "estimatedCost": "low|medium|high",
+  "estimatedTime": 15
+}
+
+Focus on:
+- Token transformation needs (critical for Web3 projects)
+- Data source availability and complexity
+- Cost and time optimization
+- Accuracy of classification`;
+
+    try {
+      const response = await this.executeWithRetry(
+        async () => {
+          return await this.anthropic.messages.create({
+            model: 'claude-3-5-sonnet-20241022',
+            max_tokens: 1000,
+            temperature: 0.1,
+            messages: [{
+              role: 'user',
+              content: prompt
+            }]
+          });
+        },
+        'classifyQuery'
+      );
+
+      const classification = this.parseQueryClassification(response.content[0].text);
+      console.log(`✅ Query classified: ${classification.recommendedApproach} approach (${classification.complexity} complexity)`);
+      
+      // Cache the result
+      this.queryClassificationCache.set(cacheKey, classification);
+      return classification;
+      
+    } catch (error: any) {
+      console.log(`❌ Query classification failed: ${error.message}`);
+      
+      // Fallback classification
+      const fallbackClassification: QueryClassification = {
+        complexity: 'unknown',
+        needsTokenTransformation: tokenSymbol ? false : true,
+        projectType: 'unknown',
+        confidence: 0.5,
+        reasoning: `Classification failed, using fallback`,
+        recommendedApproach: 'orchestrated',
+        estimatedCost: 'medium',
+        estimatedTime: 45
+      };
+      
+      // Cache the fallback result
+      this.queryClassificationCache.set(cacheKey, fallbackClassification);
+      return fallbackClassification;
+    }
+  }
+
+  // NEW: Quick classification for known simple cases
+  private quickClassifyQuery(projectName: string, tokenSymbol?: string): QueryClassification | null {
+    const name = projectName.toLowerCase();
+    
+    // Known simple cases that don't need AI classification
+    const simpleCases = [
+      'bitcoin', 'btc', 'ethereum', 'eth', 'cardano', 'ada',
+      'solana', 'sol', 'polkadot', 'dot', 'chainlink', 'link',
+      'litecoin', 'ltc', 'ripple', 'xrp', 'stellar', 'xlm'
+    ];
+    
+    if (simpleCases.includes(name) || (tokenSymbol && simpleCases.includes(tokenSymbol.toLowerCase()))) {
+      return {
+        complexity: 'simple',
+        needsTokenTransformation: false,
+        projectType: 'web3_game',
+        confidence: 0.95,
+        reasoning: 'Known major cryptocurrency, simple query',
+        recommendedApproach: 'direct_ai',
+        estimatedCost: 'low',
+        estimatedTime: 10
+      };
+    }
+    
+    // Known complex cases that need orchestration
+    const complexCases = [
+      'axie infinity', 'axs', 'slp', 'ronin',
+      'decentraland', 'mana', 'sandbox', 'sand',
+      'illuvium', 'ilv', 'gods unchained', 'gods'
+    ];
+    
+    if (complexCases.includes(name) || (tokenSymbol && complexCases.includes(tokenSymbol.toLowerCase()))) {
+      return {
+        complexity: 'complex',
+        needsTokenTransformation: true,
+        projectType: 'web3_game',
+        confidence: 0.9,
+        reasoning: 'Complex Web3 game with multiple tokens and features',
+        recommendedApproach: 'orchestrated',
+        estimatedCost: 'medium',
+        estimatedTime: 45
+      };
+    }
+    
+    return null; // Let AI classify
+  }
+
+  // NEW: Parse query classification response
+  private parseQueryClassification(aiResponse: string): QueryClassification {
+    try {
+      const jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) throw new Error('No JSON found in AI response');
+      
+      const parsed = JSON.parse(jsonMatch[0]);
+      
+      return {
+        complexity: parsed.complexity || 'unknown',
+        needsTokenTransformation: parsed.needsTokenTransformation || false,
+        projectType: parsed.projectType || 'unknown',
+        confidence: parsed.confidence || 0.5,
+        reasoning: parsed.reasoning || 'No reasoning provided',
+        recommendedApproach: parsed.recommendedApproach || 'orchestrated',
+        estimatedCost: parsed.estimatedCost || 'medium',
+        estimatedTime: parsed.estimatedTime || 30
+      };
+    } catch (error) {
+      console.error('Failed to parse query classification:', error);
+      throw error;
+    }
+  }
+
+  // NEW: Phase 2 - Direct AI Search for Simple Queries (Optimized)
+  async conductDirectAISearch(
+    projectName: string, 
+    tokenSymbol?: string, 
+    contractAddress?: string
+  ): Promise<DirectAISearchResult> {
+    const startTime = Date.now();
+    console.log(`🤖 Starting direct AI search for: ${projectName}`);
+    
+    const prompt = `Analyze "${projectName}" (${tokenSymbol || 'no token'}) using web search. Provide:
+
+1. **BASIC INFO**: What is it? Type? Launch date? Team?
+2. **TECHNICAL**: Blockchain? Tokens? Contract addresses?
+3. **FINANCIAL**: Market cap, price, supply, funding
+4. **COMMUNITY**: Social media, user base, recent news
+5. **ACCESS**: How to play/download, platforms
+6. **ASSESSMENT**: Key strengths, risks, overall rating
+
+Keep it concise but comprehensive. Include specific data and sources.`;
+
+    try {
+      const response = await this.executeWithRetry(
+        async () => {
+          return await this.anthropic.messages.create({
+            model: 'claude-3-5-sonnet-20241022',
+            max_tokens: 1500,
+            temperature: 0.1,
+            messages: [{
+              role: 'user',
+              content: prompt
+            }]
+          });
+        },
+        'conductDirectAISearch'
+      );
+
+      const timeElapsed = (Date.now() - startTime) / 1000;
+      const aiResponse = response.content[0].text;
+      
+      // Estimate cost (rough calculation based on tokens)
+      const estimatedCost = this.estimateDirectAICost(aiResponse.length);
+      
+      // Count data points (rough estimation)
+      const dataPoints = this.countDataPointsFromAIResponse(aiResponse);
+      
+      // Extract sources mentioned in the response
+      const sources = this.extractSourcesFromAIResponse(aiResponse);
+      
+      // Calculate confidence based on response quality
+      const confidence = this.calculateDirectAIConfidence(aiResponse, dataPoints, sources.length);
+      
+      console.log(`✅ Direct AI search completed in ${timeElapsed}s with ${dataPoints} data points`);
+      
+      return {
+        success: true,
+        data: {
+          analysis: aiResponse,
+          projectName,
+          tokenSymbol,
+          contractAddress,
+          searchMethod: 'direct_ai'
+        },
+        confidence,
+        dataPoints,
+        sources,
+        cost: estimatedCost,
+        timeElapsed,
+        limitations: [
+          'Limited to Claude\'s training data and web search capabilities',
+          'May miss specialized blockchain data sources',
+          'No real-time data verification',
+          'Limited access to private APIs and databases'
+        ]
+      };
+      
+    } catch (error: any) {
+      const timeElapsed = (Date.now() - startTime) / 1000;
+      console.log(`❌ Direct AI search failed: ${error.message}`);
+      
+      return {
+        success: false,
+        data: null,
+        confidence: 0,
+        dataPoints: 0,
+        sources: [],
+        cost: 0,
+        timeElapsed,
+        limitations: ['Direct AI search failed', error.message]
+      };
+    }
+  }
+
+  // NEW: Helper methods for direct AI search
+  private estimateDirectAICost(responseLength: number): number {
+    // Rough cost estimation: $0.0073 per 1000 tokens (based on test results)
+    const estimatedTokens = responseLength * 1.3; // Rough token estimation
+    return (estimatedTokens / 1000) * 0.0073;
+  }
+
+  private countDataPointsFromAIResponse(response: string): number {
+    // Count meaningful data points in AI response
+    const numbers = (response.match(/\d+/g) || []).length;
+    const urls = (response.match(/https?:\/\/[^\s]+/g) || []).length;
+    const tokens = (response.match(/\b[A-Z]{2,10}\b/g) || []).length;
+    const addresses = (response.match(/0x[a-fA-F0-9]{40}/g) || []).length;
+    
+    return numbers + urls + tokens + addresses;
+  }
+
+  private extractSourcesFromAIResponse(response: string): string[] {
+    const sources: string[] = [];
+    
+    // Extract URLs
+    const urls = response.match(/https?:\/\/[^\s]+/g) || [];
+    sources.push(...urls);
+    
+    // Extract common source mentions
+    const sourcePatterns = [
+      /(?:from|via|source:)\s+([A-Za-z0-9\s]+\.(?:com|org|io|net))/gi,
+      /(?:according to|per)\s+([A-Za-z0-9\s]+)/gi
+    ];
+    
+    for (const pattern of sourcePatterns) {
+      const matches = response.match(pattern);
+      if (matches) {
+        sources.push(...matches.map(m => m.replace(/(?:from|via|source:|according to|per)\s+/i, '')));
+      }
+    }
+    
+    return [...new Set(sources)]; // Remove duplicates
+  }
+
+  private calculateDirectAIConfidence(response: string, dataPoints: number, sourceCount: number): number {
+    // Calculate confidence based on response quality indicators
+    let confidence = 0.5; // Base confidence
+    
+    // Data points bonus
+    if (dataPoints > 50) confidence += 0.2;
+    else if (dataPoints > 20) confidence += 0.1;
+    
+    // Source count bonus
+    if (sourceCount > 5) confidence += 0.15;
+    else if (sourceCount > 2) confidence += 0.1;
+    
+    // Response length bonus
+    if (response.length > 2000) confidence += 0.1;
+    else if (response.length > 1000) confidence += 0.05;
+    
+    // Specific data indicators
+    if (response.includes('market cap') || response.includes('$')) confidence += 0.05;
+    if (response.includes('blockchain') || response.includes('token')) confidence += 0.05;
+    if (response.includes('team') || response.includes('founder')) confidence += 0.05;
+    
+    return Math.min(confidence, 0.95); // Cap at 95%
+  }
+
+  // NEW: Phase 3 - Hybrid Dynamic Search (Main Method)
+  async conductHybridDynamicSearch(
+    projectName: string,
+    tokenSymbol?: string,
+    contractAddress?: string,
+    basicInfo?: BasicProjectInfo,
+    dataCollectionFunctions?: DataCollectionFunctions
+  ): Promise<{
+    success: boolean;
+    approach: 'direct_ai' | 'orchestrated' | 'hybrid';
+    data: any;
+    confidence: number;
+    dataPoints: number;
+    cost: number;
+    timeElapsed: number;
+    classification?: QueryClassification;
+    directAIResult?: DirectAISearchResult;
+    orchestratedResult?: any;
+    reasoning: string;
+  }> {
+    const startTime = Date.now();
+    console.log(`🚀 Starting hybrid dynamic search for: ${projectName}`);
+    
+    try {
+      // Step 1: Query Classification
+      console.log(`🔍 Step 1: Classifying query...`);
+      const classification = await this.classifyQuery(projectName, tokenSymbol, contractAddress);
+      
+      // Step 2: Route based on classification
+      console.log(`🛣️ Step 2: Routing to ${classification.recommendedApproach} approach...`);
+      
+      switch (classification.recommendedApproach) {
+        case 'direct_ai':
+          return await this.handleDirectAIApproach(projectName, classification, startTime, tokenSymbol, contractAddress);
+          
+        case 'orchestrated':
+          return await this.handleOrchestratedApproach(projectName, basicInfo, dataCollectionFunctions, classification, startTime);
+          
+        case 'hybrid':
+          return await this.handleHybridApproach(projectName, tokenSymbol, contractAddress, basicInfo, dataCollectionFunctions, classification, startTime);
+          
+        default:
+          // Fallback to orchestrated
+          console.log(`⚠️ Unknown approach, falling back to orchestrated`);
+          return await this.handleOrchestratedApproach(projectName, basicInfo, dataCollectionFunctions, classification, startTime);
+      }
+      
+    } catch (error: any) {
+      const timeElapsed = (Date.now() - startTime) / 1000;
+      console.log(`❌ Hybrid search failed: ${error.message}`);
+      
+      return {
+        success: false,
+        approach: 'orchestrated',
+        data: null,
+        confidence: 0,
+        dataPoints: 0,
+        cost: 0,
+        timeElapsed,
+        reasoning: `Hybrid search failed: ${error.message}`
+      };
+    }
+  }
+
+  // NEW: Handle direct AI approach
+  private async handleDirectAIApproach(
+    projectName: string,
+    classification: QueryClassification,
+    startTime: number,
+    tokenSymbol?: string,
+    contractAddress?: string
+  ): Promise<any> {
+    console.log(`🤖 Using direct AI approach for simple query`);
+    
+    const directAIResult = await this.conductDirectAISearch(projectName, tokenSymbol, contractAddress);
+    const timeElapsed = (Date.now() - startTime) / 1000;
+    
+    if (directAIResult.success) {
+      console.log(`✅ Direct AI approach successful`);
+      return {
+        success: true,
+        approach: 'direct_ai' as const,
+        data: directAIResult.data,
+        confidence: directAIResult.confidence,
+        dataPoints: directAIResult.dataPoints,
+        cost: directAIResult.cost,
+        timeElapsed,
+        classification,
+        directAIResult,
+        reasoning: `Direct AI approach successful with ${directAIResult.dataPoints} data points`
+      };
+    } else {
+      console.log(`❌ Direct AI approach failed, this should not happen for simple queries`);
+      return {
+        success: false,
+        approach: 'direct_ai' as const,
+        data: null,
+        confidence: 0,
+        dataPoints: 0,
+        cost: 0,
+        timeElapsed,
+        classification,
+        directAIResult,
+        reasoning: `Direct AI approach failed: ${directAIResult.limitations.join(', ')}`
+      };
+    }
+  }
+
+  // NEW: Handle orchestrated approach
+  private async handleOrchestratedApproach(
+    projectName: string,
+    basicInfo?: BasicProjectInfo,
+    dataCollectionFunctions?: DataCollectionFunctions,
+    classification?: QueryClassification,
+    startTime?: number
+  ): Promise<any> {
+    console.log(`🎼 Using orchestrated approach for complex query`);
+    
+    const orchestratedResult = await conductAIOrchestratedResearch(
+      projectName,
+      this.anthropic.apiKey || '',
+      basicInfo,
+      dataCollectionFunctions
+    );
+    
+    const timeElapsed = startTime ? (Date.now() - startTime) / 1000 : 0;
+    
+    if (orchestratedResult.success) {
+      console.log(`✅ Orchestrated approach successful`);
+      return {
+        success: true,
+        approach: 'orchestrated' as const,
+        data: orchestratedResult,
+        confidence: orchestratedResult.confidence || 0.7,
+        dataPoints: Object.values(orchestratedResult.findings || {}).reduce((sum: number, finding: any) => sum + (finding?.dataPoints || 0), 0),
+        cost: 0.05, // Estimated cost for orchestrated approach
+        timeElapsed,
+        classification,
+        orchestratedResult,
+        reasoning: `Orchestrated approach successful with comprehensive data collection`
+      };
+    } else {
+      console.log(`❌ Orchestrated approach failed`);
+      return {
+        success: false,
+        approach: 'orchestrated' as const,
+        data: null,
+        confidence: 0,
+        dataPoints: 0,
+        cost: 0,
+        timeElapsed,
+        classification,
+        orchestratedResult,
+        reasoning: `Orchestrated approach failed: ${orchestratedResult.reason}`
+      };
+    }
+  }
+
+  // NEW: Handle hybrid approach
+  private async handleHybridApproach(
+    projectName: string,
+    tokenSymbol?: string,
+    contractAddress?: string,
+    basicInfo?: BasicProjectInfo,
+    dataCollectionFunctions?: DataCollectionFunctions,
+    classification?: QueryClassification,
+    startTime?: number
+  ): Promise<any> {
+    console.log(`🔄 Using hybrid approach - starting with direct AI`);
+    
+    // Step 1: Try direct AI first
+    const directAIResult = await this.conductDirectAISearch(projectName, tokenSymbol, contractAddress);
+    
+    // Step 2: Evaluate if direct AI is sufficient
+    const isDirectAISufficient = this.evaluateDirectAISufficiency(directAIResult, classification);
+    
+    if (isDirectAISufficient) {
+      console.log(`✅ Direct AI sufficient, using direct AI result`);
+      const timeElapsed = startTime ? (Date.now() - startTime) / 1000 : 0;
+      
+      return {
+        success: true,
+        approach: 'hybrid' as const,
+        data: directAIResult.data,
+        confidence: directAIResult.confidence,
+        dataPoints: directAIResult.dataPoints,
+        cost: directAIResult.cost,
+        timeElapsed,
+        classification,
+        directAIResult,
+        reasoning: `Hybrid approach: Direct AI provided sufficient data`
+      };
+    } else {
+      console.log(`⚠️ Direct AI insufficient, falling back to orchestrated approach`);
+      
+      // Step 3: Fallback to orchestrated approach
+      const orchestratedResult = await this.handleOrchestratedApproach(
+        projectName,
+        basicInfo,
+        dataCollectionFunctions,
+        classification,
+        startTime
+      );
+      
+      return {
+        ...orchestratedResult,
+        approach: 'hybrid' as const,
+        directAIResult,
+        reasoning: `Hybrid approach: Direct AI insufficient, used orchestrated fallback`
+      };
+    }
+  }
+
+  // NEW: Evaluate if direct AI result is sufficient
+  private evaluateDirectAISufficiency(directAIResult: DirectAISearchResult, classification?: QueryClassification): boolean {
+    if (!directAIResult.success) return false;
+    
+    // Check confidence threshold
+    if (directAIResult.confidence < 0.7) return false;
+    
+    // Check data points threshold
+    if (directAIResult.dataPoints < 30) return false;
+    
+    // Check if it needs token transformation but didn't get it
+    if (classification?.needsTokenTransformation) {
+      const hasTokenData = directAIResult.data?.analysis?.includes('token') || 
+                          directAIResult.data?.analysis?.includes('AXS') ||
+                          directAIResult.data?.analysis?.includes('SLP');
+      if (!hasTokenData) return false;
+    }
+    
+    // Check source diversity
+    if (directAIResult.sources.length < 3) return false;
+    
+    return true;
   }
 
   // Phase 1: Generate initial research strategy
@@ -2998,6 +3622,304 @@ Be thorough but only include verified, official sources.`;
       }
     }
   }
+
+  // NEW: Batch processing methods
+  async processBatchQueries(
+    queries: BatchQueryRequest[],
+    config: Partial<BatchProcessingConfig> = {}
+  ): Promise<BatchProcessingResult> {
+    const batchConfig: BatchProcessingConfig = {
+      maxConcurrentQueries: 3,
+      maxBatchSize: 10,
+      enableParallelClassification: true,
+      enableParallelDataCollection: true,
+      costOptimization: true,
+      timeOptimization: true,
+      retryFailedQueries: true,
+      maxRetries: 2,
+      ...config
+    };
+
+    console.log(`🚀 Starting batch processing for ${queries.length} queries`);
+    const startTime = Date.now();
+    const results: BatchQueryResult[] = [];
+    const errors: string[] = [];
+
+    // Limit batch size
+    const limitedQueries = queries.slice(0, batchConfig.maxBatchSize);
+    
+    // Step 1: Parallel query classification (if enabled)
+    let classifications: Map<string, QueryClassification> = new Map();
+    if (batchConfig.enableParallelClassification) {
+      console.log(`🔍 Performing parallel query classification...`);
+      const classificationStart = Date.now();
+      
+      const classificationPromises = limitedQueries.map(async (query) => {
+        try {
+          const classification = await this.classifyQuery(query.projectName);
+          return { projectName: query.projectName, classification };
+        } catch (error) {
+          console.error(`❌ Classification failed for ${query.projectName}:`, error);
+          return { projectName: query.projectName, classification: null };
+        }
+      });
+
+      const classificationResults = await Promise.allSettled(classificationPromises);
+      classificationResults.forEach((result, index) => {
+        if (result.status === 'fulfilled' && result.value.classification) {
+          classifications.set(result.value.projectName, result.value.classification);
+        } else {
+          console.warn(`⚠️ Classification failed for ${limitedQueries[index].projectName}`);
+        }
+      });
+
+      const classificationTime = Date.now() - classificationStart;
+      console.log(`✅ Parallel classification completed in ${classificationTime}ms`);
+    }
+
+    // Step 2: Process queries with concurrency control
+    console.log(`🔄 Processing queries with max ${batchConfig.maxConcurrentQueries} concurrent...`);
+    
+    const processQuery = async (query: BatchQueryRequest): Promise<BatchQueryResult> => {
+      const queryStart = Date.now();
+      
+      try {
+        // Get classification if available
+        const classification = classifications.get(query.projectName);
+        
+        // Use hybrid search with classification
+        const result = await this.conductHybridDynamicSearch(
+          query.projectName
+        );
+
+        return {
+          projectName: query.projectName,
+          success: result.success,
+          result: result,
+          timeElapsed: Date.now() - queryStart,
+          cost: result.cost || 0,
+          confidence: result.confidence || 0,
+          approach: result.approach || 'unknown'
+        };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        console.error(`❌ Query failed for ${query.projectName}:`, errorMessage);
+        
+        return {
+          projectName: query.projectName,
+          success: false,
+          error: errorMessage,
+          timeElapsed: Date.now() - queryStart,
+          cost: 0,
+          confidence: 0
+        };
+      }
+    };
+
+    // Process queries in batches with concurrency control
+    const batchSize = batchConfig.maxConcurrentQueries;
+    for (let i = 0; i < limitedQueries.length; i += batchSize) {
+      const batch = limitedQueries.slice(i, i + batchSize);
+      console.log(`📦 Processing batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(limitedQueries.length / batchSize)}`);
+      
+      const batchResults = await Promise.allSettled(
+        batch.map(query => processQuery(query))
+      );
+
+      batchResults.forEach((result, index) => {
+        if (result.status === 'fulfilled') {
+          results.push(result.value);
+        } else {
+          const query = batch[index];
+          results.push({
+            projectName: query.projectName,
+            success: false,
+            error: result.reason?.toString() || 'Unknown error',
+            timeElapsed: 0,
+            cost: 0,
+            confidence: 0
+          });
+        }
+      });
+
+      // Small delay between batches to respect rate limits
+      if (i + batchSize < limitedQueries.length) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
+
+    // Step 3: Retry failed queries if enabled
+    if (batchConfig.retryFailedQueries) {
+      const failedQueries = results.filter(r => !r.success);
+      if (failedQueries.length > 0) {
+        console.log(`🔄 Retrying ${failedQueries.length} failed queries...`);
+        
+        for (let retry = 1; retry <= batchConfig.maxRetries; retry++) {
+          const retryQueries = failedQueries.map(failed => 
+            limitedQueries.find(q => q.projectName === failed.projectName)
+          ).filter(Boolean) as BatchQueryRequest[];
+
+          if (retryQueries.length === 0) break;
+
+          console.log(`🔄 Retry attempt ${retry}/${batchConfig.maxRetries} for ${retryQueries.length} queries`);
+          
+          const retryResults = await Promise.allSettled(
+            retryQueries.map(query => processQuery(query))
+          );
+
+          // Update results with successful retries
+          retryResults.forEach((result, index) => {
+            if (result.status === 'fulfilled' && result.value.success) {
+              const originalIndex = results.findIndex(r => r.projectName === result.value.projectName);
+              if (originalIndex !== -1) {
+                results[originalIndex] = result.value;
+              }
+            }
+          });
+
+          // Remove successful retries from failed list
+          const successfulRetries = retryResults
+            .filter((r, i) => r.status === 'fulfilled' && r.value.success)
+            .map((r, i) => retryQueries[i].projectName);
+          
+          failedQueries.splice(0, failedQueries.length, 
+            ...failedQueries.filter(f => !successfulRetries.includes(f.projectName))
+          );
+
+          if (failedQueries.length === 0) break;
+          
+          // Wait before next retry
+          await new Promise(resolve => setTimeout(resolve, 2000 * retry));
+        }
+      }
+    }
+
+    // Step 4: Calculate summary
+    const totalTime = Date.now() - startTime;
+    const successful = results.filter(r => r.success);
+    const failed = results.filter(r => !r.success);
+    
+    const summary = {
+      total: results.length,
+      successful: successful.length,
+      failed: failed.length,
+      averageTime: results.reduce((sum, r) => sum + r.timeElapsed, 0) / results.length,
+      totalCost: results.reduce((sum, r) => sum + (r.cost || 0), 0),
+      averageConfidence: successful.length > 0 ? 
+        successful.reduce((sum, r) => sum + (r.confidence || 0), 0) / successful.length : 0,
+      performanceMetrics: {
+        parallelClassificationTime: batchConfig.enableParallelClassification ? 
+          (Date.now() - startTime) * 0.1 : 0, // Estimate
+        parallelDataCollectionTime: totalTime * 0.7, // Estimate
+        totalBatchTime: totalTime
+      }
+    };
+
+    console.log(`✅ Batch processing completed in ${totalTime}ms`);
+    console.log(`📊 Summary: ${summary.successful}/${summary.total} successful, ${summary.averageTime.toFixed(0)}ms avg time`);
+
+    return {
+      results,
+      summary,
+      errors
+    };
+  }
+
+  // NEW: Smart batch optimization
+  async optimizeBatchForSpeed(queries: BatchQueryRequest[]): Promise<BatchQueryRequest[]> {
+    console.log(`⚡ Optimizing batch for speed...`);
+    
+    // Sort by expected complexity (simple first for faster processing)
+    const optimized = [...queries].sort((a, b) => {
+      const complexityOrder = { simple: 0, unknown: 1, complex: 2 };
+      const aOrder = complexityOrder[a.expectedComplexity || 'unknown'];
+      const bOrder = complexityOrder[b.expectedComplexity || 'unknown'];
+      return aOrder - bOrder;
+    });
+
+    // Prioritize high priority queries
+    optimized.sort((a, b) => {
+      const priorityOrder = { high: 0, medium: 1, low: 2 };
+      return priorityOrder[a.priority] - priorityOrder[b.priority];
+    });
+
+    console.log(`✅ Batch optimized: ${optimized.length} queries`);
+    return optimized;
+  }
+
+  // NEW: Cost-optimized batch processing
+  async processBatchWithCostOptimization(
+    queries: BatchQueryRequest[],
+    maxTotalCost: number = 0.50 // $0.50 default limit
+  ): Promise<BatchProcessingResult> {
+    console.log(`💰 Processing batch with cost optimization (max: $${maxTotalCost})`);
+    
+    const config: Partial<BatchProcessingConfig> = {
+      maxConcurrentQueries: 2, // Lower concurrency for cost control
+      costOptimization: true,
+      timeOptimization: false, // Prioritize cost over speed
+      retryFailedQueries: false // No retries to save cost
+    };
+
+    // Start with simple queries first
+    const optimizedQueries = await this.optimizeBatchForSpeed(queries);
+    
+    // Process queries and track cost
+    let currentCost = 0;
+    const processedQueries: BatchQueryRequest[] = [];
+    const results: BatchQueryResult[] = [];
+
+    for (const query of optimizedQueries) {
+      if (currentCost >= maxTotalCost) {
+        console.log(`💰 Cost limit reached ($${currentCost.toFixed(4)}), stopping batch`);
+        break;
+      }
+
+      try {
+        const result = await this.conductHybridDynamicSearch(query.projectName);
+        const queryCost = result.cost || 0;
+        
+        if (currentCost + queryCost <= maxTotalCost) {
+          results.push({
+            projectName: query.projectName,
+            success: result.success,
+            result: result,
+            timeElapsed: 0, // Will be calculated
+            cost: queryCost,
+            confidence: result.confidence || 0,
+            approach: result.approach || 'unknown'
+          });
+          currentCost += queryCost;
+          processedQueries.push(query);
+        } else {
+          console.log(`💰 Skipping ${query.projectName} - would exceed cost limit`);
+        }
+      } catch (error) {
+        console.error(`❌ Error processing ${query.projectName}:`, error);
+      }
+    }
+
+    const summary = {
+      total: processedQueries.length,
+      successful: results.filter(r => r.success).length,
+      failed: results.filter(r => !r.success).length,
+      averageTime: 0,
+      totalCost: currentCost,
+      averageConfidence: results.filter(r => r.success).length > 0 ? 
+        results.filter(r => r.success).reduce((sum, r) => sum + (r.confidence || 0), 0) / results.filter(r => r.success).length : 0,
+      performanceMetrics: {
+        parallelClassificationTime: 0,
+        parallelDataCollectionTime: 0,
+        totalBatchTime: 0
+      }
+    };
+
+    return {
+      results,
+      summary,
+      errors: []
+    };
+  }
 }
 
 export async function conductAIOrchestratedResearch(
@@ -3568,4 +4490,52 @@ interface TokenDiscoveryResult {
   confidence: number;
   reasoning: string;
   fallbackUsed: boolean;
+}
+
+// NEW: Batch processing interfaces
+interface BatchQueryRequest {
+  projectName: string;
+  priority: 'high' | 'medium' | 'low';
+  expectedComplexity?: 'simple' | 'complex' | 'unknown';
+  customConfig?: Partial<HybridSearchConfig>;
+}
+
+interface BatchQueryResult {
+  projectName: string;
+  success: boolean;
+  result?: any;
+  error?: string;
+  timeElapsed: number;
+  cost?: number;
+  confidence?: number;
+  approach?: 'direct_ai' | 'orchestrated' | 'hybrid';
+}
+
+interface BatchProcessingConfig {
+  maxConcurrentQueries: number;
+  maxBatchSize: number;
+  enableParallelClassification: boolean;
+  enableParallelDataCollection: boolean;
+  costOptimization: boolean;
+  timeOptimization: boolean;
+  retryFailedQueries: boolean;
+  maxRetries: number;
+}
+
+interface BatchProcessingResult {
+  results: BatchQueryResult[];
+  summary: {
+    total: number;
+    successful: number;
+    failed: number;
+    averageTime: number;
+    totalCost: number;
+    averageConfidence: number;
+    performanceMetrics: {
+      parallelClassificationTime: number;
+      parallelDataCollectionTime: number;
+      totalBatchTime: number;
+    };
+  };
+  errors: string[];
 }

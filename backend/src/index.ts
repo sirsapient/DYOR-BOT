@@ -13,6 +13,7 @@ import { ResearchScoringEngine, mapDataToFindings } from './research-scoring';
 import { QualityGatesEngine, formatQualityGateResponse, ProjectType } from './quality-gates';
 import { generateConfidenceMetrics, ConfidenceMetrics } from './confidence-indicators';
 import { conductAIOrchestratedResearch, AIResearchOrchestrator } from './ai-research-orchestrator';
+import { GameStoreAPIService } from './game-store-apis';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -1321,6 +1322,47 @@ async function fetchSteamDescription(appid: string): Promise<string> {
   return '';
 }
 
+async function fetchGameStoreData(gameName: string): Promise<any> {
+  try {
+    console.log(`🎮 Fetching game store data for: ${gameName}`);
+    
+    const gameStoreService = GameStoreAPIService.getInstance();
+    const gameStoreResults = await gameStoreService.searchGame(gameName);
+    
+    if (gameStoreResults.length === 0) {
+      console.log(`❌ No game store data found for: ${gameName}`);
+      return null;
+    }
+    
+    // Extract and format game information
+    const gameInfo = gameStoreService.extractGameInfo(gameStoreResults);
+    
+    console.log(`✅ Found game store data for: ${gameName}`);
+    console.log(`📊 Platforms: ${gameInfo.platformAvailability || 'None'}`);
+    console.log(`📊 Genre: ${gameInfo.gameGenre || 'None'}`);
+    console.log(`📊 Download links: ${gameInfo.downloadLinks?.length || 0}`);
+    
+    return {
+      success: true,
+      gameInfo,
+      rawResults: gameStoreResults,
+      platforms: gameStoreResults.map((r: any) => r.platform),
+      totalResults: gameStoreResults.length
+    };
+    
+  } catch (error) {
+    console.error(`❌ Game store data fetch failed for "${gameName}":`, error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      gameInfo: null,
+      rawResults: [],
+      platforms: [],
+      totalResults: 0
+    };
+  }
+}
+
 async function fetchWebsiteAboutSection(url: string): Promise<string> {
   try {
     console.log(`🌐 Fetching website content from: ${url}`);
@@ -2131,13 +2173,17 @@ app.post('/api/research', async (req: any, res: any) => {
       return await performTraditionalResearch(req, res);
     }
 
-    console.log(`✅ ANTHROPIC_API_KEY found, proceeding with AI orchestration`);
-    console.log(`🤖 Starting AI-orchestrated research for: ${projectName}`);
+    console.log(`✅ ANTHROPIC_API_KEY found, proceeding with hybrid dynamic search`);
+    console.log(`🚀 Starting hybrid dynamic search for: ${projectName}`);
 
-    // Use AI orchestrator for research planning and execution
-    const aiResult = await conductAIOrchestratedResearch(
+    // Create AI orchestrator instance for hybrid search
+    const orchestrator = new AIResearchOrchestrator(anthropicApiKey);
+    
+    // Use hybrid dynamic search (Phase 3 implementation)
+    const hybridResult = await orchestrator.conductHybridDynamicSearch(
       projectName,
-      anthropicApiKey,
+      tokenSymbol,
+      contractAddress,
       {
         name: projectName,
         aliases: tokenSymbol ? [projectName, tokenSymbol] : [projectName],
@@ -2152,6 +2198,11 @@ app.post('/api/research', async (req: any, res: any) => {
         extractTokenomicsFromWhitepaper,
         searchProjectSpecificTokenomics,
         fetchTwitterProfileAndTweets,
+        fetchEnhancedTwitterData,
+        fetchDiscordServerData,
+        fetchRedditCommunityData,
+        fetchRedditRecentPosts,
+        discoverSocialMediaLinks,
         fetchSteamDescription,
         fetchWebsiteAboutSection,
         fetchRoninTokenData,
@@ -2162,6 +2213,19 @@ app.post('/api/research', async (req: any, res: any) => {
         getFinancialDataFromAlternativeSources
       }
     );
+
+    console.log(`🚀 Hybrid search completed for ${projectName}`);
+    console.log(`📊 Approach used: ${hybridResult.approach}`);
+    console.log(`📊 Success: ${hybridResult.success}`);
+    console.log(`📊 Data points: ${hybridResult.dataPoints}`);
+    console.log(`📊 Cost: $${hybridResult.cost.toFixed(4)}`);
+    console.log(`📊 Time: ${hybridResult.timeElapsed.toFixed(1)}s`);
+    console.log(`📊 Reasoning: ${hybridResult.reasoning}`);
+
+    // Transform hybrid result to match expected response format
+    const aiResult = hybridResult.approach === 'direct_ai' ? 
+      transformDirectAIResultToOrchestratedFormat(hybridResult) :
+      hybridResult.data; // orchestrated result is already in correct format
 
     console.log(`🤖 AI orchestration completed for ${projectName}`);
     console.log(`📊 AI Result success: ${aiResult.success}`);
@@ -2349,6 +2413,11 @@ app.post('/api/research-enhanced', async (req: any, res: any) => {
       extractTokenomicsFromWhitepaper,
       searchProjectSpecificTokenomics,
       fetchTwitterProfileAndTweets,
+      fetchEnhancedTwitterData,
+      fetchDiscordServerData,
+      fetchRedditCommunityData,
+      fetchRedditRecentPosts,
+      discoverSocialMediaLinks,
       fetchSteamDescription,
       fetchWebsiteAboutSection,
       fetchRoninTokenData,
@@ -2356,7 +2425,8 @@ app.post('/api/research-enhanced', async (req: any, res: any) => {
       discoverOfficialUrlsWithAI,
       findOfficialSourcesForEstablishedProject,
       searchContractAddressWithLLM,
-      getFinancialDataFromAlternativeSources
+      getFinancialDataFromAlternativeSources,
+      fetchGameStoreData
     };
 
     // Conduct enhanced research
@@ -2471,6 +2541,95 @@ app.post('/api/research-feedback', async (req: any, res: any) => {
   }
 });
 
+// NEW: Hybrid Dynamic Search endpoint for testing
+app.post('/api/research-hybrid', async (req: any, res: any) => {
+  console.log(`\n🚀 HYBRID DYNAMIC SEARCH REQUEST RECEIVED`);
+  console.log(`📝 Project: ${req.body.projectName}`);
+  console.log(`🔑 Token Symbol: ${req.body.tokenSymbol || 'None'}`);
+  console.log(`📄 Contract Address: ${req.body.contractAddress || 'None'}`);
+  
+  const { projectName, tokenSymbol, contractAddress } = req.body;
+  if (!projectName) {
+    console.log(`❌ ERROR: Missing projectName in request`);
+    return res.status(400).json({ error: 'Missing projectName' });
+  }
+
+  try {
+    // Check if we have the required API key
+    const anthropicApiKey = process.env.ANTHROPIC_API_KEY;
+    if (!anthropicApiKey) {
+      console.log(`❌ ANTHROPIC_API_KEY not found`);
+      return res.status(500).json({ error: 'ANTHROPIC_API_KEY not configured' });
+    }
+
+    console.log(`🚀 Starting hybrid dynamic search for: ${projectName}`);
+
+    // Create AI orchestrator instance for hybrid search
+    const orchestrator = new AIResearchOrchestrator(anthropicApiKey);
+    
+    // Use hybrid dynamic search
+    const hybridResult = await orchestrator.conductHybridDynamicSearch(
+      projectName,
+      tokenSymbol,
+      contractAddress,
+      {
+        name: projectName,
+        aliases: tokenSymbol ? [projectName, tokenSymbol] : [projectName],
+        contractAddress: contractAddress || undefined,
+        roninContractAddress: undefined,
+      },
+      {
+        // Pass the actual data collection functions
+        fetchWhitepaperUrl,
+        fetchPdfBuffer,
+        extractTokenomicsFromWhitepaper,
+        searchProjectSpecificTokenomics,
+        fetchTwitterProfileAndTweets,
+        fetchEnhancedTwitterData,
+        fetchDiscordServerData,
+        fetchRedditCommunityData,
+        fetchRedditRecentPosts,
+        discoverSocialMediaLinks,
+        fetchSteamDescription,
+        fetchWebsiteAboutSection,
+        fetchRoninTokenData,
+        fetchRoninTransactionHistory,
+        discoverOfficialUrlsWithAI,
+        findOfficialSourcesForEstablishedProject,
+        searchContractAddressWithLLM,
+        getFinancialDataFromAlternativeSources
+      }
+    );
+
+    console.log(`🚀 Hybrid search completed for ${projectName}`);
+    console.log(`📊 Approach used: ${hybridResult.approach}`);
+    console.log(`📊 Success: ${hybridResult.success}`);
+    console.log(`📊 Data points: ${hybridResult.dataPoints}`);
+    console.log(`📊 Cost: $${hybridResult.cost.toFixed(4)}`);
+    console.log(`📊 Time: ${hybridResult.timeElapsed.toFixed(1)}s`);
+    console.log(`📊 Reasoning: ${hybridResult.reasoning}`);
+
+    // Return the hybrid result directly for testing
+    res.json({
+      success: true,
+      hybridResult,
+      metadata: {
+        timestamp: new Date().toISOString(),
+        version: '1.0.0',
+        approach: hybridResult.approach
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Error in hybrid dynamic search:', error);
+    res.status(500).json({ 
+      error: 'Hybrid search failed', 
+      message: 'Dynamic search encountered an error. Please try again.',
+      details: (error as Error).message 
+    });
+  }
+});
+
 // NEW: Cache management endpoint
 app.get('/api/cache-status', async (req: any, res: any) => {
   try {
@@ -2498,6 +2657,85 @@ app.get('/api/cache-status', async (req: any, res: any) => {
     res.status(500).json({ 
       error: 'Cache status check failed', 
       details: (error as Error).message 
+    });
+  }
+});
+
+// NEW: Batch processing endpoints
+app.post('/api/research-batch', async (req: any, res: any) => {
+  try {
+    const { queries, config } = req.body;
+    
+    if (!queries || !Array.isArray(queries) || queries.length === 0) {
+      return res.status(400).json({ error: 'Queries array is required and must not be empty' });
+    }
+
+    console.log(`🚀 Batch research request for ${queries.length} projects`);
+    
+    const orchestrator = new AIResearchOrchestrator(process.env.ANTHROPIC_API_KEY || '');
+    const batchResult = await orchestrator.processBatchQueries(queries, config);
+    
+    console.log(`✅ Batch research completed`);
+    console.log(`📊 Summary: ${batchResult.summary.successful}/${batchResult.summary.total} successful`);
+    
+    res.json({
+      success: true,
+      data: batchResult,
+      summary: batchResult.summary
+    });
+    
+  } catch (error: any) {
+    console.error('❌ Batch research error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message,
+      summary: {
+        total: 0,
+        successful: 0,
+        failed: 0,
+        averageTime: 0,
+        totalCost: 0,
+        averageConfidence: 0
+      }
+    });
+  }
+});
+
+app.post('/api/research-batch-cost-optimized', async (req: any, res: any) => {
+  try {
+    const { queries, maxTotalCost = 0.50 } = req.body;
+    
+    if (!queries || !Array.isArray(queries) || queries.length === 0) {
+      return res.status(400).json({ error: 'Queries array is required and must not be empty' });
+    }
+
+    console.log(`💰 Cost-optimized batch research request for ${queries.length} projects (max: $${maxTotalCost})`);
+    
+    const orchestrator = new AIResearchOrchestrator(process.env.ANTHROPIC_API_KEY || '');
+    const batchResult = await orchestrator.processBatchWithCostOptimization(queries, maxTotalCost);
+    
+    console.log(`✅ Cost-optimized batch research completed`);
+    console.log(`💰 Total cost: $${batchResult.summary.totalCost.toFixed(4)}`);
+    
+    res.json({
+      success: true,
+      data: batchResult,
+      summary: batchResult.summary
+    });
+    
+  } catch (error: any) {
+    console.error('❌ Cost-optimized batch research error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message,
+      summary: {
+        total: 0,
+        successful: 0,
+        failed: 0,
+        averageTime: 0,
+        totalCost: 0,
+        averageConfidence: 0
+      }
     });
   }
 });
@@ -2866,20 +3104,93 @@ async function performTraditionalResearch(req: any, res: any) {
     }
   }
 
-  // --- Discord data fetch ---
+  // --- Enhanced Discord data fetch ---
   if (discordInvite) {
-    try {
-      const discordRes = await fetch(`https://discord.com/api/v10/invites/${discordInvite.split('/').pop()}?with_counts=true`);
-      if (discordRes.ok) {
-        const discordJson = await discordRes.json();
+    const inviteCode = discordInvite.split('/').pop();
+    if (inviteCode) {
+      const enhancedDiscordData = await fetchDiscordServerData(inviteCode);
+      if (enhancedDiscordData.success) {
         discordData = {
-          server_name: discordJson.guild?.name,
-          member_count: discordJson.approximate_member_count,
+          server_name: enhancedDiscordData.server_name,
+          member_count: enhancedDiscordData.member_count,
+          online_count: enhancedDiscordData.online_count,
+          description: enhancedDiscordData.description,
+          verification_level: enhancedDiscordData.verification_level,
+          premium_tier: enhancedDiscordData.premium_tier
         };
         sourcesUsed.push('Discord');
+      } else {
+        discordData = { error: enhancedDiscordData.error };
       }
-    } catch (e) {
-      discordData = { error: 'Discord fetch failed' };
+    }
+  }
+
+  // --- Reddit data fetch ---
+  let redditData = null;
+  let redditSubreddit = null;
+  
+  // Try to find Reddit community from various sources
+  if (cgData && cgData.links && cgData.links.reddit_url && Array.isArray(cgData.links.reddit_url)) {
+    const redditUrl = cgData.links.reddit_url.find((u: string) => u && /reddit\.com\/r\//i.test(u));
+    if (redditUrl) {
+      const match = redditUrl.match(/reddit\.com\/r\/([a-zA-Z0-9_]+)/i);
+      if (match) {
+        redditSubreddit = match[1];
+      }
+    }
+  }
+  
+  // If not found in CoinGecko, try common variations
+  if (!redditSubreddit) {
+    const variations = [
+      projectName.toLowerCase().replace(/\s+/g, ''),
+      projectName.toLowerCase().replace(/\s+/g, '_'),
+      projectName.toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9]/g, ''),
+      projectName.toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9]/g, '') + 'token'
+    ];
+    
+    // Test each variation
+    for (const variation of variations) {
+      const testData = await fetchRedditCommunityData(variation);
+      if (testData.success) {
+        redditSubreddit = variation;
+        redditData = testData;
+        break;
+      }
+    }
+  } else {
+    // Fetch data for the found subreddit
+    redditData = await fetchRedditCommunityData(redditSubreddit);
+  }
+  
+  if (redditData && redditData.success) {
+    redditSummary = `r/${redditData.name}: ${redditData.subscribers?.toLocaleString() || 'Unknown'} members`;
+    sourcesUsed.push('Reddit');
+  }
+
+  // --- Enhanced Twitter data fetch ---
+  let twitterData = null;
+  let twitterHandle = null;
+  
+  // Try to find Twitter handle from various sources
+  if (cgData && cgData.links && cgData.links.twitter_screen_name) {
+    twitterHandle = cgData.links.twitter_screen_name;
+  } else if (cgData && cgData.links && cgData.links.repos_url && Array.isArray(cgData.links.repos_url)) {
+    // Try to extract from website content
+    const websiteContent = await fetchWebsiteAboutSection(homepageUrls[0] || '');
+    if (websiteContent) {
+      const twitterMatch = websiteContent.match(/(?:https?:\/\/)?(?:www\.)?(?:twitter\.com|x\.com)\/([a-zA-Z0-9_]+)/i);
+      if (twitterMatch) {
+        twitterHandle = twitterMatch[1];
+      }
+    }
+  }
+  
+  if (twitterHandle) {
+    twitterData = await fetchEnhancedTwitterData(twitterHandle);
+    if (twitterData && twitterData.success) {
+      twitterSummary = `@${twitterHandle}: ${twitterData.followers || 'Unknown'} followers`;
+      sourcesUsed.push('Twitter');
     }
   }
 
@@ -3516,6 +3827,342 @@ app.use((error: any, req: any, res: any, next: any) => {
   });
 });
 
+// NEW: Transform direct AI result to orchestrated format
+function transformDirectAIResultToOrchestratedFormat(hybridResult: any): any {
+  console.log(`🔄 Transforming direct AI result to orchestrated format`);
+  
+  // Create a mock orchestrated result structure from direct AI data
+  return {
+    success: hybridResult.success,
+    reason: hybridResult.reasoning,
+    findings: {
+      direct_ai_analysis: {
+        found: true,
+        data: hybridResult.data,
+        quality: 'high' as const,
+        timestamp: new Date(),
+        dataPoints: hybridResult.dataPoints
+      }
+    },
+    confidence: hybridResult.confidence,
+    completeness: 'Available',
+    meta: 'Available',
+    approach: hybridResult.approach,
+    cost: hybridResult.cost,
+    timeElapsed: hybridResult.timeElapsed
+  };
+}
+
 app.listen(PORT, () => {
   console.log(`🚀 DYOR BOT API server running on port ${PORT}`);
+});
+
+// Enhanced Community Data Collection Functions
+async function fetchDiscordServerData(inviteCode: string): Promise<any> {
+  try {
+    console.log(`🎮 Fetching Discord server data for: ${inviteCode}`);
+    
+    const response = await fetch(`https://discord.com/api/v10/invites/${inviteCode}?with_counts=true`, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      }
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      return {
+        server_name: data.guild?.name || 'Unknown',
+        member_count: data.approximate_member_count || 0,
+        online_count: data.approximate_presence_count || 0,
+        description: data.guild?.description || '',
+        verification_level: data.guild?.verification_level || 'unknown',
+        premium_tier: data.guild?.premium_tier || 0,
+        vanity_url_code: data.guild?.vanity_url_code || null,
+        features: data.guild?.features || [],
+        success: true
+      };
+    } else {
+      console.log(`❌ Discord API error: ${response.status} ${response.statusText}`);
+      return { success: false, error: `HTTP ${response.status}` };
+    }
+  } catch (error) {
+    console.log(`❌ Discord fetch error: ${error}`);
+    return { success: false, error: (error as Error).message };
+  }
+}
+
+async function fetchRedditCommunityData(subreddit: string): Promise<any> {
+  try {
+    console.log(`📱 Fetching Reddit community data for: r/${subreddit}`);
+    
+    // Use Reddit's JSON API (no authentication required for public data)
+    const response = await fetch(`https://www.reddit.com/r/${subreddit}/about.json`, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      }
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      const subredditData = data.data;
+      
+      if (subredditData) {
+        return {
+          name: subredditData.display_name || subreddit,
+          title: subredditData.title || '',
+          description: subredditData.public_description || '',
+          subscribers: subredditData.subscribers || 0,
+          active_users: subredditData.active_user_count || 0,
+          created_utc: subredditData.created_utc || null,
+          over18: subredditData.over18 || false,
+          url: subredditData.url || `https://reddit.com/r/${subreddit}`,
+          success: true
+        };
+      } else {
+        return { success: false, error: 'Subreddit not found' };
+      }
+    } else {
+      console.log(`❌ Reddit API error: ${response.status} ${response.statusText}`);
+      return { success: false, error: `HTTP ${response.status}` };
+    }
+  } catch (error) {
+    console.log(`❌ Reddit fetch error: ${error}`);
+    return { success: false, error: (error as Error).message };
+  }
+}
+
+async function fetchRedditRecentPosts(subreddit: string, limit: number = 10): Promise<any> {
+  try {
+    console.log(`📱 Fetching recent Reddit posts for: r/${subreddit}`);
+    
+    const response = await fetch(`https://www.reddit.com/r/${subreddit}/hot.json?limit=${limit}`, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      }
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      const posts = data.data?.children || [];
+      
+      return {
+        posts: posts.map((post: any) => ({
+          title: post.data.title || '',
+          author: post.data.author || '',
+          score: post.data.score || 0,
+          comments: post.data.num_comments || 0,
+          created_utc: post.data.created_utc || null,
+          url: post.data.url || '',
+          selftext: post.data.selftext || '',
+          is_self: post.data.is_self || false
+        })),
+        success: true
+      };
+    } else {
+      console.log(`❌ Reddit posts API error: ${response.status} ${response.statusText}`);
+      return { success: false, error: `HTTP ${response.status}` };
+    }
+  } catch (error) {
+    console.log(`❌ Reddit posts fetch error: ${error}`);
+    return { success: false, error: (error as Error).message };
+  }
+}
+
+// Enhanced Twitter data collection with better error handling and fallbacks
+async function fetchEnhancedTwitterData(handle: string): Promise<any> {
+  console.log(`🐦 Fetching enhanced Twitter data for: ${handle}`);
+  
+  // Clean the handle (remove @ if present)
+  const cleanHandle = handle.replace('@', '');
+  
+  // Try Nitter instances first (more reliable for public data)
+  const nitterData = await fetchTwitterProfileAndTweets(cleanHandle);
+  
+  if (nitterData) {
+    return {
+      ...nitterData,
+      source: 'nitter',
+      success: true
+    };
+  }
+  
+  // Fallback: Try to extract basic info from website scraping
+  try {
+    const websiteData = await fetchWebsiteAboutSection(`https://twitter.com/${cleanHandle}`);
+    if (websiteData) {
+      // Extract basic info from the page
+      const followerMatch = websiteData.match(/(\d+(?:,\d+)*)\s*followers/i);
+      const followingMatch = websiteData.match(/(\d+(?:,\d+)*)\s*following/i);
+      
+      return {
+        handle: cleanHandle,
+        followers: followerMatch ? followerMatch[1] : 'Unknown',
+        following: followingMatch ? followingMatch[1] : 'Unknown',
+        bio: 'Data extracted from website',
+        source: 'website_scraping',
+        success: true,
+        limited: true
+      };
+    }
+  } catch (error) {
+    console.log(`❌ Twitter website fallback failed: ${error}`);
+  }
+  
+  return {
+    handle: cleanHandle,
+    success: false,
+    error: 'Unable to fetch Twitter data from any source'
+  };
+}
+
+// Function to discover social media links from various sources
+async function discoverSocialMediaLinks(projectName: string, websiteUrl?: string): Promise<any> {
+  console.log(`🔍 Discovering social media links for: ${projectName}`);
+  
+  const socialLinks: { [key: string]: string | null } = {
+    twitter: null,
+    discord: null,
+    reddit: null,
+    telegram: null,
+    youtube: null
+  };
+  
+  // Common social media patterns
+  const patterns: { [key: string]: RegExp } = {
+    twitter: /(?:https?:\/\/)?(?:www\.)?(?:twitter\.com|x\.com)\/([a-zA-Z0-9_]+)/i,
+    discord: /(?:https?:\/\/)?(?:www\.)?discord\.(?:gg|com)\/([a-zA-Z0-9]+)/i,
+    reddit: /(?:https?:\/\/)?(?:www\.)?reddit\.com\/r\/([a-zA-Z0-9_]+)/i,
+    telegram: /(?:https?:\/\/)?(?:www\.)?t\.me\/([a-zA-Z0-9_]+)/i,
+    youtube: /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/channel\/|youtube\.com\/c\/|youtube\.com\/@)([a-zA-Z0-9_-]+)/i
+  };
+  
+  // Try to extract from website if provided
+  if (websiteUrl) {
+    try {
+      const websiteContent = await fetchWebsiteAboutSection(websiteUrl);
+      if (websiteContent) {
+        Object.keys(patterns).forEach(platform => {
+          const match = websiteContent.match(patterns[platform]);
+          if (match) {
+            socialLinks[platform] = match[0];
+          }
+        });
+      }
+    } catch (error) {
+      console.log(`❌ Website social media extraction failed: ${error}`);
+    }
+  }
+  
+  // Try common variations for the project
+  const variations = [
+    projectName.toLowerCase().replace(/\s+/g, ''),
+    projectName.toLowerCase().replace(/\s+/g, '_'),
+    projectName.toLowerCase().replace(/\s+/g, '-'),
+    projectName.toLowerCase().replace(/[^a-z0-9]/g, ''),
+    projectName.toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9]/g, '')
+  ];
+  
+  // Test common social media URLs
+  const testUrls = {
+    twitter: variations.map(v => `https://twitter.com/${v}`),
+    discord: variations.map(v => `https://discord.gg/${v}`),
+    reddit: variations.map(v => `https://reddit.com/r/${v}`),
+    telegram: variations.map(v => `https://t.me/${v}`)
+  };
+  
+  // For now, return what we found from website scraping
+  // In a full implementation, we'd test each URL to see if it exists
+  return socialLinks;
+}
+
+// Import batch search system
+import { conductBatchSearch } from './batch-search';
+import { steamPlayerCountService } from './steam-player-count';
+
+// Single AI Batch Search Endpoint - Single comprehensive AI call for all data points
+app.post('/api/research-single-batch', async (req: any, res: any) => {
+  try {
+    const { projectName } = req.body;
+    
+    if (!projectName) {
+      return res.status(400).json({ error: 'Project name is required' });
+    }
+    
+    console.log(`🚀 BATCH SEARCH: Starting comprehensive search for ${projectName}`);
+    
+    // Conduct single comprehensive AI search
+    const batchResult = await conductBatchSearch(projectName);
+    
+    console.log(`✅ BATCH SEARCH: Completed for ${projectName} with ${batchResult.totalDataPoints} data points`);
+    
+    res.json(batchResult);
+    
+  } catch (error) {
+    console.error('❌ Batch search failed:', error);
+    res.status(500).json({ 
+      error: 'Batch search failed', 
+      details: error instanceof Error ? error.message : 'Unknown error' 
+    });
+  }
+});
+
+
+
+// Steam Player Count Endpoint - Get real-time player count for Steam games
+app.get('/api/steam-players/:gameName', async (req: any, res: any) => {
+  try {
+    const { gameName } = req.params;
+    
+    if (!gameName) {
+      return res.status(400).json({ error: 'Game name is required' });
+    }
+    
+    console.log(`🎮 STEAM PLAYERS: Fetching player count for ${gameName}`);
+    
+    const playerData = await steamPlayerCountService.getPlayerCount(gameName);
+    
+    res.json({
+      success: true,
+      data: playerData
+    });
+    
+  } catch (error) {
+    console.error('❌ Steam player count failed:', error);
+    res.status(500).json({ 
+      error: 'Steam player count failed', 
+      details: error instanceof Error ? error.message : 'Unknown error' 
+    });
+  }
+});
+
+// Steam Games Search Endpoint - Search available Steam games
+app.get('/api/steam-games/search', async (req: any, res: any) => {
+  try {
+    const { query } = req.query;
+    
+    if (!query) {
+      return res.status(400).json({ error: 'Search query is required' });
+    }
+    
+    console.log(`🎮 STEAM GAMES: Searching for ${query}`);
+    
+    const games = steamPlayerCountService.searchGames(query as string);
+    
+    res.json({
+      success: true,
+      data: games,
+      count: games.length
+    });
+    
+  } catch (error) {
+    console.error('❌ Steam games search failed:', error);
+    res.status(500).json({ 
+      error: 'Steam games search failed', 
+      details: error instanceof Error ? error.message : 'Unknown error' 
+    });
+  }
+});
+
+app.listen(PORT, () => {
+  console.log(`🚀 DYOR BOT Backend running on port ${PORT}`);
 });

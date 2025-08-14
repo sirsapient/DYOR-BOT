@@ -55,6 +55,11 @@ export interface ProjectResearch {
   discoveredUrls?: { [key: string]: string };
   collectedData?: { [key: string]: any };
   totalDataPoints?: number;
+  // PHASE 2: Enhanced AI Summary and Token/NFT Data
+  enhancedAISummary?: EnhancedAISummary;
+  tokenData?: TokenData[];
+  nftData?: NFTData[];
+  interactiveSources?: InteractiveSource[];
 }
 
 export interface ConfidenceMetrics {
@@ -193,4 +198,52 @@ export interface GameDownloadLink {
   price?: string;
   rating?: number;
   reviews?: number;
+}
+
+// ===== PHASE 2 INTERFACES =====
+
+export interface EnhancedAISummary {
+  executiveSummary: string;
+  projectOverview: string;
+  financialAnalysis: string;
+  teamAssessment: string;
+  technicalEvaluation: string;
+  communityHealth: string;
+  riskAssessment: string;
+  recommendations: string;
+}
+
+export interface TokenData {
+  name: string;
+  symbol: string;
+  contractAddress: string;
+  network: string;
+  totalSupply?: string;
+  decimals?: number;
+  verificationUrl: string;
+  marketCap?: number;
+  price?: number;
+}
+
+export interface NFTData {
+  collectionName: string;
+  marketplace: 'opensea' | 'magiceden' | 'other';
+  collectionUrl: string;
+  floorPrice?: number;
+  floorPriceCurrency?: string;
+  totalSupply?: number;
+  network: 'ethereum' | 'solana' | 'other';
+  description?: string;
+  imageUrl?: string;
+}
+
+export interface InteractiveSource {
+  name: string;
+  url: string;
+  category: 'official' | 'social' | 'financial' | 'technical' | 'community';
+  type: string;
+  description?: string;
+  lastUpdated?: string;
+  reliability: 'high' | 'medium' | 'low';
+  verified: boolean;
 } 
