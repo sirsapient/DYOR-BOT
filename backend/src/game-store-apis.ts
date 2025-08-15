@@ -521,10 +521,10 @@ export class GameStoreAPIService {
       const descriptionPatterns = [
         /<meta[^>]*name="description"[^>]*content="([^"]+)"/i,
         /<meta[^>]*property="og:description"[^>]*content="([^"]+)"/i,
-        /<p[^>]*class="[^"]*description[^"]*"[^>]*>([^<]+)</p>/i,
-        /<div[^>]*class="[^"]*description[^"]*"[^>]*>([^<]+)</div>/i,
-        /<section[^>]*class="[^"]*about[^"]*"[^>]*>([^<]+)</section>/i,
-        /<div[^>]*class="[^"]*about[^"]*"[^>]*>([^<]+)</div>/i
+        /<p[^>]*class="[^"]*description[^"]*"[^>]*>([^<]+)<\/p>/i,
+        /<div[^>]*class="[^"]*description[^"]*"[^>]*>([^<]+)<\/div>/i,
+        /<section[^>]*class="[^"]*about[^"]*"[^>]*>([^<]+)<\/section>/i,
+        /<div[^>]*class="[^"]*about[^"]*"[^>]*>([^<]+)<\/div>/i
       ];
 
       for (const pattern of descriptionPatterns) {
@@ -557,7 +557,7 @@ export class GameStoreAPIService {
 
       return null;
     } catch (error) {
-      console.log(`❌ Failed to scrape description from ${url}: ${error}`);
+      console.log(`[ERROR] Failed to scrape description from ${url}: ${error}`);
       return null;
     }
   }

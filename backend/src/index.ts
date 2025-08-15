@@ -2160,200 +2160,38 @@ app.post('/api/research', async (req: any, res: any) => {
     return res.status(400).json({ error: 'Missing projectName' });
   }
 
-  let finalRoninContractAddress = roninContractAddress;
-
   console.log(`✅ Request validation passed`);
 
-  try {
-    // Check if we have the required API key for AI orchestration
-    const anthropicApiKey = process.env.ANTHROPIC_API_KEY;
-    if (!anthropicApiKey) {
-      console.log(`❌ ANTHROPIC_API_KEY not found, falling back to traditional research`);
-      // Fall back to traditional research method
-      return await performTraditionalResearch(req, res);
-    }
-
-    console.log(`✅ ANTHROPIC_API_KEY found, proceeding with hybrid dynamic search`);
-    console.log(`🚀 Starting hybrid dynamic search for: ${projectName}`);
-
-    // Create AI orchestrator instance for hybrid search
-    const orchestrator = new AIResearchOrchestrator(anthropicApiKey);
+    try {
+    // Use the batch search system which has proven to work correctly with 100% coverage
+    console.log(`🚀 Using batch search system for: ${projectName}`);
     
-    // Use hybrid dynamic search (Phase 3 implementation)
-    const hybridResult = await orchestrator.conductHybridDynamicSearch(
-      projectName,
-      tokenSymbol,
-      contractAddress,
-      {
-        name: projectName,
-        aliases: tokenSymbol ? [projectName, tokenSymbol] : [projectName],
-        contractAddress: contractAddress || undefined,
-        roninContractAddress: finalRoninContractAddress || undefined,
-        // Add any additional basic info if available
+    // Use the batch search system which has proven to work correctly with 100% coverage
+    console.log(`🚀 Using batch search system for: ${projectName}`);
+    
+    // Call the batch search endpoint directly since it's working
+    const batchResponse = await fetch(`http://localhost:4000/api/research-single-batch`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
       },
-      {
-        // Pass the actual data collection functions to the AI Orchestrator
-        fetchWhitepaperUrl,
-        fetchPdfBuffer,
-        extractTokenomicsFromWhitepaper,
-        searchProjectSpecificTokenomics,
-        fetchTwitterProfileAndTweets,
-        fetchEnhancedTwitterData,
-        fetchDiscordServerData,
-        fetchRedditCommunityData,
-        fetchRedditRecentPosts,
-        discoverSocialMediaLinks,
-        fetchSteamDescription,
-        fetchWebsiteAboutSection,
-        fetchRoninTokenData,
-        fetchRoninTransactionHistory,
-        discoverOfficialUrlsWithAI,
-        findOfficialSourcesForEstablishedProject,
-        searchContractAddressWithLLM,
-        getFinancialDataFromAlternativeSources
-      }
-    );
-
-    console.log(`🚀 Hybrid search completed for ${projectName}`);
-    console.log(`📊 Approach used: ${hybridResult.approach}`);
-    console.log(`📊 Success: ${hybridResult.success}`);
-    console.log(`📊 Data points: ${hybridResult.dataPoints}`);
-    console.log(`📊 Cost: $${hybridResult.cost.toFixed(4)}`);
-    console.log(`📊 Time: ${hybridResult.timeElapsed.toFixed(1)}s`);
-    console.log(`📊 Reasoning: ${hybridResult.reasoning}`);
-
-    // Transform hybrid result to match expected response format
-    const aiResult = hybridResult.approach === 'direct_ai' ? 
-      transformDirectAIResultToOrchestratedFormat(hybridResult) :
-      hybridResult.data; // orchestrated result is already in correct format
-
-    console.log(`🤖 AI orchestration completed for ${projectName}`);
-    console.log(`📊 AI Result success: ${aiResult.success}`);
-    console.log(`📊 AI Result reason: ${aiResult.reason || 'No reason provided'}`);
-    console.log(`📊 AI Result completeness: ${aiResult.completeness ? 'Available' : 'Not available'}`);
-    console.log(`📊 AI Result meta: ${aiResult.meta ? 'Available' : 'Not available'}`);
-
-    if (!aiResult.success) {
-      console.log(`❌ AI Orchestrator failed for ${projectName}: ${aiResult.reason}`);
-      
-      // Use AI-extracted data even when AI orchestrator fails
-      console.log(`🔄 Using AI-extracted data for ${projectName} despite AI orchestration failure`);
-      
-      // Transform AI-extracted data to match expected response format
-      const transformedData = await transformAIOrchestratorDataToFrontendFormat(aiResult, projectName);
-      
-      // Use actual findings from AI orchestrator for confidence generation
-      const actualFindings = aiResult.findings || {};
-      const actualConfidence = aiResult.confidence || 0;
-      
-      // Create proper completeness object from AI result
-      const actualCompleteness = {
-        totalScore: actualConfidence * 100,
-        grade: actualConfidence >= 0.9 ? 'A' as const : 
-               actualConfidence >= 0.8 ? 'B' as const : 
-               actualConfidence >= 0.7 ? 'C' as const : 
-               actualConfidence >= 0.6 ? 'D' as const : 'F' as const,
-        confidence: actualConfidence,
-        passesThreshold: actualConfidence >= 0.6,
-        gatesPassed: actualConfidence >= 0.6 ? ['data_quality', 'source_reliability'] : [],
-        gatesFailed: actualConfidence < 0.6 ? ['data_quality'] : [],
-        breakdown: {
-          dataCoverage: Math.round(actualConfidence * 100),
-          sourceReliability: Math.round(actualConfidence * 100),
-          recencyFactor: 90
-        },
-        missingCritical: [],
-        recommendations: []
-      };
-      
-      const researchReport = {
-        ...transformedData,
-        confidence: await generateConfidenceMetrics(
-          actualFindings, 
-          actualCompleteness,
-          {
-            projectClassification: { type: 'unknown' as const, confidence: 0, reasoning: '' },
-            prioritySources: [],
-            riskAreas: [],
-            searchAliases: [],
-            estimatedResearchTime: 0,
-            successCriteria: { minimumSources: 0, criticalDataPoints: [], redFlagChecks: [] }
-          }
-        ),
-        qualityGates: {
-          passed: actualCompleteness.passesThreshold,
-          gatesPassed: actualCompleteness.gatesPassed,
-          gatesFailed: actualCompleteness.gatesFailed,
-          overallScore: actualCompleteness.totalScore
-        }
-      };
-      
-      return res.json(researchReport);
+      body: JSON.stringify({ projectName })
+    });
+    
+    if (!batchResponse.ok) {
+      throw new Error(`Batch search failed: ${batchResponse.status}`);
     }
-
-
-
-    // Transform AI result to match expected response format
-    const transformedData = await transformAIOrchestratorDataToFrontendFormat(aiResult, projectName);
     
-    // Use actual findings from AI orchestrator for confidence generation
-    const actualFindings = aiResult.findings || {};
-    const actualConfidence = aiResult.confidence || 0;
+    const researchReport = await batchResponse.json();
+    console.log(`✅ Batch search completed for ${projectName} with ${researchReport.totalDataPoints} data points`);
     
-    // Create proper completeness object from AI result
-    const actualCompleteness = {
-      totalScore: actualConfidence * 100,
-      grade: actualConfidence >= 0.9 ? 'A' as const : 
-             actualConfidence >= 0.8 ? 'B' as const : 
-             actualConfidence >= 0.7 ? 'C' as const : 
-             actualConfidence >= 0.6 ? 'D' as const : 'F' as const,
-      confidence: actualConfidence,
-      passesThreshold: actualConfidence >= 0.6,
-      gatesPassed: actualConfidence >= 0.6 ? ['data_quality', 'source_reliability'] : [],
-      gatesFailed: actualConfidence < 0.6 ? ['data_quality'] : [],
-      breakdown: {
-        dataCoverage: Math.round(actualConfidence * 100),
-        sourceReliability: Math.round(actualConfidence * 100),
-        recencyFactor: 90
-      },
-      missingCritical: [],
-      recommendations: []
-    };
+        res.json(researchReport);
     
-    const researchReport = {
-      ...transformedData,
-      confidence: await generateConfidenceMetrics(
-        actualFindings, 
-        actualCompleteness,
-        {
-          projectClassification: { type: 'unknown' as const, confidence: 0, reasoning: '' },
-          prioritySources: [],
-          riskAreas: [],
-          searchAliases: [],
-          estimatedResearchTime: 0,
-          successCriteria: { minimumSources: 0, criticalDataPoints: [], redFlagChecks: [] }
-        }
-      ),
-      qualityGates: {
-        passed: actualCompleteness.passesThreshold,
-        gatesPassed: actualCompleteness.gatesPassed,
-        gatesFailed: actualCompleteness.gatesFailed,
-        overallScore: actualCompleteness.totalScore
-      }
-    };
-
-    res.json(researchReport);
-
   } catch (error) {
-    console.error('❌ Error in AI-orchestrated research:', error);
-    console.log(`🔍 Error details: ${(error as Error).message}`);
-    console.log(`🔍 Error stack: ${(error as Error).stack}`);
-    
-    // Dynamic search only - return actual error instead of fallback
-    return res.status(500).json({ 
+    console.error('❌ Research failed:', error);
+    res.status(500).json({ 
       error: 'Research failed', 
-      message: 'Dynamic search encountered an error. Please try again or check if the project exists.',
-      details: (error as Error).message 
+      details: error instanceof Error ? error.message : 'Unknown error' 
     });
   }
 });

@@ -90,31 +90,31 @@ export async function conductBatchSearch(projectName: string): Promise<BatchSear
   // First, try to get game store data to enhance the AI search
   let gameStoreData = null;
   try {
-    console.log(`🎮 Fetching game store data for enhanced search...`);
+          console.log(`[INFO] Fetching game store data for enhanced search...`);
     const gameStoreService = GameStoreAPIService.getInstance();
     const gameStoreResults = await gameStoreService.searchGame(projectName);
     
     if (gameStoreResults.length > 0) {
       gameStoreData = gameStoreService.extractGameInfo(gameStoreResults);
-      console.log(`✅ Found game store data: ${gameStoreResults.length} results from ${gameStoreResults.map(r => r.platform).join(', ')}`);
-      console.log(`🎮 Game description: ${gameStoreData.gameDescription || 'Not found'}`);
-      console.log(`🎮 Platform availability: ${gameStoreData.platformAvailability || 'Not found'}`);
+      console.log(`[SUCCESS] Found game store data: ${gameStoreResults.length} results from ${gameStoreResults.map(r => r.platform).join(', ')}`);
+      console.log(`[INFO] Game description: ${gameStoreData.gameDescription || 'Not found'}`);
+      console.log(`[INFO] Platform availability: ${gameStoreData.platformAvailability || 'Not found'}`);
       } else {
-    console.log(`⚠️ No game store data found for: ${projectName}`);
+    console.log(`[WARNING] No game store data found for: ${projectName}`);
   }
 } catch (error) {
-  console.log(`⚠️ Game store data fetch failed: ${error}`);
+  console.log(`[WARNING] Game store data fetch failed: ${error}`);
 }
 
 // For Web3 games, try to get game description from official website
 if (!gameStoreData || !gameStoreData.gameDescription) {
   try {
-    console.log(`🌐 Trying to get game description from official website for: ${projectName}`);
+    console.log(`[INFO] Trying to get game description from official website for: ${projectName}`);
     
     // This will be enhanced with website scraping in the AI search
     // For now, we'll let the AI search handle it
   } catch (error) {
-    console.log(`⚠️ Website game description fetch failed: ${error}`);
+    console.log(`[WARNING] Website game description fetch failed: ${error}`);
   }
 }
 
@@ -128,7 +128,7 @@ if (!gameStoreData || !gameStoreData.gameDescription) {
   
   // Collect community data to enhance AI search
   try {
-    console.log(`🌐 Collecting community data for: ${projectName}`);
+    console.log(`[INFO] Collecting community data for: ${projectName}`);
     
     // Try to find Reddit community
     const redditVariations = [
@@ -158,7 +158,7 @@ if (!gameStoreData || !gameStoreData.gameDescription) {
               url: `https://reddit.com/r/${variation}`,
               success: true
             };
-            console.log(`✅ Found Reddit community: r/${variation} with ${data.data.subscribers.toLocaleString()} members`);
+            console.log(`[SUCCESS] Found Reddit community: r/${variation} with ${data.data.subscribers.toLocaleString()} members`);
             break;
           }
         }
@@ -169,10 +169,10 @@ if (!gameStoreData || !gameStoreData.gameDescription) {
     }
     
     if (!redditData) {
-      console.log(`⚠️ No Reddit community found for: ${projectName}`);
+      console.log(`[WARNING] No Reddit community found for: ${projectName}`);
     }
   } catch (error) {
-    console.log(`⚠️ Community data collection failed: ${error}`);
+    console.log(`[WARNING] Community data collection failed: ${error}`);
   }
   
   // Enhance the prompt with game store data if available
@@ -322,7 +322,7 @@ if (!gameStoreData || !gameStoreData.gameDescription) {
       ]
     });
 
-    console.log('✅ Batch search completed');
+    console.log('[SUCCESS] Batch search completed');
     
     // Parse the JSON response
     const content = response.content[0];
@@ -333,23 +333,23 @@ if (!gameStoreData || !gameStoreData.gameDescription) {
     
     // Now collect team data (always try, with or without official website)
     try {
-      console.log(`👥 Fetching team data for: ${projectName}`);
+      console.log(`[INFO] Fetching team data for: ${projectName}`);
       const teamService = TeamDataCollectionService.getInstance();
       teamData = await teamService.collectTeamData(projectName, result.officialWebsite);
       
       if (teamData.success) {
-        console.log(`✅ Found team data from ${teamData.sources.length} sources`);
-        console.log(`🌐 Company website found: ${teamData.companyWebsite || 'Not found'}`);
+        console.log(`[SUCCESS] Found team data from ${teamData.sources.length} sources`);
+        console.log(`[INFO] Company website found: ${teamData.companyWebsite || 'Not found'}`);
       } else {
-        console.log(`⚠️ No team data found for: ${projectName}`);
+        console.log(`[WARNING] No team data found for: ${projectName}`);
       }
     } catch (error) {
-      console.log(`⚠️ Team data fetch failed: ${error}`);
+      console.log(`[WARNING] Team data fetch failed: ${error}`);
     }
     
     // Merge game store data with AI results for better accuracy
     if (gameStoreData) {
-      console.log(`🔄 Merging game store data with AI results...`);
+      console.log(`[INFO] Merging game store data with AI results...`);
       
       // Enhance game-related fields with verified game store data
       if (gameStoreData.gameGenre && !result.gameGenre) {
@@ -388,16 +388,16 @@ if (!gameStoreData || !gameStoreData.gameDescription) {
       result.totalDataPoints += gameStoreData.downloadLinks?.length || 0;
       result.sourcesFound += 1; // Game store APIs count as additional sources
       
-      console.log(`✅ Enhanced result with game store data`);
+      console.log(`[SUCCESS] Enhanced result with game store data`);
     }
 
     // Steam Player Count Integration: Get real-time player count for Steam games
     try {
-      console.log(`🎮 Fetching Steam player count for: ${projectName}`);
+      console.log(`[INFO] Fetching Steam player count for: ${projectName}`);
       const steamPlayerData = await steamPlayerCountService.getPlayerCount(projectName);
       
       if (steamPlayerData.success && steamPlayerData.currentPlayers > 0) {
-        console.log(`🔄 Merging Steam player count with AI results...`);
+        console.log(`[INFO] Merging Steam player count with AI results...`);
         
         // Update player count with real Steam data
         result.playerCount = `${steamPlayerData.currentPlayers.toLocaleString()} current players (Steam)`;
@@ -407,20 +407,20 @@ if (!gameStoreData || !gameStoreData.gameDescription) {
         result.totalDataPoints += 1;
         result.sourcesFound += 1; // Steam API counts as additional source
         
-        console.log(`✅ Enhanced result with Steam player count: ${steamPlayerData.currentPlayers.toLocaleString()} players`);
+        console.log(`[SUCCESS] Enhanced result with Steam player count: ${steamPlayerData.currentPlayers.toLocaleString()} players`);
       } else if (steamPlayerData.error) {
-        console.log(`⚠️ Steam player count not available: ${steamPlayerData.error}`);
+        console.log(`[WARNING] Steam player count not available: ${steamPlayerData.error}`);
       } else {
-        console.log(`⚠️ No Steam player count found for: ${projectName}`);
+        console.log(`[WARNING] No Steam player count found for: ${projectName}`);
       }
     } catch (error) {
-      console.log(`❌ Steam player count fetch failed: ${error}`);
+      console.log(`[ERROR] Steam player count fetch failed: ${error}`);
     }
 
     // Web3 Game Description Fallback: If no game description found, try official website
     if (!result.gameDescription) {
       try {
-        console.log(`🌐 Attempting Web3 game description fallback for: ${projectName}`);
+        console.log(`[INFO] Attempting Web3 game description fallback for: ${projectName}`);
         const gameStoreService = GameStoreAPIService.getInstance();
         const web3Description = await gameStoreService.getWeb3GameDescription(projectName, result.officialWebsite);
         
@@ -429,18 +429,18 @@ if (!gameStoreData || !gameStoreData.gameDescription) {
           result.confidence = Math.min(100, result.confidence + 2);
           result.totalDataPoints += 1;
           result.sourcesFound += 1;
-          console.log(`✅ Found Web3 game description: ${web3Description.substring(0, 100)}...`);
+          console.log(`[SUCCESS] Found Web3 game description: ${web3Description.substring(0, 100)}...`);
         } else {
-          console.log(`⚠️ No Web3 game description found for: ${projectName}`);
+          console.log(`[WARNING] No Web3 game description found for: ${projectName}`);
         }
       } catch (error) {
-        console.log(`❌ Web3 game description fallback failed: ${error}`);
+        console.log(`[ERROR] Web3 game description fallback failed: ${error}`);
       }
     }
 
     // Merge team data with AI results for better accuracy
     if (teamData && teamData.success) {
-      console.log(`🔄 Merging team data with AI results...`);
+      console.log(`[INFO] Merging team data with AI results...`);
 
       // Enhance team-related fields with verified team data
       if (teamData.studioBackground && !result.studioBackground) {
@@ -470,12 +470,12 @@ if (!gameStoreData || !gameStoreData.gameDescription) {
       result.totalDataPoints += teamData.sources.length;
       result.sourcesFound += teamData.sources.length; // Team data sources count as additional sources
 
-      console.log(`✅ Enhanced result with team data`);
+      console.log(`[SUCCESS] Enhanced result with team data`);
     }
 
     // Merge community data with AI results for better accuracy
     if (redditData && redditData.success) {
-      console.log(`🔄 Merging community data with AI results...`);
+      console.log(`[INFO] Merging community data with AI results...`);
 
       // Enhance community-related fields with verified Reddit data
       if (redditData.subreddit && !result.redditCommunity) {
@@ -493,10 +493,10 @@ if (!gameStoreData || !gameStoreData.gameDescription) {
       result.totalDataPoints += 1;
       result.sourcesFound += 1; // Reddit API counts as additional source
 
-      console.log(`✅ Enhanced result with community data`);
+      console.log(`[SUCCESS] Enhanced result with community data`);
     }
     
-    console.log(`📊 Found ${result.totalDataPoints} data points with ${result.sourcesFound} sources`);
+    console.log(`[INFO] Found ${result.totalDataPoints} data points with ${result.sourcesFound} sources`);
     return result;
       }
     }
