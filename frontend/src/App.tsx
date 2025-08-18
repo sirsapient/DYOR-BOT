@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { ProjectResearch } from './types';
 import { mockAxieInfinityData } from './mockData';
+import { TokenPriceChart } from './components/TokenPriceChart';
+import ChatBubble, { ChatMessage } from './components/ChatBubble';
 import './App.css';
 
 function LoadingModal({ show }: { show: boolean }) {
@@ -33,6 +35,11 @@ function App() {
   const [researchLoading, setResearchLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [developmentMode, setDevelopmentMode] = useState(false);
+  
+  // Chat functionality
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [chatLoading, setChatLoading] = useState(false);
+  const [sessionProjects, setSessionProjects] = useState<{ [key: string]: ProjectResearch }>({});
 
   // Export functionality
   const exportReport = () => {
@@ -89,6 +96,137 @@ function App() {
     URL.revokeObjectURL(url);
   };
 
+  // Chat message handling
+  const handleChatMessage = async (message: string) => {
+    const userMessage: ChatMessage = {
+      id: Date.now().toString(),
+      type: 'user',
+      content: message,
+      timestamp: new Date(),
+      projectContext: Object.keys(sessionProjects)
+    };
+
+    setChatMessages(prev => [...prev, userMessage]);
+    setChatLoading(true);
+
+    try {
+      // Call the backend chat API
+      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:4000';
+      const fullUrl = `${apiUrl}/api/chat`;
+      
+      const requestBody = {
+        message,
+        projects: sessionProjects,
+        sessionId: Date.now().toString() // Simple session ID for now
+      };
+      
+      console.log('💬 Sending chat request:', requestBody);
+      
+      const res = await fetch(fullUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody),
+      });
+      
+      if (!res.ok) {
+        throw new Error(`API error: ${res.status} ${res.statusText}`);
+      }
+      
+      const data = await res.json();
+      
+      const botMessage: ChatMessage = {
+        id: (Date.now() + 1).toString(),
+        type: 'bot',
+        content: data.response,
+        timestamp: new Date(),
+        projectContext: Object.keys(sessionProjects)
+      };
+
+      setChatMessages(prev => [...prev, botMessage]);
+    } catch (error) {
+      console.error('Chat API error:', error);
+      
+      // Fallback to simple response if backend fails
+      const fallbackResponse = generateFallbackResponse(message, sessionProjects);
+      
+      const botMessage: ChatMessage = {
+        id: (Date.now() + 1).toString(),
+        type: 'bot',
+        content: fallbackResponse,
+        timestamp: new Date(),
+        projectContext: Object.keys(sessionProjects)
+      };
+      setChatMessages(prev => [...prev, botMessage]);
+    } finally {
+      setChatLoading(false);
+    }
+  };
+
+  // Fallback response generator (simple keyword matching)
+  const generateFallbackResponse = (message: string, projects: { [key: string]: ProjectResearch }): string => {
+    const projectNames = Object.keys(projects);
+    
+    if (projectNames.length === 0) {
+      return "I don't have any project data in my session. Please search for a project first!";
+    }
+
+    const lowerMessage = message.toLowerCase();
+    
+    // Simple keyword-based responses
+    if (lowerMessage.includes('market cap') || lowerMessage.includes('marketcap')) {
+      const responses = projectNames.map(name => {
+        const project = projects[name];
+        const marketCap = project.financialData?.marketCap;
+        return `${name}: $${marketCap ? marketCap.toLocaleString() : 'N/A'}`;
+      });
+      return `Market Cap Comparison:\n${responses.join('\n')}`;
+    }
+
+    if (lowerMessage.includes('team') || lowerMessage.includes('founder')) {
+      const responses = projectNames.map(name => {
+        const project = projects[name];
+        const teamSize = project.teamAnalysis?.teamMembers?.length || 0;
+        return `${name}: ${teamSize} team members found`;
+      });
+      return `Team Information:\n${responses.join('\n')}`;
+    }
+
+    if (lowerMessage.includes('community') || lowerMessage.includes('discord')) {
+      const responses = projectNames.map(name => {
+        const project = projects[name];
+        const discordMembers = project.communityHealth?.discordData?.member_count || 0;
+        return `${name}: ${discordMembers.toLocaleString()} Discord members`;
+      });
+      return `Community Size:\n${responses.join('\n')}`;
+    }
+
+    if (lowerMessage.includes('risk') || lowerMessage.includes('red flag')) {
+      const responses = projectNames.map(name => {
+        const project = projects[name];
+        const redFlags = project.keyFindings?.redFlags?.length || 0;
+        return `${name}: ${redFlags} red flags identified`;
+      });
+      return `Risk Assessment:\n${responses.join('\n')}`;
+    }
+
+    if (lowerMessage.includes('compare') || lowerMessage.includes('difference')) {
+      return `I can help you compare the projects! Try asking about specific metrics like:
+- Market cap comparison
+- Team size differences  
+- Community engagement
+- Risk assessment
+- Token information`;
+    }
+
+    return `I have data for ${projectNames.join(', ')}. You can ask me about:
+- Market cap and financial data
+- Team information and background
+- Community size and engagement
+- Risk factors and red flags
+- Token details and metrics
+- General project comparisons`;
+  };
+
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     setResearchLoading(true);
@@ -99,13 +237,18 @@ function App() {
     if (developmentMode) {
       setTimeout(() => {
         setResearch(mockAxieInfinityData);
+        // Add to session projects
+        setSessionProjects(prev => ({
+          ...prev,
+          [mockAxieInfinityData.projectName]: mockAxieInfinityData
+        }));
         setResearchLoading(false);
       }, 1000); // Simulate loading time
       return;
     }
     
     try {
-      const apiUrl = process.env.REACT_APP_API_URL || 'https://dyor-bot.onrender.com';
+      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:4000';
       const fullUrl = `${apiUrl}/api/research`;
       
       const requestBody = { 
@@ -127,6 +270,12 @@ function App() {
       
       const data = await res.json();
       setResearch(data);
+      
+      // Add to session projects
+      setSessionProjects(prev => ({
+        ...prev,
+        [data.projectName]: data
+      }));
     } catch (err) {
       setError(`Failed to fetch research: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
@@ -139,6 +288,13 @@ function App() {
   return (
     <div className="App">
       <LoadingModal show={researchLoading} />
+      
+      <ChatBubble
+        onSendMessage={handleChatMessage}
+        messages={chatMessages}
+        isLoading={chatLoading}
+        projectsInSession={Object.keys(sessionProjects)}
+      />
         
         <div className="main-container">
           {/* Left Panel - Interactive Data Sources */}
@@ -148,6 +304,17 @@ function App() {
               <h2 className="project-title">{research.projectName}</h2>
               <div className="project-type">{research.projectType}</div>
             </div>
+
+            {/* Token Price Chart */}
+            <TokenPriceChart
+              tokenId={research.projectName === "Axie Infinity" ? "axie-infinity" :
+                      research.financialData?.roninTokenInfo?.symbol?.toLowerCase() || 
+                      research.financialData?.avalancheTokenInfo?.tokenInfo?.tokenSymbol?.toLowerCase() ||
+                      research.projectName.toLowerCase().replace(/\s+/g, '-')}
+              tokenSymbol={research.financialData?.roninTokenInfo?.symbol || 
+                          research.financialData?.avalancheTokenInfo?.tokenInfo?.tokenSymbol}
+              projectName={research.projectName}
+            />
 
             {/* Confidence Display */}
             {research.confidence && (
@@ -334,6 +501,11 @@ function App() {
                         setResearchLoading(true);
                         setTimeout(() => {
                           setResearch(mockAxieInfinityData);
+                          // Add to session projects
+                          setSessionProjects(prev => ({
+                            ...prev,
+                            [mockAxieInfinityData.projectName]: mockAxieInfinityData
+                          }));
                           setResearchLoading(false);
                         }, 500);
                       }}
@@ -610,6 +782,13 @@ function App() {
     <div className="App">
       <LoadingModal show={researchLoading} />
       
+      <ChatBubble
+        onSendMessage={handleChatMessage}
+        messages={chatMessages}
+        isLoading={chatLoading}
+        projectsInSession={Object.keys(sessionProjects)}
+      />
+      
       <div className="initial-screen">
         {/* Logo and Title */}
         <div className="logo-container">
@@ -656,6 +835,11 @@ function App() {
                   setResearchLoading(true);
                   setTimeout(() => {
                     setResearch(mockAxieInfinityData);
+                    // Add to session projects
+                    setSessionProjects(prev => ({
+                      ...prev,
+                      [mockAxieInfinityData.projectName]: mockAxieInfinityData
+                    }));
                     setResearchLoading(false);
                   }, 500);
                 }}

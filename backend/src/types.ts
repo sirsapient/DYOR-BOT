@@ -35,6 +35,59 @@ export interface ProjectResearch {
   };
   aiSummary?: string;
   sourcesUsed?: string[];
+  // Chart data
+  confidence?: ConfidenceData;
+  totalDataPoints?: number;
+}
+
+export interface ConfidenceData {
+  overall: {
+    score: number;
+    grade: string;
+    level: string;
+    description: string;
+  };
+  breakdown: {
+    dataCompleteness: {
+      score: number;
+      found: number;
+      total: number;
+      missing: string[];
+    };
+    sourceReliability: {
+      score: number;
+      official: number;
+      verified: number;
+      scraped: number;
+    };
+    dataFreshness: {
+      score: number;
+      averageAge: number;
+      oldestSource: string;
+    };
+  };
+  sourceDetails?: ConfidenceSourceDetail[];
+  limitations?: string[];
+  strengths?: string[];
+  userGuidance?: {
+    trustLevel: string;
+    useCase: string;
+    warnings: string[];
+    additionalResearch: string[];
+  };
+}
+
+export interface ConfidenceSourceDetail {
+  name: string;
+  displayName: string;
+  found: boolean;
+  quality: string;
+  reliability: string;
+  dataPoints: number;
+  lastUpdated: string;
+  confidence: number;
+  icon: string;
+  description: string;
 }
 
 export interface ResearchQuality {
