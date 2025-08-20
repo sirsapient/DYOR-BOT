@@ -1479,7 +1479,7 @@ Please provide a JSON response with the following structure:
       "investigationApproach": "Deep dive LinkedIn/social verification"
     }
   ],
-  "searchAliases": ["projectname", "ticker", "common_misspellings"],
+  "searchAliases": ["projectname", "ticker", "common_misspellings", "studio_name", "developer_name", "publisher_name"],
   "estimatedResearchTime": 25,
   "successCriteria": {
     "minimumSources": 7,
@@ -1493,9 +1493,23 @@ Focus on:
 2. Most important sources for THIS specific project type
 3. Key risk areas to investigate
 4. Alternative names/tickers to search
-5. Comprehensive research goals with high standards for ALL projects
-6. Aggressive documentation and whitepaper discovery
-7. Thorough technical and security assessment`;
+5. Studio/Developer identification - if this is a game, identify the studio/developer/publisher that created it
+6. Comprehensive research goals with high standards for ALL projects
+7. Aggressive documentation and whitepaper discovery
+8. Thorough technical and security assessment
+
+CRITICAL: For gaming projects, identify the studio/developer/publisher relationship. Many games are developed by studios (e.g., "WAGMI Defense" might be developed by "WAGMI Games"). Include both the game name AND studio name in searchAliases for comprehensive research.
+
+STUDIO DETECTION PATTERNS:
+- If project name contains "Defense", "Attack", "Battle", "War", "Fight", "Combat" - likely a game by a studio
+- Common studio suffixes: "Games", "Studio", "Dev", "Interactive", "Entertainment"
+- Look for patterns like "ProjectName Games" or "ProjectName Studio"
+- For web3 games, also check for "ProjectName Labs", "ProjectName DAO", "ProjectName Protocol"
+
+EXAMPLES:
+- "WAGMI Defense" → search for "WAGMI Games", "WAGMI Studio", "WAGMI Defense"
+- "Axie Infinity" → search for "Sky Mavis", "Axie Games", "Axie Infinity"
+- "The Sandbox" → search for "The Sandbox", "Sandbox Games", "Sandbox Studio"`;
   }
 
   // Build adaptive research prompt during collection
@@ -3933,9 +3947,24 @@ export async function conductAIOrchestratedResearch(
   const orchestrator = new AIResearchOrchestrator(anthropicApiKey);
   
   try {
-    // Step 1: Generate research plan
+    // NEW: Step 1 - Try template-based research plan first (reduce AI calls)
     console.log(`📋 Generating research plan for ${projectName}...`);
-    const plan = await orchestrator.generateResearchPlan(projectName, basicInfo);
+    
+    // NEW: Quick classification without AI
+    const projectType = quickClassifyProject(projectName);
+    let plan;
+    
+    if (projectType) {
+      console.log(`✅ Using template for ${projectType} project type`);
+      plan = generateTemplateResearchPlan(projectName, projectType);
+    }
+    
+    // Fallback to AI-generated plan if no template available
+    if (!plan) {
+      console.log(`🤖 No template available, using AI-generated plan`);
+      plan = await orchestrator.generateResearchPlan(projectName, basicInfo);
+    }
+    
     console.log(`✅ Research plan generated with ${plan.prioritySources.length} priority sources`);
     
     // Step 2: Discover official URLs once for all sources
@@ -3946,41 +3975,108 @@ export async function conductAIOrchestratedResearch(
       console.log(`✅ Discovered URLs:`, discoveredUrls);
     }
     
-    // Step 3: Collect data from sources using discovered URLs
-    console.log(`🔍 Collecting data from sources...`);
+    // NEW: Step 3 - Parallel data collection from sources
+    console.log(`🔍 Collecting data from sources in parallel...`);
     const findings: ResearchFindings = {};
     
-    for (const source of plan.prioritySources) {
-      console.log(`📊 Collecting from ${source.source}...`);
+    // NEW: Create promises for all sources to run in parallel
+    const sourcePromises = plan.prioritySources.map(async (source) => {
+      console.log(`📊 Starting collection from ${source.source}...`);
       
-      const sourceData = await collectFromSourceWithRealFunctions(
-        source.source,
-        source.searchTerms,
-        plan.searchAliases,
-        projectName,
-        dataCollectionFunctions,
-        basicInfo,
-        discoveredUrls
-      );
+      try {
+        const sourceData = await collectFromSourceWithRealFunctions(
+          source.source,
+          source.searchTerms,
+          plan.searchAliases,
+          projectName,
+          dataCollectionFunctions,
+          basicInfo,
+          discoveredUrls
+        );
+        
+        if (sourceData) {
+          const dataPoints = orchestrator.countDataPoints(JSON.stringify(sourceData));
+          console.log(`✅ Collected ${dataPoints} data points from ${source.source}`);
+          
+          return {
+            source: source.source,
+            found: true,
+            data: sourceData,
+            quality: 'medium',
+            timestamp: new Date(),
+            dataPoints: dataPoints
+          };
+                 } else {
+           console.log(`❌ No data found from ${source.source}`);
+           return {
+             source: source.source,
+             found: false,
+             data: null,
+             quality: 'low' as const,
+             timestamp: new Date(),
+             dataPoints: 0
+           };
+         }
+             } catch (error) {
+         console.log(`❌ Error collecting from ${source.source}: ${(error as Error).message}`);
+         return {
+           source: source.source,
+           found: false,
+           data: null,
+           quality: 'low' as const,
+           timestamp: new Date(),
+           dataPoints: 0
+         };
+       }
+    });
+    
+    // NEW: Execute all source collection in parallel
+    const sourceResults = await Promise.allSettled(sourcePromises);
+    
+    // NEW: Process results and check for early termination
+    let totalDataPoints = 0;
+    let successfulSources = 0;
+    
+    for (const result of sourceResults) {
+      if (result.status === 'fulfilled') {
+        const sourceResult = result.value;
+        findings[sourceResult.source] = {
+          found: sourceResult.found,
+          data: sourceResult.data,
+          quality: sourceResult.quality,
+          timestamp: sourceResult.timestamp,
+          dataPoints: sourceResult.dataPoints
+        };
+        
+        if (sourceResult.found) {
+          totalDataPoints += sourceResult.dataPoints;
+          successfulSources++;
+        }
+      }
+    }
+    
+    // NEW: Early termination check
+    const earlyTerminationThreshold = 20; // Minimum data points for early termination
+    const earlyTerminationConfidence = 0.7; // Minimum confidence for early termination
+    
+    if (totalDataPoints >= earlyTerminationThreshold) {
+      console.log(`✅ Early termination: Found ${totalDataPoints} data points from ${successfulSources} sources`);
       
-      if (sourceData) {
-        findings[source.source] = {
-          found: true,
-          data: sourceData,
-          quality: 'medium',
-          timestamp: new Date(),
-          dataPoints: orchestrator.countDataPoints(JSON.stringify(sourceData))
+      // NEW: Quick confidence calculation for early termination
+      const confidence = Math.min((totalDataPoints / 50) * 100, 100) / 100; // Scale to 0-1
+      
+      if (confidence >= earlyTerminationConfidence) {
+        console.log(`✅ Sufficient confidence (${(confidence * 100).toFixed(1)}%) for early termination`);
+        
+        return {
+          success: true,
+          findings: findings,
+          plan: plan,
+          confidence: confidence,
+          earlyTerminated: true,
+          totalDataPoints: totalDataPoints,
+          successfulSources: successfulSources
         };
-        console.log(`✅ Collected ${findings[source.source].dataPoints} data points from ${source.source}`);
-      } else {
-        findings[source.source] = {
-          found: false,
-          data: null,
-          quality: 'low',
-          timestamp: new Date(),
-          dataPoints: 0
-        };
-        console.log(`❌ No data found from ${source.source}`);
       }
     }
     
@@ -3991,7 +4087,7 @@ export async function conductAIOrchestratedResearch(
       console.log(`  - ${sourceName}: ${finding.found ? 'FOUND' : 'NOT FOUND'} (${finding.dataPoints} data points)`);
     });
     
-    // Step 4: Check if we should pass to second AI
+    // Step 4: Check if we should pass to second AI (only if not early terminated)
     const secondAICheck = orchestrator.shouldPassToSecondAI(findings);
     console.log(`🤖 Second AI check: ${secondAICheck.shouldPass ? 'PASS' : 'FAIL'}`);
     console.log(`📊 Confidence: ${(secondAICheck.confidenceScore * 100).toFixed(2)}%`);
@@ -4003,11 +4099,13 @@ export async function conductAIOrchestratedResearch(
         reason: `Insufficient research quality after AI-guided collection`,
         findings: findings,
         plan: plan,
-        confidence: secondAICheck.confidenceScore
+        confidence: secondAICheck.confidenceScore,
+        totalDataPoints: totalDataPoints,
+        successfulSources: successfulSources
       };
     }
     
-    // Step 5: Assess research completeness
+    // Step 5: Assess research completeness (only if not early terminated)
     console.log(`📋 Assessing research completeness...`);
     const completeness = await orchestrator.assessResearchCompleteness(plan, findings, projectName);
     
@@ -4028,7 +4126,9 @@ export async function conductAIOrchestratedResearch(
         reason: `Insufficient research quality after AI-guided collection`,
         findings: findings,
         plan: plan,
-        confidence: completeness.confidence
+        confidence: completeness.confidence,
+        totalDataPoints: totalDataPoints,
+        successfulSources: successfulSources
       };
     }
     
@@ -4036,22 +4136,24 @@ export async function conductAIOrchestratedResearch(
     console.log(`✅ Research completed successfully for ${projectName}`);
     return {
       success: true,
-      reason: 'No reason provided',
       findings: findings,
       plan: plan,
       confidence: completeness.confidence,
-      completeness: 'Available',
-      meta: 'Available'
+      earlyTerminated: false,
+      totalDataPoints: totalDataPoints,
+      successfulSources: successfulSources
     };
     
   } catch (error) {
-    console.log(`❌ AI Orchestrator failed for ${projectName}: ${(error as Error).message}`);
+    console.log(`❌ AI-orchestrated research failed for ${projectName}: ${(error as Error).message}`);
     return {
       success: false,
-      reason: (error as Error).message,
+      reason: `AI-orchestrated research failed: ${(error as Error).message}`,
       findings: {},
-      plan: orchestrator.generateFallbackPlan(),
-      confidence: 0
+      plan: null,
+      confidence: 0,
+      totalDataPoints: 0,
+      successfulSources: 0
     };
   }
 }
@@ -4069,11 +4171,17 @@ function normalizeSourceName(sourceName: string): string {
     'community_metrics': 'community_health',
     'social_metrics': 'community_health',
     'team_metrics': 'team_info',
+    'team_information': 'team_info',
     'company_info': 'team_info',
     'security_metrics': 'security_audit',
     'audit_reports': 'security_audit',
     'media_metrics': 'media_coverage',
-    'press_coverage': 'media_coverage'
+    'press_coverage': 'media_coverage',
+    'on_chain_data': 'onchain_data',
+    'blockchain_data': 'onchain_data',
+    'smart_contracts': 'onchain_data',
+    'official_documentation': 'official_documentation',
+    'official_resources': 'official_documentation'
   };
   
   return sourceNameMappings[sourceName] || sourceName;
@@ -4538,4 +4646,98 @@ interface BatchProcessingResult {
     };
   };
   errors: string[];
+}
+
+// NEW: Template system for common project types to reduce AI calls
+const PROJECT_TEMPLATES = {
+  web3_game: {
+    prioritySources: [
+      { source: 'official_website', searchTerms: ['official website', 'homepage'] },
+      { source: 'whitepaper', searchTerms: ['whitepaper', 'tokenomics', 'economics'] },
+      { source: 'github_repos', searchTerms: ['github', 'repository', 'code'] },
+      { source: 'social_media', searchTerms: ['twitter', 'discord', 'telegram'] },
+      { source: 'financial_data', searchTerms: ['token price', 'market cap', 'trading'] }
+    ],
+    searchAliases: ['game', 'gaming', 'play', 'nft', 'crypto'],
+    estimatedDataPoints: 25
+  },
+  traditional_game: {
+    prioritySources: [
+      { source: 'official_website', searchTerms: ['official website', 'homepage'] },
+      { source: 'steam_page', searchTerms: ['steam', 'download', 'play'] },
+      { source: 'social_media', searchTerms: ['twitter', 'discord', 'reddit'] },
+      { source: 'reviews', searchTerms: ['reviews', 'ratings', 'user feedback'] },
+      { source: 'news', searchTerms: ['news', 'announcements', 'updates'] }
+    ],
+    searchAliases: ['game', 'gaming', 'play', 'video game'],
+    estimatedDataPoints: 20
+  },
+  publisher: {
+    prioritySources: [
+      { source: 'official_website', searchTerms: ['official website', 'company'] },
+      { source: 'about_page', searchTerms: ['about', 'team', 'company info'] },
+      { source: 'portfolio', searchTerms: ['games', 'projects', 'portfolio'] },
+      { source: 'social_media', searchTerms: ['twitter', 'linkedin', 'company'] },
+      { source: 'news', searchTerms: ['news', 'press releases', 'announcements'] }
+    ],
+    searchAliases: ['publisher', 'studio', 'company', 'developer'],
+    estimatedDataPoints: 18
+  },
+  platform: {
+    prioritySources: [
+      { source: 'official_website', searchTerms: ['official website', 'platform'] },
+      { source: 'documentation', searchTerms: ['docs', 'documentation', 'api'] },
+      { source: 'github_repos', searchTerms: ['github', 'repository', 'code'] },
+      { source: 'social_media', searchTerms: ['twitter', 'discord', 'community'] },
+      { source: 'financial_data', searchTerms: ['token price', 'market cap', 'trading'] }
+    ],
+    searchAliases: ['platform', 'protocol', 'network', 'infrastructure'],
+    estimatedDataPoints: 22
+  }
+};
+
+// NEW: Quick project classification without AI
+function quickClassifyProject(projectName: string): string | null {
+  const name = projectName.toLowerCase();
+  
+  // Web3 games
+  if (name.includes('axie') || name.includes('decentraland') || name.includes('sandbox') || 
+      name.includes('cryptokitties') || name.includes('wagmi') || name.includes('nft') ||
+      name.includes('crypto') || name.includes('blockchain')) {
+    return 'web3_game';
+  }
+  
+  // Traditional games
+  if (name.includes('game') || name.includes('play') || name.includes('gaming') ||
+      name.includes('steam') || name.includes('epic') || name.includes('console')) {
+    return 'traditional_game';
+  }
+  
+  // Publishers
+  if (name.includes('publisher') || name.includes('studio') || name.includes('entertainment') ||
+      name.includes('interactive') || name.includes('games') || name.includes('company')) {
+    return 'publisher';
+  }
+  
+  // Platforms
+  if (name.includes('platform') || name.includes('protocol') || name.includes('network') ||
+      name.includes('infrastructure') || name.includes('api') || name.includes('sdk')) {
+    return 'platform';
+  }
+  
+  return null;
+}
+
+// NEW: Template-based research plan generation
+function generateTemplateResearchPlan(projectName: string, projectType: string): any {
+  const template = PROJECT_TEMPLATES[projectType as keyof typeof PROJECT_TEMPLATES];
+  if (!template) return null;
+  
+  return {
+    prioritySources: template.prioritySources,
+    searchAliases: template.searchAliases,
+    estimatedDataPoints: template.estimatedDataPoints,
+    confidence: 0.8,
+    reasoning: `Using template for ${projectType} project type`
+  };
 }

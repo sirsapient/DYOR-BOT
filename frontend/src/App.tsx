@@ -233,8 +233,13 @@ function App() {
     setResearch(null);
     setError(null);
     
-    // Development mode - use mock data
-    if (developmentMode) {
+    console.log('🔍 Search initiated for:', projectName);
+    console.log('🔍 Development mode:', developmentMode);
+    console.log('🔍 NODE_ENV:', process.env.NODE_ENV);
+    
+    // Development mode - use mock data (only in development environment)
+    if (process.env.NODE_ENV === 'development' && developmentMode) {
+      console.log('🔍 Using mock data (development mode enabled)');
       setTimeout(() => {
         setResearch(mockAxieInfinityData);
         // Add to session projects
@@ -247,8 +252,24 @@ function App() {
       return;
     }
     
+    console.log('🔍 Making live API call...');
+    
     try {
       const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:4000';
+      
+      // First, check if the backend is available
+      console.log('🔍 Checking backend health...');
+      try {
+        const healthRes = await fetch(`${apiUrl}/api/health`);
+        if (!healthRes.ok) {
+          throw new Error(`Backend health check failed: ${healthRes.status}`);
+        }
+        console.log('🔍 Backend is healthy');
+      } catch (healthErr) {
+        console.error('🔍 Backend health check failed:', healthErr);
+        throw new Error(`Backend is not available. Please ensure the backend server is running. Error: ${healthErr instanceof Error ? healthErr.message : 'Unknown error'}`);
+      }
+      
       const fullUrl = `${apiUrl}/api/research`;
       
       const requestBody = { 
@@ -256,6 +277,8 @@ function App() {
       };
       
       // Debug: Log what we're sending
+      console.log('🔍 API URL:', apiUrl);
+      console.log('🔍 Full URL:', fullUrl);
       console.log('🔍 Sending request with data:', requestBody);
       
       const res = await fetch(fullUrl, {
@@ -264,11 +287,17 @@ function App() {
         body: JSON.stringify(requestBody),
       });
       
+      console.log('🔍 Response status:', res.status);
+      console.log('🔍 Response ok:', res.ok);
+      
       if (!res.ok) {
-        throw new Error(`API error: ${res.status} ${res.statusText}`);
+        const errorText = await res.text();
+        console.error('🔍 Error response body:', errorText);
+        throw new Error(`API error: ${res.status} ${res.statusText} - ${errorText}`);
       }
       
       const data = await res.json();
+      console.log('🔍 Received data:', data);
       setResearch(data);
       
       // Add to session projects
@@ -277,6 +306,7 @@ function App() {
         [data.projectName]: data
       }));
     } catch (err) {
+      console.error('🔍 Search error:', err);
       setError(`Failed to fetch research: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
       setResearchLoading(false);
@@ -464,18 +494,20 @@ function App() {
                 <h1 className="brand-title">DYOR BOT</h1>
               </div>
               
-              {/* Development Mode Toggle */}
-              <div className="dev-mode-toggle">
-                <label className="dev-mode-label">
-                  <input
-                    type="checkbox"
-                    checked={developmentMode}
-                    onChange={(e) => setDevelopmentMode(e.target.checked)}
-                    className="dev-mode-checkbox"
-                  />
-                  <span className="dev-mode-text">DEV MODE (Axie Infinity Mock Data)</span>
-                </label>
-              </div>
+              {/* Development Mode Toggle - Only show in development */}
+              {process.env.NODE_ENV === 'development' && (
+                <div className="dev-mode-toggle">
+                  <label className="dev-mode-label">
+                    <input
+                      type="checkbox"
+                      checked={developmentMode}
+                      onChange={(e) => setDevelopmentMode(e.target.checked)}
+                      className="dev-mode-checkbox"
+                    />
+                    <span className="dev-mode-text">DEV MODE (Axie Infinity Mock Data)</span>
+                  </label>
+                </div>
+              )}
               
               <div className="search-input-section">
                 <div className="search-input-title">SEARCH INPUT</div>
@@ -484,17 +516,17 @@ function App() {
                     type="text"
                     value={projectName}
                     onChange={e => setProjectName(e.target.value)}
-                    placeholder={developmentMode ? "// dev mode - any input works" : "// enter token or project"}
+                    placeholder={process.env.NODE_ENV === 'development' && developmentMode ? "// dev mode - any input works" : "// enter token or project"}
                     className="search-input"
                   />
                   <button 
                     type="submit" 
-                    disabled={researchLoading || (!projectName && !developmentMode)}
+                    disabled={researchLoading || (!projectName && !(process.env.NODE_ENV === 'development' && developmentMode))}
                     className="search-button"
                   >
                     {researchLoading ? 'SEARCHING...' : 'SEARCH'}
                   </button>
-                  {developmentMode && (
+                  {developmentMode && process.env.NODE_ENV === 'development' && (
                     <button 
                       type="button"
                       onClick={() => {
@@ -798,18 +830,20 @@ function App() {
           <h1 className="brand-title">DYOR BOT</h1>
         </div>
 
-        {/* Development Mode Toggle */}
-        <div className="dev-mode-toggle">
-          <label className="dev-mode-label">
-            <input
-              type="checkbox"
-              checked={developmentMode}
-              onChange={(e) => setDevelopmentMode(e.target.checked)}
-              className="dev-mode-checkbox"
-            />
-            <span className="dev-mode-text">DEV MODE (Axie Infinity Mock Data)</span>
-          </label>
-        </div>
+        {/* Development Mode Toggle - Only show in development */}
+        {process.env.NODE_ENV === 'development' && (
+          <div className="dev-mode-toggle">
+            <label className="dev-mode-label">
+              <input
+                type="checkbox"
+                checked={developmentMode}
+                onChange={(e) => setDevelopmentMode(e.target.checked)}
+                className="dev-mode-checkbox"
+              />
+              <span className="dev-mode-text">DEV MODE (Axie Infinity Mock Data)</span>
+            </label>
+          </div>
+        )}
 
         {/* Search Form */}
         <div className="search-form-container">
@@ -818,17 +852,17 @@ function App() {
               type="text"
               value={projectName}
               onChange={e => setProjectName(e.target.value)}
-              placeholder={developmentMode ? "// dev mode - any input works" : "// enter token or project"}
+              placeholder={process.env.NODE_ENV === 'development' && developmentMode ? "// dev mode - any input works" : "// enter token or project"}
               className="search-input-large"
             />
             <button 
               type="submit" 
-              disabled={researchLoading || (!projectName && !developmentMode)}
+              disabled={researchLoading || (!projectName && !(process.env.NODE_ENV === 'development' && developmentMode))}
               className="search-button-large"
             >
               {researchLoading ? 'SEARCHING...' : 'SEARCH'}
             </button>
-            {developmentMode && (
+            {process.env.NODE_ENV === 'development' && developmentMode && (
               <button 
                 type="button"
                 onClick={() => {

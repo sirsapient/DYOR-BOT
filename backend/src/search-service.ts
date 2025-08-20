@@ -20,10 +20,69 @@ interface DuckDuckGoResponse {
   }>;
 }
 
+// NEW: Enhanced caching with longer duration
+const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
+const AI_CACHE_DURATION = 12 * 60 * 60 * 1000; // 12 hours
+
+// NEW: Smart cache implementation
+class SmartCache {
+  private cache = new Map<string, { data: any; timestamp: number }>();
+  
+  set(key: string, data: any, duration: number = CACHE_DURATION) {
+    this.cache.set(key, { data, timestamp: Date.now() + duration });
+  }
+  
+  get(key: string): any | null {
+    const cached = this.cache.get(key);
+    if (cached && Date.now() < cached.timestamp) {
+      return cached.data;
+    }
+    this.cache.delete(key);
+    return null;
+  }
+
+  clear() {
+    this.cache.clear();
+  }
+
+  size(): number {
+    return this.cache.size;
+  }
+}
+
+// NEW: Optimized search engine configuration
+const OPTIMIZED_SEARCH_ENGINES = [
+  {
+    name: 'DuckDuckGo',
+    url: 'https://html.duckduckgo.com/html/',
+    priority: 1,
+    reliability: 0.9,
+    timeout: 5000
+  },
+  {
+    name: 'SearX',
+    url: 'https://searx.be/search',
+    priority: 2,
+    reliability: 0.8,
+    timeout: 5000
+  },
+  {
+    name: 'Brave',
+    url: 'https://search.brave.com/search',
+    priority: 3,
+    reliability: 0.7,
+    timeout: 5000
+  }
+];
+
+// NEW: Early termination thresholds
+const MINIMUM_DATA_POINTS = 15;
+const MINIMUM_CONFIDENCE = 70;
+
 export class FreeSearchService {
   private static instance: FreeSearchService;
-  private cache: Map<string, { results: SearchResult[]; timestamp: number }> = new Map();
-  private readonly CACHE_DURATION = 30 * 60 * 1000; // 30 minutes
+  private cache: SmartCache = new SmartCache();
+  private readonly CACHE_DURATION = 30 * 60 * 1000; // 30 minutes (legacy)
 
   static getInstance(): FreeSearchService {
     if (!FreeSearchService.instance) {
@@ -34,32 +93,31 @@ export class FreeSearchService {
 
   async search(query: string, maxResults: number = 5): Promise<SearchResult[]> {
     const cacheKey = `${query}_${maxResults}`;
-    const cached = this.cache.get(cacheKey);
     
-    if (cached && Date.now() - cached.timestamp < this.CACHE_DURATION) {
+    // NEW: Check enhanced cache first
+    const cached = this.cache.get(cacheKey);
+    if (cached) {
       console.log(`📋 Using cached search results for: ${query}`);
-      return cached.results;
+      return cached;
     }
 
     console.log(`🔍 Free search for: ${query}`);
     
     try {
-      // Add a small delay to avoid rate limiting
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // Try DuckDuckGo Instant Answer API first
+      // NEW: Try DuckDuckGo API first (fastest)
       const response = await fetch(`https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`, {
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-        }
+        },
+        signal: AbortSignal.timeout(5000) // 5 second timeout
       });
       
       if (!response.ok) {
-        console.log(`❌ DuckDuckGo API failed: ${response.status}, trying web scraping fallback`);
-        const fallbackResults = await this.getWebScrapingResults(query, maxResults);
+        console.log(`❌ DuckDuckGo API failed: ${response.status}, trying parallel web scraping fallback`);
+        const fallbackResults = await this.getParallelWebScrapingResults(query, maxResults);
         if (fallbackResults.length > 0) {
-          this.cache.set(cacheKey, { results: fallbackResults, timestamp: Date.now() });
-          console.log(`✅ Found ${fallbackResults.length} results via web scraping for: ${query}`);
+          this.cache.set(cacheKey, fallbackResults);
+          console.log(`✅ Found ${fallbackResults.length} results via parallel web scraping for: ${query}`);
           return fallbackResults;
         }
         return this.getFallbackResults(query);
@@ -99,16 +157,23 @@ export class FreeSearchService {
         }
       }
 
-      // If we don't have enough results or no results at all, try web scraping fallback
+      // NEW: Early termination check
+      if (this.shouldTerminateEarly(results.length, this.calculateConfidence(results))) {
+        console.log(`✅ Sufficient data found (${results.length} results), terminating early`);
+        this.cache.set(cacheKey, results);
+        return results;
+      }
+
+      // If we don't have enough results, try parallel web scraping fallback
       if (results.length === 0 || results.length < maxResults) {
-        console.log(`🔍 No results from API, trying web scraping fallback for: ${query}`);
-        const fallbackResults = await this.getWebScrapingResults(query, maxResults - results.length);
-        console.log(`🔍 Web scraping returned ${fallbackResults.length} results for: ${query}`);
+        console.log(`🔍 No results from API, trying parallel web scraping fallback for: ${query}`);
+        const fallbackResults = await this.getParallelWebScrapingResults(query, maxResults - results.length);
+        console.log(`🔍 Parallel web scraping returned ${fallbackResults.length} results for: ${query}`);
         results.push(...fallbackResults);
       }
 
       // Cache the results
-      this.cache.set(cacheKey, { results, timestamp: Date.now() });
+      this.cache.set(cacheKey, results);
 
       console.log(`✅ Found ${results.length} results for: ${query}`);
       return results;
@@ -119,174 +184,327 @@ export class FreeSearchService {
     }
   }
 
-  private async getWebScrapingResults(query: string, maxResults: number): Promise<SearchResult[]> {
-    console.log(`🔍 Starting web scraping for: ${query}`);
+  // NEW: Parallel web scraping with optimized engines
+  private async getParallelWebScrapingResults(query: string, maxResults: number): Promise<SearchResult[]> {
+    console.log(`🔍 Starting parallel web scraping for: ${query}`);
+    
     try {
-      // Enhanced search engines with better success rates
-      const searchUrls = [
-        `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}&t=h_&ia=web`,
-        `https://searx.be/search?q=${encodeURIComponent(query)}&format=json`,
-        `https://search.brave.com/search?q=${encodeURIComponent(query)}`,
-        `https://www.qwant.com/?q=${encodeURIComponent(query)}&t=web`
-      ];
+      // NEW: Create search promises for all engines in parallel
+      const searchPromises = OPTIMIZED_SEARCH_ENGINES.map(engine => 
+        this.searchWithEngine(engine, query, maxResults)
+      );
 
-      for (const searchUrl of searchUrls) {
-        try {
-          // Add longer delay between requests to avoid rate limiting
-          await new Promise(resolve => setTimeout(resolve, 1000));
+      // NEW: Execute all searches in parallel
+      const results = await Promise.allSettled(searchPromises);
+      
+      // NEW: Collect successful results
+      const successfulResults: SearchResult[] = [];
+      for (const result of results) {
+        if (result.status === 'fulfilled' && result.value.length > 0) {
+          successfulResults.push(...result.value);
+          console.log(`✅ Parallel search successful with ${result.value.length} results`);
           
-          const response = await fetch(searchUrl, {
-            headers: {
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-              'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
-              'Accept-Language': 'en-US,en;q=0.9',
-              'Accept-Encoding': 'gzip, deflate, br',
-              'Connection': 'keep-alive',
-              'Upgrade-Insecure-Requests': '1',
-              'Sec-Fetch-Dest': 'document',
-              'Sec-Fetch-Mode': 'navigate',
-              'Sec-Fetch-Site': 'none',
-              'Cache-Control': 'max-age=0'
-            }
-          });
-
-          if (!response.ok) {
-            console.log(`❌ Search engine ${searchUrl} returned status: ${response.status}`);
-            continue;
+          // NEW: Early termination if we have enough results
+          if (successfulResults.length >= maxResults) {
+            console.log(`✅ Early termination: Found ${successfulResults.length} results`);
+            break;
           }
-
-          const html = await response.text();
-          const results: SearchResult[] = [];
-
-          // Enhanced regex patterns for different search engines
-          let linkMatches: string[] = [];
-          
-          // Try multiple regex patterns for different search engines
-          const patterns = [
-            /href="([^"]*)"[^>]*>([^<]*)</g,
-            /<a[^>]*href="([^"]*)"[^>]*>([^<]*)</g,
-            /"url":"([^"]*)"[^}]*"title":"([^"]*)"/g,
-            /href="([^"]*)"[^>]*title="([^"]*)"/g
-          ];
-
-          for (const pattern of patterns) {
-            const matches = html.match(pattern);
-            if (matches && matches.length > 0) {
-              linkMatches = matches;
-              break;
-            }
-          }
-
-          for (const match of linkMatches.slice(0, maxResults * 3)) { // Get more to filter
-            let hrefMatch, titleMatch;
-            
-            // Handle different match formats
-            if (match.includes('"url"')) {
-              // JSON format
-              const urlMatch = match.match(/"url":"([^"]*)"/);
-              const titleMatch2 = match.match(/"title":"([^"]*)"/);
-              hrefMatch = urlMatch;
-              titleMatch = titleMatch2;
-            } else {
-              // HTML format
-              hrefMatch = match.match(/href="([^"]*)"/);
-              titleMatch = match.match(/>([^<]*)</) || match.match(/title="([^"]*)"/);
-            }
-            
-            if (hrefMatch && titleMatch) {
-              const link = hrefMatch[1];
-              const title = titleMatch[1];
-              
-              // Enhanced filtering for better quality results
-              if (link.startsWith('http') && 
-                  !link.includes('duckduckgo.com') && 
-                  !link.includes('google.com') &&
-                  !link.includes('bing.com') &&
-                  !link.includes('brave.com') &&
-                  !link.includes('qwant.com') &&
-                  !link.includes('searx.be') &&
-                  !link.includes('javascript:') &&
-                  !link.includes('mailto:') &&
-                  title.length > 5 &&
-                  !title.includes('Search') &&
-                  !title.includes('Results') &&
-                  !title.includes('Loading')) {
-                
-                results.push({
-                  title: title.trim(),
-                  link: link,
-                  snippet: title.trim()
-                });
-              }
-            }
-          }
-
-          if (results.length > 0) {
-            console.log(`✅ Web scraping found ${results.length} results from ${searchUrl}`);
-            return results.slice(0, maxResults);
-          }
-        } catch (error) {
-          console.log(`❌ Web scraping failed for ${searchUrl}: ${(error as Error).message}`);
-          continue;
         }
       }
 
-      // If all search engines fail, try direct URL testing for common patterns
-      console.log(`🔍 Trying direct URL testing for: ${query}`);
-      const directResults = await this.testDirectUrls(query, maxResults);
-      if (directResults.length > 0) {
-        console.log(`✅ Direct URL testing found ${directResults.length} results`);
-        return directResults;
+      // NEW: If no results from parallel search, try direct URL testing
+      if (successfulResults.length === 0) {
+        console.log(`🔍 No parallel results, trying direct URL testing for: ${query}`);
+        const directResults = await this.testDirectUrlsInParallel(query, maxResults);
+        if (directResults.length > 0) {
+          console.log(`✅ Direct URL testing found ${directResults.length} results`);
+          return directResults;
+        }
       }
 
-      return [];
+      return successfulResults.slice(0, maxResults);
     } catch (error) {
-      console.log(`❌ All web scraping fallbacks failed: ${(error as Error).message}`);
+      console.log(`❌ All parallel web scraping fallbacks failed: ${(error as Error).message}`);
       return [];
     }
   }
 
-  private async testDirectUrls(query: string, maxResults: number): Promise<SearchResult[]> {
+  // NEW: Search with individual engine
+  private async searchWithEngine(engine: any, query: string, maxResults: number): Promise<SearchResult[]> {
+    try {
+      const searchUrl = `${engine.url}?q=${encodeURIComponent(query)}&format=json`;
+      
+      const response = await fetch(searchUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.9',
+          'Accept-Encoding': 'gzip, deflate, br',
+          'Connection': 'keep-alive',
+          'Upgrade-Insecure-Requests': '1',
+          'Sec-Fetch-Dest': 'document',
+          'Sec-Fetch-Mode': 'navigate',
+          'Sec-Fetch-Site': 'none',
+          'Cache-Control': 'max-age=0'
+        },
+        signal: AbortSignal.timeout(engine.timeout)
+      });
+
+      if (!response.ok) {
+        console.log(`❌ ${engine.name} returned status: ${response.status}`);
+        return [];
+      }
+
+      const html = await response.text();
+      const results: SearchResult[] = [];
+
+      // Enhanced regex patterns for different search engines
+      let linkMatches: string[] = [];
+      
+      // Try multiple regex patterns for different search engines
+      const patterns = [
+        /href="([^"]*)"[^>]*>([^<]*)</g,
+        /<a[^>]*href="([^"]*)"[^>]*>([^<]*)</g,
+        /"url":"([^"]*)"[^}]*"title":"([^"]*)"/g,
+        /href="([^"]*)"[^>]*title="([^"]*)"/g
+      ];
+
+      for (const pattern of patterns) {
+        const matches = html.match(pattern);
+        if (matches && matches.length > 0) {
+          linkMatches = matches;
+          break;
+        }
+      }
+
+      for (const match of linkMatches.slice(0, maxResults * 3)) {
+        let hrefMatch, titleMatch;
+        
+        // Handle different match formats
+        if (match.includes('"url"')) {
+          // JSON format
+          const urlMatch = match.match(/"url":"([^"]*)"/);
+          const titleMatch2 = match.match(/"title":"([^"]*)"/);
+          hrefMatch = urlMatch;
+          titleMatch = titleMatch2;
+        } else {
+          // HTML format
+          hrefMatch = match.match(/href="([^"]*)"/);
+          titleMatch = match.match(/>([^<]*)</) || match.match(/title="([^"]*)"/);
+        }
+        
+        if (hrefMatch && titleMatch) {
+          const link = hrefMatch[1];
+          const title = titleMatch[1];
+          
+          // Enhanced filtering for better quality results
+          if (link.startsWith('http') && 
+              !link.includes('duckduckgo.com') && 
+              !link.includes('google.com') &&
+              !link.includes('bing.com') &&
+              !link.includes('brave.com') &&
+              !link.includes('qwant.com') &&
+              !link.includes('searx.be') &&
+              !link.includes('javascript:') &&
+              !link.includes('mailto:') &&
+              title.length > 5 &&
+              !title.includes('Search') &&
+              !title.includes('Results') &&
+              !title.includes('Loading') &&
+              !title.includes('User Survey') &&
+              !title.includes('Survey') &&
+              !title.includes('Mojeek') &&
+              !title.includes('blocksurvey') &&
+              !link.includes('blocksurvey.io') &&
+              !link.includes('survey') &&
+              !link.includes('mojeek')) {
+            
+            results.push({
+              title: title.trim(),
+              link: link,
+              snippet: title.trim()
+            });
+          }
+        }
+      }
+
+      return results.slice(0, maxResults);
+    } catch (error) {
+      console.log(`❌ ${engine.name} search failed: ${(error as Error).message}`);
+      return [];
+    }
+  }
+
+  // NEW: Parallel URL testing
+  private async testDirectUrlsInParallel(projectName: string, maxResults: number): Promise<SearchResult[]> {
     const results: SearchResult[] = [];
-    const projectName = query.toLowerCase().replace(/\s+/g, '');
+    const projectNameClean = projectName.toLowerCase().replace(/\s+/g, '');
     
-    // Common URL patterns to test
+    // NEW: Optimized URL patterns with prioritization
     const urlPatterns = [
-      `https://${projectName}.com`,
-      `https://www.${projectName}.com`,
-      `https://${projectName}.org`,
-      `https://${projectName}.io`,
-      `https://${projectName}.app`,
-      `https://${projectName}.xyz`,
-      `https://docs.${projectName}.com`,
-      `https://whitepaper.${projectName}.com`,
-      `https://github.com/${projectName}`,
-      `https://github.com/${projectName.replace(/[^a-z0-9]/g, '')}`
+      // HIGH PRIORITY
+      `https://${projectNameClean}.com`,
+      `https://www.${projectNameClean}.com`,
+      // MEDIUM PRIORITY
+      `https://${projectNameClean}.io`,
+      `https://${projectNameClean}.org`,
+      `https://${projectNameClean}.app`,
+      // LOW PRIORITY
+      `https://${projectNameClean}.xyz`,
+      `https://${projectNameClean}.game`,
+      `https://${projectNameClean}.play`,
+      `https://${projectNameClean}.gg`,
+      `https://${projectNameClean}.net`,
+      `https://${projectNameClean}.co`,
+      `https://${projectNameClean}.dev`,
+      `https://docs.${projectNameClean}.com`,
+      `https://whitepaper.${projectNameClean}.com`,
+      `https://docs.${projectNameClean}.io`,
+      `https://whitepaper.${projectNameClean}.io`,
+      `https://paper.${projectNameClean}.com`,
+      `https://tokenomics.${projectNameClean}.com`,
+      `https://github.com/${projectNameClean}`,
+      `https://github.com/${projectNameClean.replace(/[^a-z0-9]/g, '')}`,
+      `https://github.com/${projectNameClean.replace(/[^a-z0-9]/g, '-')}`,
+      `https://twitter.com/${projectNameClean}`,
+      `https://twitter.com/${projectNameClean.replace(/[^a-z0-9]/g, '')}`,
+      `https://discord.gg/${projectNameClean}`,
+      `https://discord.gg/${projectNameClean.replace(/[^a-z0-9]/g, '')}`,
+      `https://t.me/${projectNameClean}`,
+      `https://t.me/${projectNameClean.replace(/[^a-z0-9]/g, '')}`,
+      `https://medium.com/@${projectNameClean}`,
+      `https://mirror.xyz/${projectNameClean}`,
+      `https://opensea.io/collection/${projectNameClean}`,
+      `https://magiceden.io/collections/${projectNameClean}`
+    ];
+    
+    // NEW: Studio/Developer URL patterns
+    const studioUrlPatterns = [
+      `https://${projectNameClean.replace(/\s+/g, '')}games.com`,
+      `https://${projectNameClean.replace(/\s+/g, '')}studio.com`,
+      `https://${projectNameClean.replace(/\s+/g, '')}dev.com`,
+      `https://${projectNameClean.replace(/\s+/g, '')}publisher.com`,
+      `https://${projectNameClean.replace(/\s+/g, '')}games.io`,
+      `https://${projectNameClean.replace(/\s+/g, '')}studio.io`,
+      `https://${projectNameClean.replace(/\s+/g, '')}dev.io`,
+      `https://${projectNameClean.replace(/\s+/g, '')}publisher.io`,
+      `https://${projectNameClean}games.com`,
+      `https://${projectNameClean}games.io`,
+      `https://${projectNameClean}games.xyz`,
+      `https://${projectNameClean}studio.com`,
+      `https://${projectNameClean}studio.io`,
+      `https://${projectNameClean}studio.xyz`,
+      `https://${projectNameClean}dev.com`,
+      `https://${projectNameClean}dev.io`,
+      `https://${projectNameClean}dev.xyz`
     ];
 
-    for (const url of urlPatterns.slice(0, maxResults)) {
-      try {
-        const response = await fetch(url, {
-          method: 'HEAD',
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-          }
-        });
-
-        if (response.ok) {
-          results.push({
-            title: `${query} - Official Site`,
-            link: url,
-            snippet: `Official website for ${query}`
-          });
+    // NEW: Test all URLs in parallel
+    const allUrlPatterns = [...urlPatterns, ...studioUrlPatterns];
+    const urlPromises = allUrlPatterns.map(url => this.testUrl(url, projectName));
+    
+    const urlResults = await Promise.allSettled(urlPromises);
+    
+    // NEW: Collect successful results
+    for (const result of urlResults) {
+      if (result.status === 'fulfilled' && result.value) {
+        results.push(result.value);
+        if (results.length >= maxResults) {
+          break; // Early termination
         }
-      } catch (error) {
-        // URL doesn't exist, continue to next
-        continue;
       }
     }
 
     return results;
+  }
+
+  // NEW: Test individual URL with timeout
+  private async testUrl(url: string, projectName: string): Promise<SearchResult | null> {
+    try {
+      // NEW: Try HEAD first (faster)
+      const response = await fetch(url, {
+        method: 'HEAD',
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        },
+        signal: AbortSignal.timeout(2000) // NEW: 2 second timeout instead of 5
+      });
+
+      if (response.ok) {
+        return {
+          title: `${projectName} - Official Site`,
+          link: url,
+          snippet: `Official website for ${projectName}`
+        };
+      }
+    } catch (error) {
+      // If HEAD fails, try GET method
+      try {
+        const response = await fetch(url, {
+          method: 'GET',
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+          },
+          signal: AbortSignal.timeout(2000) // NEW: 2 second timeout
+        });
+
+        if (response.ok) {
+          return {
+            title: `${projectName} - Official Site`,
+            link: url,
+            snippet: `Official website for ${projectName}`
+          };
+        }
+      } catch (getError) {
+        // Both methods failed, return null
+        return null;
+      }
+    }
+    
+    return null;
+  }
+
+  // NEW: Early termination logic
+  private shouldTerminateEarly(dataPoints: number, confidence: number): boolean {
+    return dataPoints >= MINIMUM_DATA_POINTS && confidence >= MINIMUM_CONFIDENCE;
+  }
+
+  // NEW: Calculate confidence based on result quality
+  private calculateConfidence(results: SearchResult[]): number {
+    if (results.length === 0) return 0;
+    
+    let confidence = 0;
+    
+    // Base confidence on number of results
+    confidence += Math.min(results.length * 10, 50);
+    
+    // Bonus for official-looking URLs
+    const officialUrls = results.filter(r => 
+      r.link.includes('.com') || 
+      r.link.includes('.io') || 
+      r.link.includes('.org')
+    );
+    confidence += officialUrls.length * 5;
+    
+    // Bonus for descriptive titles
+    const descriptiveTitles = results.filter(r => 
+      r.title.length > 10 && 
+      !r.title.includes('Search') && 
+      !r.title.includes('Results')
+    );
+    confidence += descriptiveTitles.length * 3;
+    
+    return Math.min(confidence, 100);
+  }
+
+  // LEGACY: Keep for backward compatibility
+  private async getWebScrapingResults(query: string, maxResults: number): Promise<SearchResult[]> {
+    return this.getParallelWebScrapingResults(query, maxResults);
+  }
+
+  // LEGACY: Keep for backward compatibility
+  private async testDirectUrls(query: string, maxResults: number): Promise<SearchResult[]> {
+    return this.testDirectUrlsInParallel(query, maxResults);
   }
 
   private getFallbackResults(query: string): SearchResult[] {
@@ -329,6 +547,122 @@ export class FreeSearchService {
     }
     
     return allResults;
+  }
+
+  // Generate studio search terms based on project name patterns
+  private generateStudioSearchTerms(projectName: string): string[] {
+    const studioTerms: string[] = [];
+    
+    // Extract potential studio name from project name
+    const words = projectName.split(/\s+/);
+    
+    // If project name has multiple words, try different combinations
+    if (words.length > 1) {
+      // Try first word as studio name
+      const firstWord = words[0];
+      studioTerms.push(`${firstWord} Games`);
+      studioTerms.push(`${firstWord} Studio`);
+      studioTerms.push(`${firstWord} Dev`);
+      studioTerms.push(`${firstWord} Interactive`);
+      studioTerms.push(`${firstWord} Entertainment`);
+      studioTerms.push(`${firstWord} Labs`);
+      studioTerms.push(`${firstWord} DAO`);
+      studioTerms.push(`${firstWord} Protocol`);
+      
+      // Try first two words as studio name
+      if (words.length >= 2) {
+        const firstTwoWords = words.slice(0, 2).join(' ');
+        studioTerms.push(`${firstTwoWords} Games`);
+        studioTerms.push(`${firstTwoWords} Studio`);
+        studioTerms.push(`${firstTwoWords} Dev`);
+      }
+    } else {
+      // Single word project name
+      studioTerms.push(`${projectName} Games`);
+      studioTerms.push(`${projectName} Studio`);
+      studioTerms.push(`${projectName} Dev`);
+      studioTerms.push(`${projectName} Interactive`);
+      studioTerms.push(`${projectName} Entertainment`);
+      studioTerms.push(`${projectName} Labs`);
+      studioTerms.push(`${projectName} DAO`);
+      studioTerms.push(`${projectName} Protocol`);
+    }
+    
+    // Add common studio patterns
+    studioTerms.push(`${projectName} developer`);
+    studioTerms.push(`${projectName} publisher`);
+    studioTerms.push(`${projectName} created by`);
+    studioTerms.push(`${projectName} developed by`);
+    studioTerms.push(`${projectName} team`);
+    studioTerms.push(`${projectName} company`);
+    
+    return studioTerms;
+  }
+
+  // Specialized search methods for gaming projects
+  async searchForGamingProject(projectName: string): Promise<SearchResult[]> {
+    console.log(`🎮 Starting specialized gaming project search for: ${projectName}`);
+    
+    const results: SearchResult[] = [];
+    
+    // Gaming-specific search terms
+    const gamingSearchTerms = [
+      `${projectName} game`,
+      `${projectName} gaming`,
+      `${projectName} play`,
+      `${projectName} download`,
+      `${projectName} steam`,
+      `${projectName} epic games`,
+      `${projectName} blockchain game`,
+      `${projectName} web3 game`,
+      `${projectName} nft game`,
+      `${projectName} crypto game`,
+      `${projectName} whitepaper`,
+      `${projectName} tokenomics`,
+      `${projectName} roadmap`,
+      `${projectName} alpha`,
+      `${projectName} beta`,
+      `${projectName} launch`,
+      `${projectName} release`
+    ];
+    
+    // Studio/Developer search terms - try to identify the studio
+    const studioSearchTerms = this.generateStudioSearchTerms(projectName);
+    
+    // Search with gaming-specific terms
+    for (const term of gamingSearchTerms.slice(0, 8)) { // Limit to avoid rate limiting
+      try {
+        const termResults = await this.search(term, 3);
+        results.push(...termResults);
+        
+        // Add delay between searches
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      } catch (error) {
+        console.log(`❌ Gaming search failed for "${term}": ${(error as Error).message}`);
+      }
+    }
+    
+    // Search for studio/developer information
+    console.log(`🎮 Searching for studio/developer information...`);
+    for (const term of studioSearchTerms.slice(0, 5)) { // Limit to avoid rate limiting
+      try {
+        const termResults = await this.search(term, 3);
+        results.push(...termResults);
+        
+        // Add delay between searches
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      } catch (error) {
+        console.log(`❌ Studio search failed for "${term}": ${(error as Error).message}`);
+      }
+    }
+    
+    // Remove duplicates
+    const uniqueResults = results.filter((result, index, self) => 
+      index === self.findIndex(r => r.link === result.link)
+    );
+    
+    console.log(`🎮 Gaming search found ${uniqueResults.length} unique results for: ${projectName}`);
+    return uniqueResults.slice(0, 10); // Return top 10 results
   }
 
   // Specialized search methods for common use cases
@@ -852,8 +1186,8 @@ export class FreeSearchService {
 
   getCacheStats(): { size: number; entries: string[] } {
     return {
-      size: this.cache.size,
-      entries: Array.from(this.cache.keys())
+      size: this.cache.size(),
+      entries: Array.from(this.cache['cache'].keys())
     };
   }
 
