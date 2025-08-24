@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ProjectResearch } from './types';
 import { mockAxieInfinityData } from './mockData';
 import { TokenPriceChart } from './components/TokenPriceChart';
+import { NFTLifetimeValueChart } from './components/NFTLifetimeValueChart';
 import ChatBubble, { ChatMessage } from './components/ChatBubble';
 import './App.css';
 
@@ -345,6 +346,14 @@ function App() {
                           research.financialData?.avalancheTokenInfo?.tokenInfo?.tokenSymbol}
               projectName={research.projectName}
             />
+
+            {/* NFT Lifetime Value Chart */}
+            {research.nftData && research.nftData.length > 0 && (
+              <NFTLifetimeValueChart
+                nftData={research.nftData[0]} // Show the top NFT collection
+                projectName={research.projectName}
+              />
+            )}
 
             {/* Confidence Display */}
             {research.confidence && (

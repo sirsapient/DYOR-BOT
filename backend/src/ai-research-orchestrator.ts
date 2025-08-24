@@ -3980,7 +3980,7 @@ export async function conductAIOrchestratedResearch(
     const findings: ResearchFindings = {};
     
     // NEW: Create promises for all sources to run in parallel
-    const sourcePromises = plan.prioritySources.map(async (source) => {
+    const sourcePromises = plan.prioritySources.map(async (source: any) => {
       console.log(`📊 Starting collection from ${source.source}...`);
       
       try {

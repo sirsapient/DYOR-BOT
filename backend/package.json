@@ -12,7 +12,14 @@
     "batch-demo": "ts-node src/batch-processing-demo.ts",
     "batch-test": "ts-node src/simple-batch-test.ts",
     "steam-test": "ts-node src/test-steam-players.ts",
-    "quick-test": "ts-node src/quick-test.ts"
+    "quick-test": "ts-node src/quick-test.ts",
+    "nft-test": "ts-node src/test-nft-service.ts",
+    "opensea-test": "ts-node src/test-opensea.ts",
+    "opensea-direct": "ts-node src/test-opensea-direct.ts",
+    "opensea-v2": "ts-node src/test-opensea-v2.ts",
+    "opensea-current": "ts-node src/test-opensea-current.ts",
+    "opensea-search": "ts-node src/test-opensea-search.ts",
+    "opensea-structure": "ts-node src/test-opensea-structure.ts"
   },
   "keywords": [],
   "author": "",

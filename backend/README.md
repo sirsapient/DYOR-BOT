@@ -28,6 +28,7 @@ DYOR BOT backend provides intelligent research capabilities for Web3 and gaming 
 - **Financial Data** - Market cap, token information from multiple chains
 - **Team Analysis** - LinkedIn, Glassdoor, company background research
 - **Steam Integration** - Game reviews and community sentiment
+- **NFT Marketplaces** - OpenSea and Magic Eden NFT data collection
 
 ### Quality Gates
 - Automated quality assessment
@@ -100,6 +101,7 @@ The system returns comprehensive research data including:
 - **Team Analysis** - Company background, LinkedIn insights, reviews
 - **Technical Assessment** - Security analysis, GitHub activity, review scores
 - **Community Health** - Social media activity, Discord data, Steam reviews
+- **NFT Data** - NFT collections, floor prices, volume, and lifetime value metrics
 - **Confidence Scoring** - Overall confidence grade and detailed breakdown
 
 ## Architecture
@@ -111,6 +113,7 @@ The system returns comprehensive research data including:
 - **Quality Gates** (`quality-gates.ts`) - Quality assessment and validation
 - **Research Scoring** (`research-scoring.ts`) - Confidence and completeness scoring
 - **Confidence Indicators** (`confidence-indicators.ts`) - Visual confidence display
+- **NFT Service** (`nft-service.ts`) - NFT marketplace data collection
 
 ### Data Flow
 
@@ -165,6 +168,8 @@ npm run build:prod
 - `TWITTER_BEARER_TOKEN` - Twitter API token for social analysis
 - `DISCORD_TOKEN` - Discord bot token for community analysis
 - `STEAM_API_KEY` - Steam API key for game reviews
+- `OPENSEA_API_KEY` - OpenSea API key for NFT data collection
+- `MAGIC_EDEN_API_KEY` - Magic Eden API key for NFT data collection
 - `PORT` - Server port (default: 3001)
 
 ### Quality Gates Configuration
@@ -178,6 +183,42 @@ const qualityGates = {
   requiredSources: ['whitepaper', 'github'],
   timeLimit: 300000 // 5 minutes
 };
+```
+
+## NFT Integration
+
+The system now includes comprehensive NFT data collection for Web3 games:
+
+### NFT Features
+- **Multi-Marketplace Support** - OpenSea (Ethereum) and Magic Eden (Solana)
+- **Lifetime Value Analysis** - Historical price and volume data
+- **Collection Ranking** - Automatic selection of top NFT by volume/floor price
+- **Real-time Data** - Current floor prices, volume, and market metrics
+
+### NFT Data Structure
+```typescript
+interface NFTData {
+  collectionName: string;
+  marketplace: 'opensea' | 'magiceden' | 'other';
+  collectionUrl: string;
+  floorPrice?: number;
+  floorPriceCurrency?: string;
+  totalSupply?: number;
+  network: 'ethereum' | 'solana' | 'other';
+  description?: string;
+  imageUrl?: string;
+  volume24h?: number;
+  volumeTotal?: number;
+  owners?: number;
+  listed?: number;
+  lifetimeValue?: NFTLifetimeValue;
+}
+```
+
+### Testing NFT Service
+```bash
+# Test NFT service functionality
+npm run nft-test
 ```
 
 ## Contributing

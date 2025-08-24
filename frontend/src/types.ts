@@ -235,6 +235,33 @@ export interface NFTData {
   network: 'ethereum' | 'solana' | 'other';
   description?: string;
   imageUrl?: string;
+  volume24h?: number;
+  volumeTotal?: number;
+  owners?: number;
+  listed?: number;
+  lifetimeValue?: NFTLifetimeValue;
+}
+
+export interface NFTLifetimeValue {
+  totalVolume: number;
+  totalSales: number;
+  averagePrice: number;
+  highestSale: number;
+  lowestSale: number;
+  priceHistory: NFTPricePoint[];
+  volumeHistory: NFTVolumePoint[];
+}
+
+export interface NFTPricePoint {
+  date: string;
+  price: number;
+  currency: string;
+}
+
+export interface NFTVolumePoint {
+  date: string;
+  volume: number;
+  sales: number;
 }
 
 export interface InteractiveSource {

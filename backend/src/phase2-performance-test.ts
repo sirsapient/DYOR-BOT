@@ -32,17 +32,22 @@ async function testPhase2Performance() {
     try {
       // Mock data collection functions for testing
       const mockDataCollectionFunctions = {
-        discoverOfficialUrlsWithAI: async () => ({ website: 'https://example.com' }),
         fetchWhitepaperUrl: async () => 'https://example.com/whitepaper',
+        fetchPdfBuffer: async () => Buffer.from('mock pdf content'),
+        extractTokenomicsFromWhitepaper: async () => ({ tokenomics: 'mock data' }),
+        searchProjectSpecificTokenomics: async () => ({ tokenomics: 'mock data' }),
         fetchTwitterProfileAndTweets: async () => ({ followers: 1000 }),
+        fetchEnhancedTwitterData: async () => ({ followers: 1000, tweets: [] }),
         fetchDiscordServerData: async () => ({ members: 500 }),
         fetchRedditCommunityData: async () => ({ subscribers: 200 }),
+        fetchRedditRecentPosts: async () => ([]),
+        discoverSocialMediaLinks: async () => ({ twitter: 'https://twitter.com/example' }),
         fetchSteamDescription: async () => 'Game description',
         fetchWebsiteAboutSection: async () => 'About section',
         fetchRoninTokenData: async () => ({ symbol: 'TOKEN' }),
         fetchRoninTransactionHistory: async () => ([]),
         discoverOfficialUrlsWithAI: async () => ({ website: 'https://example.com' }),
-        findOfficialSourcesForEstablishedProject: async () => ({ website: 'https://example.com' }),
+        findOfficialSourcesForEstablishedProject: async () => ({ website: 'https://example.com', twitter: 'https://twitter.com/example' }),
         searchContractAddressWithLLM: async () => '0x123...',
         getFinancialDataFromAlternativeSources: async () => ({ marketCap: 1000000 })
       };

@@ -14,6 +14,7 @@ import { QualityGatesEngine, formatQualityGateResponse, ProjectType } from './qu
 import { generateConfidenceMetrics, ConfidenceMetrics } from './confidence-indicators';
 import { conductAIOrchestratedResearch, AIResearchOrchestrator } from './ai-research-orchestrator';
 import { GameStoreAPIService } from './game-store-apis';
+import { NFTService } from './nft-service';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -2434,6 +2435,33 @@ app.post('/api/research-enhanced', async (req: any, res: any) => {
     const qualityGates = new QualityGatesEngine();
     const gateResult = qualityGates.checkQualityGates(aiResult.findings, undefined, projectName);
 
+    // NEW: NFT Search for Web3 Games
+    let nftData: any[] = [];
+    // Check if this is a Web3 game project
+    const isWeb3Game = aiResult.findings.projectType?.data?.toLowerCase().includes('web3') || 
+                      aiResult.findings.projectType?.data?.toLowerCase().includes('game') ||
+                      projectName.toLowerCase().includes('axie') ||
+                      projectName.toLowerCase().includes('nft');
+    
+    if (isWeb3Game) {
+      try {
+        console.log(`🔍 Searching NFTs for Web3 game: ${projectName}`);
+        const nftService = NFTService.getInstance();
+        const nftCollections = await nftService.searchNFTs(projectName);
+        
+        if (nftCollections.length > 0) {
+          // Get the top NFT collection by volume/floor price
+          const topNFT = nftService.getTopNFT(nftCollections);
+          nftData = topNFT ? [topNFT] : nftCollections.slice(0, 1);
+          console.log(`✅ Found ${nftCollections.length} NFT collections for ${projectName}`);
+        } else {
+          console.log(`⚠️ No NFT collections found for ${projectName}`);
+        }
+      } catch (error) {
+        console.error(`❌ NFT search failed for ${projectName}:`, error);
+      }
+    }
+
     // NEW: Generate comprehensive response with all new features
     const enhancedResponse = {
       projectName,
@@ -2452,7 +2480,7 @@ app.post('/api/research-enhanced', async (req: any, res: any) => {
       },
       researchPlan: aiResult.plan,
       findings: aiResult.findings,
-      completeness: aiResult.completeness,
+      nftData: nftData, // NEW: Include NFT data
       cacheStatus: {
         hasCachedData: updateStatus.needsUpdate === false,
         lastUpdateAge: updateStatus.lastUpdateAge,
