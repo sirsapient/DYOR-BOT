@@ -13,7 +13,7 @@ export interface QualityGateResult {
 }
 
 export interface ProjectType {
-  type: 'web3_game' | 'traditional_game' | 'publisher' | 'platform' | 'unknown';
+  type: 'web3_game' | 'traditional_game' | 'publisher' | 'platform' | 'DeFi' | 'AI' | 'NFT' | 'MemeCoin' | 'Infrastructure' | 'DAO' | 'unknown';
   confidence: number;
 }
 

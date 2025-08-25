@@ -1,0 +1,135 @@
+{
+  "timestamp": "2025-08-25T21:32:39.284Z",
+  "config": {
+    "ecosystems": [
+      "defi"
+    ],
+    "maxProjectsPerRun": 5,
+    "delayBetweenTests": 2000,
+    "delayBetweenEcosystems": 5000,
+    "saveResults": true,
+    "resultsFile": "defi-test-results.json"
+  },
+  "results": [
+    {
+      "projectName": "Uniswap",
+      "projectType": "defi",
+      "chain": "ethereum",
+      "success": true,
+      "dataCollected": [],
+      "missingData": [
+        "TVL",
+        "APY",
+        "Liquidity Pools",
+        "Token Distribution"
+      ],
+      "errors": [],
+      "executionTime": 43983,
+      "confidence": 0,
+      "notes": []
+    },
+    {
+      "projectName": "Aave",
+      "projectType": "defi",
+      "chain": "ethereum",
+      "success": true,
+      "dataCollected": [],
+      "missingData": [
+        "TVL",
+        "APY",
+        "Smart Contract Audits",
+        "Risk Assessment"
+      ],
+      "errors": [],
+      "executionTime": 637,
+      "confidence": 0,
+      "notes": []
+    },
+    {
+      "projectName": "Trader Joe",
+      "projectType": "defi",
+      "chain": "avalanche",
+      "success": true,
+      "dataCollected": [],
+      "missingData": [
+        "TVL",
+        "APY",
+        "Protocol Revenue",
+        "Governance"
+      ],
+      "errors": [],
+      "executionTime": 19057,
+      "confidence": 0.3,
+      "notes": []
+    },
+    {
+      "projectName": "Raydium",
+      "projectType": "defi",
+      "chain": "solana",
+      "success": true,
+      "dataCollected": [],
+      "missingData": [
+        "TVL",
+        "APY",
+        "Liquidity Pools",
+        "Token Distribution"
+      ],
+      "errors": [],
+      "executionTime": 13884,
+      "confidence": 0,
+      "notes": []
+    },
+    {
+      "projectName": "GMX",
+      "projectType": "defi",
+      "chain": "arbitrum",
+      "success": true,
+      "dataCollected": [],
+      "missingData": [
+        "TVL",
+        "APY",
+        "Risk Assessment",
+        "Protocol Revenue"
+      ],
+      "errors": [],
+      "executionTime": 19376,
+      "confidence": 0.35,
+      "notes": []
+    }
+  ],
+  "summaries": [
+    {
+      "ecosystem": "defi",
+      "totalProjects": 5,
+      "successfulTests": 5,
+      "failedTests": 0,
+      "averageExecutionTime": 19387.4,
+      "averageConfidence": 0.12999999999999998,
+      "dataCoverage": 0,
+      "topPerformingProjects": [],
+      "problematicProjects": [
+        "Uniswap",
+        "Aave",
+        "Trader Joe",
+        "Raydium",
+        "GMX"
+      ],
+      "recommendations": [
+        "Enhance data quality and confidence for defi",
+        "Optimize performance for slow defi projects"
+      ]
+    }
+  ],
+  "overallSummary": {
+    "totalProjects": 5,
+    "totalSuccessful": 5,
+    "totalFailed": 0,
+    "successRate": 100,
+    "avgExecutionTime": 19387.4,
+    "avgConfidence": 0.12999999999999998,
+    "bestPerformingEcosystem": "defi",
+    "worstPerformingEcosystem": "defi",
+    "overallDataCoverage": 0,
+    "timestamp": "2025-08-25T21:32:39.283Z"
+  }
+}

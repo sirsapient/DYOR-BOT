@@ -1,0 +1,393 @@
+{
+  "timestamp": "2025-08-25T21:34:00.727Z",
+  "config": {
+    "ecosystems": [
+      "defi",
+      "nft",
+      "ai",
+      "memecoin",
+      "infrastructure",
+      "dao",
+      "web3_games"
+    ],
+    "maxProjectsPerRun": 5,
+    "delayBetweenTests": 1500,
+    "delayBetweenEcosystems": 3000,
+    "saveResults": true,
+    "resultsFile": "quick-test-results.json"
+  },
+  "results": [
+    {
+      "projectName": "Uniswap",
+      "projectType": "defi",
+      "chain": "ethereum",
+      "success": true,
+      "dataCollected": [],
+      "missingData": [
+        "TVL",
+        "APY",
+        "Liquidity Pools",
+        "Token Distribution"
+      ],
+      "errors": [],
+      "executionTime": 8924,
+      "confidence": 0,
+      "notes": []
+    },
+    {
+      "projectName": "Aave",
+      "projectType": "defi",
+      "chain": "ethereum",
+      "success": true,
+      "dataCollected": [],
+      "missingData": [
+        "TVL",
+        "APY",
+        "Smart Contract Audits",
+        "Risk Assessment"
+      ],
+      "errors": [],
+      "executionTime": 606,
+      "confidence": 0,
+      "notes": []
+    },
+    {
+      "projectName": "Bored Ape Yacht Club",
+      "projectType": "nft",
+      "chain": "ethereum",
+      "success": true,
+      "dataCollected": [],
+      "missingData": [
+        "Floor Price",
+        "Volume",
+        "Rarity",
+        "Community Utility"
+      ],
+      "errors": [],
+      "executionTime": 8,
+      "confidence": 0,
+      "notes": []
+    },
+    {
+      "projectName": "Doodles",
+      "projectType": "nft",
+      "chain": "ethereum",
+      "success": true,
+      "dataCollected": [],
+      "missingData": [
+        "Floor Price",
+        "Volume",
+        "Royalty Structure",
+        "IP Rights"
+      ],
+      "errors": [],
+      "executionTime": 13312,
+      "confidence": 0,
+      "notes": []
+    },
+    {
+      "projectName": "Fetch.ai",
+      "projectType": "ai",
+      "chain": "ethereum",
+      "success": true,
+      "dataCollected": [],
+      "missingData": [
+        "Model Performance",
+        "API Pricing",
+        "Team Expertise",
+        "Use Cases"
+      ],
+      "errors": [],
+      "executionTime": 3,
+      "confidence": 0,
+      "notes": []
+    },
+    {
+      "projectName": "Ocean Protocol",
+      "projectType": "ai",
+      "chain": "ethereum",
+      "success": true,
+      "dataCollected": [],
+      "missingData": [
+        "Model Performance",
+        "Training Data",
+        "API Pricing",
+        "Ethical Considerations"
+      ],
+      "errors": [],
+      "executionTime": 6,
+      "confidence": 0,
+      "notes": []
+    },
+    {
+      "projectName": "Dogecoin",
+      "projectType": "memecoin",
+      "chain": "ethereum",
+      "success": true,
+      "dataCollected": [],
+      "missingData": [
+        "Community Sentiment",
+        "Viral Potential",
+        "Celebrity Endorsements",
+        "Tokenomics"
+      ],
+      "errors": [],
+      "executionTime": 4,
+      "confidence": 0,
+      "notes": []
+    },
+    {
+      "projectName": "Shiba Inu",
+      "projectType": "memecoin",
+      "chain": "ethereum",
+      "success": true,
+      "dataCollected": [],
+      "missingData": [
+        "Community Sentiment",
+        "Social Momentum",
+        "Tokenomics",
+        "Liquidity Locks"
+      ],
+      "errors": [],
+      "executionTime": 4,
+      "confidence": 0,
+      "notes": []
+    },
+    {
+      "projectName": "Polygon",
+      "projectType": "infrastructure",
+      "chain": "polygon",
+      "success": true,
+      "dataCollected": [],
+      "missingData": [
+        "Network Metrics",
+        "Security Features",
+        "Scalability",
+        "Developer Experience"
+      ],
+      "errors": [],
+      "executionTime": 282,
+      "confidence": 0.72,
+      "notes": []
+    },
+    {
+      "projectName": "Arbitrum",
+      "projectType": "infrastructure",
+      "chain": "arbitrum",
+      "success": true,
+      "dataCollected": [],
+      "missingData": [
+        "Network Metrics",
+        "Security",
+        "Scalability",
+        "Interoperability"
+      ],
+      "errors": [],
+      "executionTime": 155,
+      "confidence": 0.8,
+      "notes": []
+    },
+    {
+      "projectName": "Uniswap DAO",
+      "projectType": "dao",
+      "chain": "ethereum",
+      "success": true,
+      "dataCollected": [],
+      "missingData": [
+        "Governance",
+        "Proposals",
+        "Treasury",
+        "Community"
+      ],
+      "errors": [],
+      "executionTime": 791,
+      "confidence": 0,
+      "notes": []
+    },
+    {
+      "projectName": "Aave DAO",
+      "projectType": "dao",
+      "chain": "ethereum",
+      "success": true,
+      "dataCollected": [],
+      "missingData": [
+        "Governance",
+        "Proposals",
+        "Treasury",
+        "Voting Mechanisms"
+      ],
+      "errors": [],
+      "executionTime": 620,
+      "confidence": 0,
+      "notes": []
+    },
+    {
+      "projectName": "Axie Infinity",
+      "projectType": "web3_games",
+      "chain": "ronin",
+      "success": true,
+      "dataCollected": [],
+      "missingData": [
+        "Player Count",
+        "Token Price",
+        "NFT Collections",
+        "Team Info"
+      ],
+      "errors": [],
+      "executionTime": 4,
+      "confidence": 0.8,
+      "notes": []
+    },
+    {
+      "projectName": "The Sandbox",
+      "projectType": "web3_games",
+      "chain": "ethereum",
+      "success": true,
+      "dataCollected": [],
+      "missingData": [
+        "Player Count",
+        "Token Price",
+        "NFT Collections",
+        "Development Activity"
+      ],
+      "errors": [],
+      "executionTime": 5,
+      "confidence": 0.8,
+      "notes": []
+    }
+  ],
+  "summaries": [
+    {
+      "ecosystem": "defi",
+      "totalProjects": 2,
+      "successfulTests": 2,
+      "failedTests": 0,
+      "averageExecutionTime": 4765,
+      "averageConfidence": 0,
+      "dataCoverage": 0,
+      "topPerformingProjects": [],
+      "problematicProjects": [
+        "Uniswap",
+        "Aave"
+      ],
+      "recommendations": [
+        "Enhance data quality and confidence for defi"
+      ]
+    },
+    {
+      "ecosystem": "nft",
+      "totalProjects": 2,
+      "successfulTests": 2,
+      "failedTests": 0,
+      "averageExecutionTime": 6660,
+      "averageConfidence": 0,
+      "dataCoverage": 0,
+      "topPerformingProjects": [],
+      "problematicProjects": [
+        "Bored Ape Yacht Club",
+        "Doodles"
+      ],
+      "recommendations": [
+        "Enhance data quality and confidence for nft",
+        "Optimize performance for slow nft projects"
+      ]
+    },
+    {
+      "ecosystem": "ai",
+      "totalProjects": 2,
+      "successfulTests": 2,
+      "failedTests": 0,
+      "averageExecutionTime": 4.5,
+      "averageConfidence": 0,
+      "dataCoverage": 0,
+      "topPerformingProjects": [],
+      "problematicProjects": [
+        "Fetch.ai",
+        "Ocean Protocol"
+      ],
+      "recommendations": [
+        "Enhance data quality and confidence for ai"
+      ]
+    },
+    {
+      "ecosystem": "memecoin",
+      "totalProjects": 2,
+      "successfulTests": 2,
+      "failedTests": 0,
+      "averageExecutionTime": 4,
+      "averageConfidence": 0,
+      "dataCoverage": 0,
+      "topPerformingProjects": [],
+      "problematicProjects": [
+        "Dogecoin",
+        "Shiba Inu"
+      ],
+      "recommendations": [
+        "Enhance data quality and confidence for memecoin"
+      ]
+    },
+    {
+      "ecosystem": "infrastructure",
+      "totalProjects": 2,
+      "successfulTests": 2,
+      "failedTests": 0,
+      "averageExecutionTime": 218.5,
+      "averageConfidence": 0.76,
+      "dataCoverage": 0,
+      "topPerformingProjects": [],
+      "problematicProjects": [
+        "Polygon",
+        "Arbitrum"
+      ],
+      "recommendations": [
+        "Enhance data quality and confidence for infrastructure"
+      ]
+    },
+    {
+      "ecosystem": "dao",
+      "totalProjects": 2,
+      "successfulTests": 2,
+      "failedTests": 0,
+      "averageExecutionTime": 705.5,
+      "averageConfidence": 0,
+      "dataCoverage": 0,
+      "topPerformingProjects": [],
+      "problematicProjects": [
+        "Uniswap DAO",
+        "Aave DAO"
+      ],
+      "recommendations": [
+        "Enhance data quality and confidence for dao"
+      ]
+    },
+    {
+      "ecosystem": "web3_games",
+      "totalProjects": 2,
+      "successfulTests": 2,
+      "failedTests": 0,
+      "averageExecutionTime": 4.5,
+      "averageConfidence": 0.8,
+      "dataCoverage": 0,
+      "topPerformingProjects": [],
+      "problematicProjects": [
+        "Axie Infinity",
+        "The Sandbox"
+      ],
+      "recommendations": [
+        "Enhance data quality and confidence for web3_games"
+      ]
+    }
+  ],
+  "overallSummary": {
+    "totalProjects": 14,
+    "totalSuccessful": 14,
+    "totalFailed": 0,
+    "successRate": 100,
+    "avgExecutionTime": 1766,
+    "avgConfidence": 0.22285714285714286,
+    "bestPerformingEcosystem": "defi",
+    "worstPerformingEcosystem": "defi",
+    "overallDataCoverage": 0,
+    "timestamp": "2025-08-25T21:34:00.726Z"
+  }
+}
