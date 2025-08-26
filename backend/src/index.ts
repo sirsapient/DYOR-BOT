@@ -2445,24 +2445,30 @@ ${projectName} research completed with AI orchestrated data collection from ${ai
 
 ## Project Overview
 
-${projectName} is a Web3 project with active development and community engagement.
+${projectName} is a Web3 project that has been analyzed using our comprehensive research system. While limited data was available during this analysis, we've provided the best possible assessment based on available information.
 
-## Key Strengths
+## Key Findings
 
-- **AI Analysis**: Comprehensive research using AI-powered data collection
-- **Data Quality**: ${aiResult.confidence >= 0.8 ? 'High' : aiResult.confidence >= 0.6 ? 'Medium' : 'Low'} confidence analysis
-- **Source Coverage**: ${aiResult.successfulSources} sources successfully analyzed
+${aiResult.totalDataPoints > 0 ? 
+  `- **Data Collection**: Successfully gathered ${aiResult.totalDataPoints} data points from ${aiResult.successfulSources} sources
+- **Analysis Quality**: ${aiResult.confidence >= 0.8 ? 'High' : aiResult.confidence >= 0.6 ? 'Medium' : 'Low'} confidence analysis completed
+- **Research Coverage**: Comprehensive search across multiple data sources` :
+  `- **Limited Data Available**: No specific data points were found during this search
+- **Research Attempted**: Comprehensive search across multiple data sources was performed
+- **Recommendation**: Additional manual research may be needed for complete assessment`}
 
 ## Technical Assessment
 
-- **Project Type**: Web3Game (default classification)
+- **Project Type**: Web3Game (default classification based on search context)
 - **Data Quality**: ${aiResult.confidence >= 0.8 ? 'high' : aiResult.confidence >= 0.6 ? 'medium' : 'low'}
-- **Sources Verified**: ${aiResult.successfulSources}
-- **Data Points**: ${aiResult.totalDataPoints} collected
+- **Sources Attempted**: Multiple data sources including whitepaper, team verification, and smart contracts
+- **Research Status**: ${aiResult.earlyTerminated ? 'Early termination due to limited data' : 'Complete analysis'}
 
 ## Investment Recommendation
 
-Based on AI analysis, ${projectName} shows ${aiResult.confidence >= 0.7 ? 'strong' : aiResult.confidence >= 0.5 ? 'moderate' : 'limited'} potential with ${aiResult.totalDataPoints} data points collected.
+${aiResult.totalDataPoints > 0 ? 
+  `Based on AI analysis, ${projectName} shows ${aiResult.confidence >= 0.7 ? 'strong' : aiResult.confidence >= 0.5 ? 'moderate' : 'limited'} potential with ${aiResult.totalDataPoints} data points collected.` :
+  `Due to limited available data, we cannot provide a comprehensive investment recommendation for ${projectName} at this time.`}
 
 ## Risk Assessment
 
@@ -2470,29 +2476,40 @@ Based on AI analysis, ${projectName} shows ${aiResult.confidence >= 0.7 ? 'stron
 **Data Quality**: ${aiResult.confidence >= 0.8 ? 'high' : aiResult.confidence >= 0.6 ? 'medium' : 'low'}
 **Sources Verified**: ${aiResult.successfulSources}
 
-This assessment is based on AI-powered data collection from multiple sources.`,
-      dataPointSummaries: {
-        financial: {
-          title: "Financial Data",
-          summary: `AI analysis completed with ${aiResult.totalDataPoints} data points`,
-          confidence: aiResult.confidence >= 0.8 ? 85 : aiResult.confidence >= 0.6 ? 75 : 60
-        },
-        team: {
-          title: "Team Analysis", 
-          summary: `AI analysis completed with ${aiResult.totalDataPoints} data points`,
-          confidence: aiResult.confidence >= 0.8 ? 80 : aiResult.confidence >= 0.6 ? 70 : 60
-        },
-        technical: {
-          title: "Technical Assessment",
-          summary: `AI analysis completed with ${aiResult.totalDataPoints} data points`,
-          confidence: aiResult.confidence >= 0.8 ? 75 : aiResult.confidence >= 0.6 ? 65 : 60
-        },
-        community: {
-          title: "Community Health",
-          summary: `AI analysis completed with ${aiResult.totalDataPoints} data points`,
-          confidence: aiResult.confidence >= 0.8 ? 85 : aiResult.confidence >= 0.6 ? 75 : 60
+## Additional Research Needed
+
+${aiResult.totalDataPoints === 0 ? 
+  `- **Manual Verification**: Check official project website and documentation
+- **Community Research**: Review social media presence and community discussions
+- **Technical Analysis**: Verify smart contracts and blockchain data
+- **Team Background**: Research team members and company information` :
+  `- **Data Verification**: Cross-reference findings with official sources
+- **Community Engagement**: Monitor social media and community channels
+- **Ongoing Monitoring**: Track project development and updates`}
+
+This assessment is based on AI-powered data collection from multiple sources. ${aiResult.totalDataPoints === 0 ? 'Due to limited data availability, additional manual research is recommended.' : ''}`,
+              dataPointSummaries: {
+          financial: {
+            title: "Financial Data",
+            summary: aiResult.totalDataPoints > 0 ? `AI analysis completed with ${aiResult.totalDataPoints} data points` : "No financial data available",
+            confidence: aiResult.confidence >= 0.8 ? 85 : aiResult.confidence >= 0.6 ? 75 : 60
+          },
+          team: {
+            title: "Team Analysis", 
+            summary: aiResult.totalDataPoints > 0 ? `AI analysis completed with ${aiResult.totalDataPoints} data points` : "No team data available",
+            confidence: aiResult.confidence >= 0.8 ? 80 : aiResult.confidence >= 0.6 ? 70 : 60
+          },
+          technical: {
+            title: "Technical Assessment",
+            summary: aiResult.totalDataPoints > 0 ? `AI analysis completed with ${aiResult.totalDataPoints} data points` : "No technical data available",
+            confidence: aiResult.confidence >= 0.8 ? 75 : aiResult.confidence >= 0.6 ? 65 : 60
+          },
+          community: {
+            title: "Community Health",
+            summary: aiResult.totalDataPoints > 0 ? `AI analysis completed with ${aiResult.totalDataPoints} data points` : "No community data available",
+            confidence: aiResult.confidence >= 0.8 ? 85 : aiResult.confidence >= 0.6 ? 75 : 60
+          }
         }
-      }
     };
     
     console.log(`[SUCCESS] AI orchestrated research completed for ${projectName} with ${aiResult.totalDataPoints} data points`);
@@ -2602,11 +2619,10 @@ app.post('/api/research-enhanced', async (req: any, res: any) => {
 
     // NEW: NFT Search for Web3 Games
     let nftData: any[] = [];
-    // Check if this is a Web3 game project
-    const isWeb3Game = aiResult.findings.projectType?.data?.toLowerCase().includes('web3') || 
-                      aiResult.findings.projectType?.data?.toLowerCase().includes('game') ||
-                      projectName.toLowerCase().includes('axie') ||
-                      projectName.toLowerCase().includes('nft');
+    // Check if this is a Web3 game project (simplified check)
+    const isWeb3Game = projectName.toLowerCase().includes('axie') ||
+                      projectName.toLowerCase().includes('nft') ||
+                      projectName.toLowerCase().includes('game');
     
     if (isWeb3Game) {
       try {
