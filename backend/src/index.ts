@@ -2337,11 +2337,40 @@ This assessment is based on basic data collection from multiple sources.`,
       return;
     }
 
+    // Enhanced data collection functions with retry and caching (same as Web3 gaming)
+    const enhancedDataCollectionFunctions = {
+      fetchWhitepaperUrl,
+      fetchPdfBuffer,
+      extractTokenomicsFromWhitepaper,
+      searchProjectSpecificTokenomics,
+      fetchTwitterProfileAndTweets,
+      fetchEnhancedTwitterData,
+      fetchDiscordServerData,
+      fetchRedditCommunityData,
+      fetchRedditRecentPosts,
+      discoverSocialMediaLinks,
+      fetchSteamDescription,
+      fetchWebsiteAboutSection,
+      fetchRoninTokenData,
+      fetchRoninTransactionHistory,
+      discoverOfficialUrlsWithAI,
+      findOfficialSourcesForEstablishedProject,
+      searchContractAddressWithLLM,
+      getFinancialDataFromAlternativeSources,
+      fetchGameStoreData
+    };
+
+    // Prepare basic info
+    const basicInfo = {
+      name: projectName,
+      aliases: tokenSymbol ? [projectName, tokenSymbol] : [projectName],
+    };
+
     const aiResult = await conductAIOrchestratedResearch(
       projectName,
       anthropicApiKey,
-      undefined,
-      undefined // Use default data collection functions
+      basicInfo,
+      enhancedDataCollectionFunctions
     );
     
     if (!aiResult || !aiResult.success) {
