@@ -2164,65 +2164,236 @@ app.post('/api/research', async (req: any, res: any) => {
   console.log(`Request validation passed`);
 
   try {
-    // Use the real dynamic batch search system
-    console.log(`[INFO] Starting dynamic batch search for: ${projectName}`);
+    // Use the comprehensive AI orchestrated research system
+    console.log(`[INFO] Starting AI orchestrated research for: ${projectName}`);
     
     // Conduct comprehensive AI search with all data sources
-    const batchResult = await conductBatchSearch(projectName);
+    const anthropicApiKey = process.env.ANTHROPIC_API_KEY;
+    if (!anthropicApiKey) {
+      console.log(`⚠️ No Anthropic API key found, using fallback research`);
+      // Use fallback research without AI
+      const fallbackResult = await conductBatchSearch(projectName);
+      const frontendData = {
+        projectName: fallbackResult.projectName,
+        projectType: fallbackResult.projectType,
+        discoveredUrls: {
+          officialWebsite: fallbackResult.officialWebsite,
+          whitepaper: fallbackResult.officialWebsite ? `${fallbackResult.officialWebsite}/whitepaper` : undefined,
+          github: fallbackResult.githubRepository,
+          documentation: fallbackResult.documentation
+        },
+        gameData: {
+          projectType: fallbackResult.projectType,
+          projectDescription: fallbackResult.gameDescription || `Basic research for ${projectName}`,
+          downloadLinks: fallbackResult.downloadLinks?.map(link => ({
+            platform: "website",
+            url: link
+          })) || [],
+          confidence: fallbackResult.confidence,
+          dataQuality: fallbackResult.dataQuality,
+          sourcesFound: fallbackResult.sourcesFound,
+          totalDataPoints: fallbackResult.totalDataPoints
+        },
+        keyFindings: {
+          positives: [
+            fallbackResult.studioBackground ? "Experienced development team" : null,
+            fallbackResult.githubRepository ? "Open source development" : null,
+            fallbackResult.twitterFollowers ? "Strong social media presence" : null,
+            fallbackResult.discordMembers ? "Active community" : null
+          ].filter(Boolean),
+          negatives: [
+            !fallbackResult.documentation ? "Limited documentation" : null,
+            !fallbackResult.securityAudits?.length ? "No security audits found" : null
+          ].filter(Boolean),
+          redFlags: []
+        },
+        confidence: {
+          overall: {
+            grade: fallbackResult.confidence >= 80 ? "A" : fallbackResult.confidence >= 60 ? "B" : "C",
+            score: fallbackResult.confidence,
+            level: fallbackResult.confidence >= 80 ? "very_high" : fallbackResult.confidence >= 60 ? "high" : fallbackResult.confidence >= 40 ? "medium" : "low",
+            description: `Data quality: ${fallbackResult.dataQuality} with ${fallbackResult.sourcesFound} sources`
+          },
+          breakdown: {
+            dataCompleteness: {
+              score: Math.min(100, (fallbackResult.totalDataPoints / 30) * 100),
+              found: fallbackResult.totalDataPoints,
+              total: 30,
+              missing: []
+            },
+            sourceReliability: {
+              score: fallbackResult.dataQuality === 'high' ? 90 : fallbackResult.dataQuality === 'medium' ? 70 : 50,
+              official: fallbackResult.officialWebsite ? 1 : 0,
+              verified: fallbackResult.sourcesFound - (fallbackResult.officialWebsite ? 1 : 0),
+              scraped: 0
+            },
+            dataFreshness: {
+              score: 95,
+              averageAge: 1.5,
+              oldestSource: 'Recent data collection'
+            }
+          },
+          sourceDetails: [
+            {
+              name: 'fallback_research',
+              displayName: 'Basic Research',
+              found: true,
+              quality: fallbackResult.dataQuality,
+              reliability: 'verified',
+              dataPoints: fallbackResult.totalDataPoints,
+              lastUpdated: new Date().toISOString(),
+              confidence: fallbackResult.confidence,
+              icon: '🔍',
+              description: `Basic research from ${fallbackResult.sourcesFound} sources`
+            }
+          ],
+          limitations: [
+            'Basic research results may be limited',
+            'AI analysis not available without API key'
+          ],
+          strengths: [
+            `Basic data collection from ${fallbackResult.sourcesFound} sources`,
+            `Real-time analysis with ${fallbackResult.totalDataPoints} data points`,
+            'Reliable fallback research method'
+          ],
+          userGuidance: {
+            trustLevel: fallbackResult.confidence >= 80 ? 'high' : fallbackResult.confidence >= 60 ? 'medium' : 'low',
+            useCase: 'Suitable for basic project assessment',
+            warnings: [
+              'Data is collected dynamically and may change',
+              'Verify critical information from official sources'
+            ],
+            additionalResearch: [
+              'Check official project documentation',
+              'Verify team information on LinkedIn',
+              'Review community discussions and sentiment'
+            ]
+          }
+        },
+        aiSummary: `# Executive Summary
+
+${projectName} research completed with basic data collection from ${fallbackResult.sourcesFound} sources.
+
+## Project Overview
+
+${projectName} is a ${fallbackResult.projectType} project with active development and community engagement.
+
+## Key Strengths
+
+${fallbackResult.studioBackground ? `- **Experienced Team**: ${fallbackResult.studioBackground}` : ''}
+${fallbackResult.githubRepository ? `- **Open Source**: Active development on GitHub` : ''}
+${fallbackResult.twitterFollowers ? `- **Social Presence**: ${fallbackResult.twitterFollowers} Twitter followers` : ''}
+${fallbackResult.discordMembers ? `- **Community**: ${fallbackResult.discordMembers} Discord members` : ''}
+
+## Technical Assessment
+
+${fallbackResult.technologyStack ? `- **Technology**: ${fallbackResult.technologyStack}` : ''}
+${fallbackResult.smartContracts?.length ? `- **Smart Contracts**: ${fallbackResult.smartContracts.length} contracts deployed` : ''}
+${fallbackResult.securityAudits?.length ? `- **Security**: ${fallbackResult.securityAudits.length} audits completed` : ''}
+
+## Financial Data
+
+${fallbackResult.marketCap ? `- **Market Cap**: ${fallbackResult.marketCap}` : ''}
+${fallbackResult.tokenPrice ? `- **Token Price**: ${fallbackResult.tokenPrice}` : ''}
+${fallbackResult.volume24h ? `- **24h Volume**: ${fallbackResult.volume24h}` : ''}
+
+## Investment Recommendation
+
+Based on basic analysis, ${projectName} shows ${fallbackResult.confidence >= 70 ? 'strong' : fallbackResult.confidence >= 50 ? 'moderate' : 'limited'} potential with ${fallbackResult.totalDataPoints} data points collected.
+
+## Risk Assessment
+
+**Overall Risk Level**: ${fallbackResult.confidence >= 80 ? 'Low' : fallbackResult.confidence >= 60 ? 'Medium' : 'High'}
+**Data Quality**: ${fallbackResult.dataQuality}
+**Sources Verified**: ${fallbackResult.sourcesFound}
+
+This assessment is based on basic data collection from multiple sources.`,
+        dataPointSummaries: {
+          financial: {
+            title: "Financial Data",
+            summary: fallbackResult.marketCap ? `Market cap: ${fallbackResult.marketCap}, Token: ${fallbackResult.tokenSymbol || 'N/A'}` : "Financial data being collected",
+            confidence: fallbackResult.marketCap ? 85 : 60
+          },
+          team: {
+            title: "Team Analysis", 
+            summary: fallbackResult.studioBackground ? `Team: ${fallbackResult.teamSize || 'Unknown'} members, ${fallbackResult.companyLocation || 'Location unknown'}` : "Team data being collected",
+            confidence: fallbackResult.studioBackground ? 80 : 60
+          },
+          technical: {
+            title: "Technical Assessment",
+            summary: fallbackResult.technologyStack ? `Tech: ${fallbackResult.technologyStack}` : "Technical data being collected",
+            confidence: fallbackResult.technologyStack ? 75 : 60
+          },
+          community: {
+            title: "Community Health",
+            summary: fallbackResult.twitterFollowers ? `Social: ${fallbackResult.twitterFollowers} followers, ${fallbackResult.discordMembers || '0'} Discord members` : "Community data being collected",
+            confidence: fallbackResult.twitterFollowers ? 85 : 60
+          }
+        }
+      };
+      
+      console.log(`[SUCCESS] Fallback research completed for ${projectName} with ${fallbackResult.totalDataPoints} data points`);
+      res.json(frontendData);
+      return;
+    }
+
+    const aiResult = await conductAIOrchestratedResearch(
+      projectName,
+      anthropicApiKey,
+      undefined,
+      undefined // Use default data collection functions
+    );
     
-    // Convert to frontend format
+    if (!aiResult || !aiResult.success) {
+      console.log(`❌ AI research failed for ${projectName}`);
+      return res.status(500).json({ 
+        error: 'AI research failed', 
+        details: aiResult?.reason || 'Unknown error' 
+      });
+    }
+    
+    // Convert AI result to frontend format
     const frontendData = {
-      projectName: batchResult.projectName,
-      projectType: batchResult.projectType,
+      projectName: projectName,
+      projectType: 'Web3Game', // Default type since AI result doesn't include this
       discoveredUrls: {
-        officialWebsite: batchResult.officialWebsite,
-        whitepaper: batchResult.officialWebsite ? `${batchResult.officialWebsite}/whitepaper` : undefined,
-        github: batchResult.githubRepository,
-        documentation: batchResult.documentation
+        officialWebsite: undefined, // Will be extracted from findings if available
+        whitepaper: undefined,
+        github: undefined,
+        documentation: undefined
       },
       gameData: {
-        projectType: batchResult.projectType,
-        projectDescription: batchResult.gameDescription || `Dynamic research for ${projectName}`,
-        downloadLinks: batchResult.downloadLinks?.map(link => ({
-          platform: "website",
-          url: link
-        })) || [],
-        confidence: batchResult.confidence,
-        dataQuality: batchResult.dataQuality,
-        sourcesFound: batchResult.sourcesFound,
-        totalDataPoints: batchResult.totalDataPoints
+        projectType: 'Web3Game',
+        projectDescription: `AI research for ${projectName}`,
+        downloadLinks: [],
+        confidence: aiResult.confidence,
+        dataQuality: aiResult.confidence >= 0.8 ? 'high' : aiResult.confidence >= 0.6 ? 'medium' : 'low',
+        sourcesFound: aiResult.successfulSources,
+        totalDataPoints: aiResult.totalDataPoints
       },
       keyFindings: {
-        positives: [
-          batchResult.studioBackground ? "Experienced development team" : null,
-          batchResult.githubRepository ? "Open source development" : null,
-          batchResult.twitterFollowers ? "Strong social media presence" : null,
-          batchResult.discordMembers ? "Active community" : null
-        ].filter(Boolean),
-        negatives: [
-          !batchResult.documentation ? "Limited documentation" : null,
-          !batchResult.securityAudits?.length ? "No security audits found" : null
-        ].filter(Boolean),
+        positives: [],
+        negatives: [],
         redFlags: []
       },
       confidence: {
         overall: {
-          grade: batchResult.confidence >= 80 ? "A" : batchResult.confidence >= 60 ? "B" : "C",
-          score: batchResult.confidence,
-          level: batchResult.confidence >= 80 ? "very_high" : batchResult.confidence >= 60 ? "high" : batchResult.confidence >= 40 ? "medium" : "low",
-          description: `Data quality: ${batchResult.dataQuality} with ${batchResult.sourcesFound} sources`
+          grade: aiResult.confidence >= 0.8 ? "A" : aiResult.confidence >= 0.6 ? "B" : "C",
+          score: Math.round(aiResult.confidence * 100),
+          level: aiResult.confidence >= 0.8 ? "very_high" : aiResult.confidence >= 0.6 ? "high" : aiResult.confidence >= 0.4 ? "medium" : "low",
+          description: `Data quality: ${aiResult.confidence >= 0.8 ? 'high' : aiResult.confidence >= 0.6 ? 'medium' : 'low'} with ${aiResult.successfulSources} sources`
         },
         breakdown: {
           dataCompleteness: {
-            score: Math.min(100, (batchResult.totalDataPoints / 30) * 100),
-            found: batchResult.totalDataPoints,
+            score: Math.min(100, (aiResult.totalDataPoints / 30) * 100),
+            found: aiResult.totalDataPoints,
             total: 30,
             missing: []
           },
           sourceReliability: {
-            score: batchResult.dataQuality === 'high' ? 90 : batchResult.dataQuality === 'medium' ? 70 : 50,
-            official: batchResult.officialWebsite ? 1 : 0,
-            verified: batchResult.sourcesFound - (batchResult.officialWebsite ? 1 : 0),
+            score: aiResult.confidence >= 0.8 ? 90 : aiResult.confidence >= 0.6 ? 70 : 50,
+            official: 0,
+            verified: aiResult.successfulSources,
             scraped: 0
           },
           dataFreshness: {
@@ -2233,30 +2404,30 @@ app.post('/api/research', async (req: any, res: any) => {
         },
         sourceDetails: [
           {
-            name: 'batch_search',
-            displayName: 'Dynamic Search',
+            name: 'ai_orchestrated_research',
+            displayName: 'AI Orchestrated Research',
             found: true,
-            quality: batchResult.dataQuality,
+            quality: aiResult.confidence >= 0.8 ? 'high' : aiResult.confidence >= 0.6 ? 'medium' : 'low',
             reliability: 'verified',
-            dataPoints: batchResult.totalDataPoints,
+            dataPoints: aiResult.totalDataPoints,
             lastUpdated: new Date().toISOString(),
-            confidence: batchResult.confidence,
-            icon: '🔍',
-            description: `Dynamic data collection from ${batchResult.sourcesFound} sources`
+            confidence: Math.round(aiResult.confidence * 100),
+            icon: '🤖',
+            description: `AI-powered research from ${aiResult.successfulSources} sources`
           }
         ],
         limitations: [
-          'Dynamic search results may vary based on data availability',
+          'AI research results may vary based on data availability',
           'Real-time data collection in progress'
         ],
         strengths: [
-          `Comprehensive data collection from ${batchResult.sourcesFound} sources`,
-          `Real-time analysis with ${batchResult.totalDataPoints} data points`,
-          'Dynamic search adapts to available information'
+          `Comprehensive AI analysis from ${aiResult.successfulSources} sources`,
+          `Real-time analysis with ${aiResult.totalDataPoints} data points`,
+          'AI-powered insights and recommendations'
         ],
         userGuidance: {
-          trustLevel: batchResult.confidence >= 80 ? 'high' : batchResult.confidence >= 60 ? 'medium' : 'low',
-          useCase: 'Suitable for initial project assessment and research',
+          trustLevel: aiResult.confidence >= 0.8 ? 'high' : aiResult.confidence >= 0.6 ? 'medium' : 'low',
+          useCase: 'Suitable for comprehensive project assessment and research',
           warnings: [
             'Data is collected dynamically and may change',
             'Verify critical information from official sources'
@@ -2270,67 +2441,61 @@ app.post('/api/research', async (req: any, res: any) => {
       },
       aiSummary: `# Executive Summary
 
-${projectName} research completed with dynamic data collection from ${batchResult.sourcesFound} sources.
+${projectName} research completed with AI orchestrated data collection from ${aiResult.successfulSources} sources.
 
 ## Project Overview
 
-${projectName} is a ${batchResult.projectType} project with active development and community engagement.
+${projectName} is a Web3 project with active development and community engagement.
 
 ## Key Strengths
 
-${batchResult.studioBackground ? `- **Experienced Team**: ${batchResult.studioBackground}` : ''}
-${batchResult.githubRepository ? `- **Open Source**: Active development on GitHub` : ''}
-${batchResult.twitterFollowers ? `- **Social Presence**: ${batchResult.twitterFollowers} Twitter followers` : ''}
-${batchResult.discordMembers ? `- **Community**: ${batchResult.discordMembers} Discord members` : ''}
+- **AI Analysis**: Comprehensive research using AI-powered data collection
+- **Data Quality**: ${aiResult.confidence >= 0.8 ? 'High' : aiResult.confidence >= 0.6 ? 'Medium' : 'Low'} confidence analysis
+- **Source Coverage**: ${aiResult.successfulSources} sources successfully analyzed
 
 ## Technical Assessment
 
-${batchResult.technologyStack ? `- **Technology**: ${batchResult.technologyStack}` : ''}
-${batchResult.smartContracts?.length ? `- **Smart Contracts**: ${batchResult.smartContracts.length} contracts deployed` : ''}
-${batchResult.securityAudits?.length ? `- **Security**: ${batchResult.securityAudits.length} audits completed` : ''}
-
-## Financial Data
-
-${batchResult.marketCap ? `- **Market Cap**: ${batchResult.marketCap}` : ''}
-${batchResult.tokenPrice ? `- **Token Price**: ${batchResult.tokenPrice}` : ''}
-${batchResult.volume24h ? `- **24h Volume**: ${batchResult.volume24h}` : ''}
+- **Project Type**: Web3Game (default classification)
+- **Data Quality**: ${aiResult.confidence >= 0.8 ? 'high' : aiResult.confidence >= 0.6 ? 'medium' : 'low'}
+- **Sources Verified**: ${aiResult.successfulSources}
+- **Data Points**: ${aiResult.totalDataPoints} collected
 
 ## Investment Recommendation
 
-Based on dynamic analysis, ${projectName} shows ${batchResult.confidence >= 70 ? 'strong' : batchResult.confidence >= 50 ? 'moderate' : 'limited'} potential with ${batchResult.totalDataPoints} data points collected.
+Based on AI analysis, ${projectName} shows ${aiResult.confidence >= 0.7 ? 'strong' : aiResult.confidence >= 0.5 ? 'moderate' : 'limited'} potential with ${aiResult.totalDataPoints} data points collected.
 
 ## Risk Assessment
 
-**Overall Risk Level**: ${batchResult.confidence >= 80 ? 'Low' : batchResult.confidence >= 60 ? 'Medium' : 'High'}
-**Data Quality**: ${batchResult.dataQuality}
-**Sources Verified**: ${batchResult.sourcesFound}
+**Overall Risk Level**: ${aiResult.confidence >= 0.8 ? 'Low' : aiResult.confidence >= 0.6 ? 'Medium' : 'High'}
+**Data Quality**: ${aiResult.confidence >= 0.8 ? 'high' : aiResult.confidence >= 0.6 ? 'medium' : 'low'}
+**Sources Verified**: ${aiResult.successfulSources}
 
-This assessment is based on real-time data collection from multiple sources.`,
+This assessment is based on AI-powered data collection from multiple sources.`,
       dataPointSummaries: {
         financial: {
           title: "Financial Data",
-          summary: batchResult.marketCap ? `Market cap: ${batchResult.marketCap}, Token: ${batchResult.tokenSymbol || 'N/A'}` : "Financial data being collected",
-          confidence: batchResult.marketCap ? 85 : 60
+          summary: `AI analysis completed with ${aiResult.totalDataPoints} data points`,
+          confidence: aiResult.confidence >= 0.8 ? 85 : aiResult.confidence >= 0.6 ? 75 : 60
         },
         team: {
           title: "Team Analysis", 
-          summary: batchResult.studioBackground ? `Team: ${batchResult.teamSize || 'Unknown'} members, ${batchResult.companyLocation || 'Location unknown'}` : "Team data being collected",
-          confidence: batchResult.studioBackground ? 80 : 60
+          summary: `AI analysis completed with ${aiResult.totalDataPoints} data points`,
+          confidence: aiResult.confidence >= 0.8 ? 80 : aiResult.confidence >= 0.6 ? 70 : 60
         },
         technical: {
           title: "Technical Assessment",
-          summary: batchResult.technologyStack ? `Tech: ${batchResult.technologyStack}` : "Technical data being collected",
-          confidence: batchResult.technologyStack ? 75 : 60
+          summary: `AI analysis completed with ${aiResult.totalDataPoints} data points`,
+          confidence: aiResult.confidence >= 0.8 ? 75 : aiResult.confidence >= 0.6 ? 65 : 60
         },
         community: {
           title: "Community Health",
-          summary: batchResult.twitterFollowers ? `Social: ${batchResult.twitterFollowers} followers, ${batchResult.discordMembers || '0'} Discord members` : "Community data being collected",
-          confidence: batchResult.twitterFollowers ? 85 : 60
+          summary: `AI analysis completed with ${aiResult.totalDataPoints} data points`,
+          confidence: aiResult.confidence >= 0.8 ? 85 : aiResult.confidence >= 0.6 ? 75 : 60
         }
       }
     };
     
-    console.log(`[SUCCESS] Dynamic search completed for ${projectName} with ${batchResult.totalDataPoints} data points`);
+    console.log(`[SUCCESS] AI orchestrated research completed for ${projectName} with ${aiResult.totalDataPoints} data points`);
     res.json(frontendData);
     
   } catch (error) {
