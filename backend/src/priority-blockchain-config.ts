@@ -14,6 +14,7 @@ export interface PriorityBlockchainConfig {
     transactionHistory: string;
     contractVerification: string;
     nftData?: string;
+    [key: string]: string | undefined; // Allow additional properties
   };
   supportedFeatures: string[];
   nativeToken: {
@@ -22,9 +23,10 @@ export interface PriorityBlockchainConfig {
     decimals: number;
   };
   apiKeyRequired: boolean;
-  apiKeyService: string;
-  apiKeyUrl: string;
-  status: 'active' | 'limited' | 'manual';
+  apiKeyService?: string;
+  apiKeyUrl?: string;
+  status: 'active' | 'limited' | 'inactive';
+  notes?: string[];
 }
 
 // Priority Blockchain Configurations
@@ -90,11 +92,12 @@ export const PRIORITY_BLOCKCHAINS: { [key: string]: PriorityBlockchainConfig } =
     apiEndpoints: {
       price: 'https://api.coingecko.com/api/v3/simple/price?ids=avalanche-2&vs_currencies=usd&include_market_cap=true',
       marketCap: 'https://api.coingecko.com/api/v3/coins/avalanche-2',
+      tokenInfo: 'https://api.snowtrace.io/api?module=token&action=tokeninfo&contractaddress={address}',
+      transactionHistory: 'https://api.snowtrace.io/api?module=account&action=txlist&address={address}',
+      contractVerification: 'https://api.snowtrace.io/api?module=contract&action=getsourcecode&address={address}',
       defiProtocols: 'https://api.llama.fi/protocols?chain=Avalanche',
       tokenList: 'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=250&page=1&sparkline=false&platform=avalanche',
       bridgeData: 'https://bridge.avax.network/api/v1/',
-      // Note: Detailed transaction history requires Snowtrace API (paid)
-      // Using RPC for basic blockchain operations
       rpcEndpoint: 'https://api.avax.network/ext/bc/C/rpc'
     },
     supportedFeatures: ['smart_contracts', 'tokens', 'nfts', 'defi', 'dao', 'gaming'],

@@ -3,7 +3,7 @@
 
 export interface BlockchainConfig {
   name: string;
-  chainId: number;
+  chainId: number | string;
   symbol: string;
   explorer: string;
   rpcUrl: string;
@@ -645,4 +645,3 @@ export function getChainsSupportingFeature(feature: string): string[] {
     .filter(([_, config]) => config.supportedFeatures.includes(feature))
     .map(([chainName, _]) => chainName);
 }
-
