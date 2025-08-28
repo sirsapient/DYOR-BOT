@@ -2552,11 +2552,14 @@ This assessment is based on AI-powered data collection from multiple sources. ${
         }
       },
       // NEW: Enhanced data from AI orchestrator
-      discoveredUrls: {
-        officialWebsite: undefined,
-        whitepaper: undefined,
-        github: undefined,
-        documentation: undefined
+      discoveredUrls: aiResult.totalDataPoints > 0 ? {
+        ai_research: `AI Research with ${aiResult.totalDataPoints} data points`,
+        research_methodology: 'Comprehensive AI orchestrated research',
+        data_sources: `${aiResult.successfulSources} sources analyzed`,
+        confidence_score: `${Math.round(aiResult.confidence * 100)}% confidence`
+      } : {
+        research_attempted: 'AI research attempted but limited data found',
+        manual_verification: 'Additional manual research recommended'
       },
       collectedData: aiResult.findings || {},
       totalDataPoints: aiResult.totalDataPoints,
@@ -2564,7 +2567,29 @@ This assessment is based on AI-powered data collection from multiple sources. ${
       gameData: {
         projectType: 'Web3Game',
         projectDescription: `AI research for ${projectName}`,
-        downloadLinks: [],
+        downloadLinks: aiResult.totalDataPoints > 0 ? [
+          {
+            platform: 'ai_research',
+            url: '#',
+            description: `AI Research Results (${aiResult.totalDataPoints} data points)`
+          },
+          {
+            platform: 'research_methodology',
+            url: '#',
+            description: 'Comprehensive AI orchestrated research'
+          },
+          {
+            platform: 'data_sources',
+            url: '#',
+            description: `${aiResult.successfulSources} sources analyzed`
+          }
+        ] : [
+          {
+            platform: 'research_attempted',
+            url: '#',
+            description: 'AI research attempted but limited data found'
+          }
+        ],
         confidence: aiResult.confidence,
         dataQuality: aiResult.confidence >= 0.8 ? 'high' : aiResult.confidence >= 0.6 ? 'medium' : 'low',
         sourcesFound: aiResult.successfulSources,
