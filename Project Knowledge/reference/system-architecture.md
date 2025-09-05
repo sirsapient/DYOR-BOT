@@ -1,350 +1,253 @@
-# System Architecture - DYOR BOT
+# DYOR BOT System Architecture
 
-## 🎯 **ARCHITECTURE OVERVIEW**
+## 🎯 **System Overview**
 
-### **Purpose**
-DYOR BOT is a comprehensive research tool for analyzing Web3 and gaming projects. It uses over 10 data sources to provide project analysis, key findings, and confidence metrics.
+DYOR BOT is a comprehensive Web3 project research platform that combines AI orchestration with dynamic data collection to provide comprehensive project analysis. The system operates in two modes: **AI Orchestrated Research** (preferred) and **Fallback Batch Search** (when AI is unavailable).
 
-### **Core Design Principles**
-- **Dynamic Search Only**: No fallback data, all information from real-time sources
-- **AI-Driven Research**: Claude-powered orchestration and analysis
-- **Multi-Source Data Collection**: Comprehensive data from multiple APIs and services
-- **Quality Gates**: Data validation and completeness checking
-- **Confidence Scoring**: Automated analysis and findings generation
+## 🏗️ **High-Level Architecture**
 
----
-
-## 🏗️ **SYSTEM COMPONENTS**
-
-### **Frontend Application**
-- **Framework**: React with TypeScript
-- **Deployment**: Vercel
-- **URL**: https://dyor-bot.vercel.app
-- **Features**:
-  - Three-panel layout (search, results, confidence)
-  - Collapsible sections for better UX
-  - Real-time data display
-  - Responsive design
-
-### **Backend API**
-- **Framework**: Node.js with Express
-- **Language**: TypeScript
-- **Deployment**: Render
-- **URL**: https://dyor-bot.onrender.com
-- **Features**:
-  - RESTful API endpoints
-  - AI orchestration integration
-  - Multi-source data collection
-  - Quality gates and validation
-
-### **AI Orchestrator**
-- **Provider**: Anthropic Claude
-- **Model**: Claude 3 Sonnet
-- **Integration**: Direct API integration
-- **Features**:
-  - Research planning and execution
-  - Data analysis and findings generation
-  - Academic report format output
-  - Confidence scoring
-
-### **Search Service**
-- **Primary Engine**: DuckDuckGo API
-- **Fallback Engines**: SearX.be, Brave Search, Qwant
-- **Features**:
-  - Multiple search engine support
-  - Caching system (30-minute duration)
-  - Rate limiting and delays
-  - Web scraping fallbacks
-
----
-
-## 🔄 **DATA FLOW ARCHITECTURE**
-
-### **1. User Input Flow**
 ```
-User enters project name → Frontend validation → API call to /api/research
+┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
+│   Frontend      │    │   Backend API    │    │   AI Services   │
+│   (React)       │◄──►│   (Node.js)      │◄──►│   (Claude)      │
+│                 │    │                  │    │                 │
+│ • Search UI     │    │ • Research       │    │ • Research      │
+│ • Results       │    │   Orchestrator   │    │   Planning      │
+│ • Data Sources  │    │ • Data          │    │ • Analysis      │
+│ • AI Summary    │    │   Collection     │    │ • Summaries     │
+└─────────────────┘    └──────────────────┘    └─────────────────┘
+                                │
+                                ▼
+                       ┌──────────────────┐
+                       │  External APIs   │
+                       │                  │
+                       │ • CoinGecko      │
+                       │ • Etherscan      │
+                       │ • Twitter        │
+                       │ • Discord        │
+                       │ • GitHub         │
+                       └──────────────────┘
 ```
 
-### **2. Backend Research Flow**
+## 🔄 **Data Flow Architecture**
+
+### **1. Research Request Flow**
 ```
-API receives request → AI Orchestrator plans research → Data collection begins
+User Search Request
+        │
+        ▼
+┌─────────────────┐
+│  /api/research  │
+│   Endpoint      │
+└─────────────────┘
+        │
+        ▼
+┌─────────────────┐
+│ API Key Check   │
+│ ANTHROPIC_API_KEY│
+└─────────────────┘
+        │
+        ▼
+┌─────────────────┐    ┌─────────────────┐
+│ AI Orchestrator │    │ Fallback Batch  │
+│ (Preferred)     │    │ Search          │
+└─────────────────┘    └─────────────────┘
+        │                       │
+        ▼                       ▼
+┌─────────────────┐    ┌─────────────────┐
+│ Research Plan   │    │ Basic Search    │
+│ Generation      │    │ Engine          │
+└─────────────────┘    └─────────────────┘
+        │                       │
+        ▼                       ▼
+┌─────────────────┐    ┌─────────────────┐
+│ Parallel Data   │    │ Sequential      │
+│ Collection      │    │ Data Collection │
+└─────────────────┘    └─────────────────┘
+        │                       │
+        ▼                       ▼
+┌─────────────────┐    ┌─────────────────┐
+│ AI Analysis &   │    │ Basic Data      │
+│ Summary         │    │ Processing      │
+└─────────────────┘    └─────────────────┘
+        │                       │
+        ▼                       ▼
+┌─────────────────┐    ┌─────────────────┐
+│ Frontend        │    │ Frontend        │
+│ Data Format     │    │ Data Format     │
+└─────────────────┘    └─────────────────┘
 ```
 
-### **3. Data Collection Process**
-```
-1. Project Classification (AI determines project type)
-2. Official Source Discovery (website, whitepaper, docs)
-3. Financial Data Collection (market cap, token info)
-4. Team Analysis (LinkedIn, Glassdoor, studio background)
-5. Technical Assessment (security, reviews, GitHub)
-6. Community Health (Twitter, Discord, Reddit, Steam)
-7. Quality Gates Validation
-8. AI Analysis & Findings Generation
-9. Confidence Metrics Calculation
-```
+## 🧩 **Core Components**
 
-### **4. Response Structure**
-```typescript
-ProjectResearch {
-  projectName: string;
-  projectType: 'Web3Game' | 'TraditionalGame' | 'Publisher' | 'Platform';
-  keyFindings: { positives: string[], negatives: string[], redFlags: string[] };
-  financialData: { marketCap?, roninTokenInfo?, avalancheTokenInfo? };
-  teamAnalysis: TeamAnalysis;
-  technicalAssessment: TechnicalAssessment;
-  communityHealth: CommunityHealth;
-  confidence: ConfidenceMetrics;
-  discoveredUrls: { [sourceType: string]: string };
-  totalDataPoints: number;
-  gameData: GameData;
-}
-```
+### **1. Frontend (React)**
+- **Location**: `frontend/src/App.tsx`
+- **Key Features**:
+  - Search interface
+  - Results display (2-column layout)
+  - Interactive data sources (left column)
+  - AI summary display (right column)
+  - Data export functionality
 
----
+### **2. Backend API Server**
+- **Location**: `backend/src/index.ts`
+- **Main Endpoint**: `/api/research`
+- **Key Functions**:
+  - Request validation
+  - API key management
+  - Research orchestration
+  - Data transformation
+  - Response formatting
 
-## 🔧 **CORE MODULES**
-
-### **AI Research Orchestrator**
-- **File**: `backend/src/ai-research-orchestrator.ts`
-- **Purpose**: Orchestrates research planning and execution
-- **Features**:
-  - Query classification (simple vs complex)
-  - Research strategy generation
+### **3. AI Research Orchestrator**
+- **Location**: `backend/src/ai-research-orchestrator.ts`
+- **Key Functions**:
+  - `conductAIOrchestratedResearch()`
+  - Research plan generation
+  - Source classification
   - Data collection coordination
-  - Hybrid search architecture
+  - AI analysis integration
 
-### **Search Service**
-- **File**: `backend/src/search-service.ts`
-- **Purpose**: Handles all external data discovery
-- **Features**:
-  - Multiple search engine integration
-  - Web scraping capabilities
-  - Caching and rate limiting
-  - Error handling and fallbacks
+### **4. Data Collection Functions**
+- **Location**: `backend/src/index.ts` (enhancedDataCollectionFunctions)
+- **Key Functions**:
+  - `fetchWhitepaperUrl()`
+  - `fetchTwitterProfileAndTweets()`
+  - `fetchDiscordServerData()`
+  - `fetchWebsiteAboutSection()`
+  - `discoverOfficialUrlsWithAI()`
 
-### **Data Collection Functions**
-- **File**: `backend/src/index.ts` (data collection functions)
-- **Purpose**: Collects data from specific sources
-- **Features**:
-  - Financial data collection (CoinGecko, blockchain explorers)
-  - Social media data (Twitter, Discord, Reddit)
-  - Game platform data (Steam, Epic, GOG)
-  - Team and company information
+## 🔍 **Current Issues Analysis**
 
-### **Quality Gates**
-- **File**: `backend/src/quality-gates.ts`
-- **Purpose**: Validates data quality and completeness
-- **Features**:
-  - Data completeness checking
-  - Source reliability validation
-  - Confidence scoring
-  - Quality thresholds
+### **Issue 1: AI Summary Format Mismatch**
+**Problem**: AI summary not matching Axie Infinity academic style
+**Root Cause**: AI orchestrator is failing and falling back to batch search
+**Evidence**: 
+- Backend logs show "AI research failed"
+- Fallback path generates incomplete summary
+- `discoveredUrls` and `gameData.downloadLinks` are empty
 
-### **Research Scoring**
-- **File**: `backend/src/research-scoring.ts`
-- **Purpose**: Generates confidence metrics and scoring
-- **Features**:
-  - Data point coverage analysis
-  - Confidence calculation
-  - Quality assessment
-  - Performance metrics
+### **Issue 2: Interactive Sources Not Working**
+**Problem**: All sources show "INVALID URL" status
+**Root Cause**: Data collection functions not working for template sources
+**Evidence**:
+- Template uses: `official_website`, `whitepaper`, `github_repos`, `social_media`, `financial_data`
+- `collectFromSourceWithRealFunctions()` missing cases for `official_website` and `github_repos`
+- Data collection returns `null` for missing source types
 
----
+## 📊 **Data Collection Flow**
 
-## 🌐 **EXTERNAL INTEGRATIONS**
-
-### **Search Engines**
-- **DuckDuckGo**: Primary search engine
-- **SearX.be**: Privacy-focused fallback
-- **Brave Search**: Alternative search engine
-- **Qwant**: European search engine
-
-### **Financial Data Sources**
-- **CoinGecko**: Primary crypto data source
-- **CoinMarketCap**: Alternative financial data
-- **Etherscan**: Ethereum blockchain data
-- **BSCScan**: BSC blockchain data
-- **Ronin Explorer**: Ronin network data
-
-### **Social Media APIs**
-- **Twitter**: Via Nitter and web scraping
-- **Discord**: Discord API integration
-- **Reddit**: Reddit JSON API
-- **Telegram**: Web scraping fallback
-
-### **Game Platforms**
-- **Steam**: Steam API integration
-- **Epic Games Store**: GraphQL API
-- **GOG**: GOG API integration
-- **Itch.io**: Itch.io API integration
-
-### **Development Platforms**
-- **GitHub**: GitHub API integration
-- **GitLab**: Web scraping fallback
-- **Bitbucket**: Web scraping fallback
-
-### **Documentation Platforms**
-- **Google Docs**: Web scraping
-- **Notion**: Web scraping
-- **Medium**: Web scraping
-- **Mirror**: Web scraping
-
----
-
-## 🎯 **HYBRID SEARCH ARCHITECTURE**
-
-### **Query Classification System**
+### **Template-Based Research Plan**
 ```typescript
-interface QueryClassification {
-  complexity: 'simple' | 'complex' | 'unknown';
-  confidence: number;
-  reasoning: string;
-  recommendedApproach: 'direct' | 'orchestrated' | 'hybrid';
+web3_game: {
+  prioritySources: [
+    { source: 'official_website', searchTerms: ['official website', 'homepage'] },
+    { source: 'whitepaper', searchTerms: ['whitepaper', 'tokenomics', 'economics'] },
+    { source: 'github_repos', searchTerms: ['github', 'repository', 'code'] },
+    { source: 'social_media', searchTerms: ['twitter', 'discord', 'telegram'] },
+    { source: 'financial_data', searchTerms: ['token price', 'market cap', 'trading'] }
+  ]
 }
 ```
 
-### **Search Approaches**
+### **Data Collection Process**
+1. **Source Classification**: Template determines source types
+2. **URL Discovery**: `discoverOfficialUrlsWithAI()` finds URLs
+3. **Data Collection**: `collectFromSourceWithRealFunctions()` processes each source
+4. **Data Processing**: AI orchestrator analyzes collected data
+5. **Summary Generation**: Claude generates comprehensive report
 
-#### **Direct AI Search**
-- **Use Case**: Simple queries, known projects
-- **Response Time**: 5-10 seconds
-- **Cost**: Low ($0.0073 per search)
-- **Data Quality**: Good overview, limited to training data
+## 🚨 **Critical Path Issues**
 
-#### **Orchestrated Search**
-- **Use Case**: Complex projects, comprehensive research
-- **Response Time**: 25-45 seconds
-- **Cost**: Medium ($0.02-0.05 per search)
-- **Data Quality**: Comprehensive, real-time verification
+### **Missing Source Type Handlers**
+The `collectFromSourceWithRealFunctions()` function is missing cases for:
+- `official_website` → Should collect website data
+- `github_repos` → Should collect repository information
+- `financial_data` → Should collect financial metrics
 
-#### **Hybrid Search**
-- **Use Case**: Intelligent routing based on query complexity
-- **Response Time**: Variable based on approach
-- **Cost**: Optimized based on complexity
-- **Data Quality**: Best of both approaches
-
----
-
-## 📊 **DATA STRUCTURES**
-
-### **Project Types Supported**
-- **Web3Game**: Blockchain-based games
-- **TraditionalGame**: Conventional video games
-- **Publisher**: Game publishing companies
-- **Platform**: Gaming platforms and marketplaces
-
-### **Data Categories**
-1. **Basic Project Information** (7 data points)
-2. **Financial Data** (8 data points)
-3. **Team & Company Information** (7 data points)
-4. **Technical Information** (7 data points)
-5. **Community & Social** (9 data points)
-6. **Game/Product Information** (8 data points)
-7. **News & Media** (5 data points)
-
-### **Confidence Metrics**
-```typescript
-interface ConfidenceMetrics {
-  totalScore: number;
-  grade: 'A' | 'B' | 'C' | 'D' | 'F';
-  confidence: number;
-  passesThreshold: boolean;
-  gatesPassed: number;
-  gatesFailed: number;
-  breakdown: {
-    dataCompleteness: number;
-    sourceReliability: number;
-    dataFreshness: number;
-    coverage: number;
-  };
-}
+### **Data Flow Breakdown**
+```
+Template Source → collectFromSourceWithRealFunctions() → Missing Case → Returns null → No Data Collected
 ```
 
----
+### **Fallback Path Issues**
+When AI orchestrator fails:
+1. Falls back to `conductBatchSearch()`
+2. Returns different data structure
+3. `discoveredUrls` becomes empty `{}`
+4. `gameData.downloadLinks` becomes empty `[]`
+5. Frontend shows "INVALID URL" for all sources
 
-## 🔒 **SECURITY & RELIABILITY**
+## 🛠️ **Required Fixes**
 
-### **API Key Management**
-- **Environment Variables**: All API keys stored in `.env` files
-- **Production Security**: Keys configured in deployment platforms
-- **Access Control**: No hardcoded keys in source code
+### **Fix 1: Add Missing Source Type Handlers**
+```typescript
+case 'official_website':
+  // Handle website data collection
+  break;
+  
+case 'github_repos':
+  // Handle GitHub repository data collection
+  break;
+```
 
-### **Rate Limiting**
-- **Search Engines**: 1-second delays between requests
-- **External APIs**: Respect rate limits and implement backoff
-- **Caching**: 30-minute cache duration to reduce API calls
+### **Fix 2: Ensure AI Orchestrator Success**
+- Debug why AI orchestrator is failing
+- Check data collection function availability
+- Verify source type normalization
 
-### **Error Handling**
-- **Graceful Degradation**: System continues with partial data
-- **Fallback Sources**: Multiple data sources for redundancy
-- **Error Logging**: Comprehensive error tracking and reporting
+### **Fix 3: Data Structure Consistency**
+- Ensure both paths return same `ProjectResearch` format
+- Populate `discoveredUrls` and `gameData.downloadLinks` consistently
+- Match Axie Infinity mock data structure
 
-### **Data Validation**
-- **Quality Gates**: Data completeness and reliability checking
-- **Source Verification**: Validate data from multiple sources
-- **Confidence Scoring**: Automated quality assessment
+## 📈 **System Performance Metrics**
 
----
+### **Current Performance**
+- **AI Orchestrator**: ❌ Failing (falling back to batch search)
+- **Batch Search**: ✅ Working (but wrong data format)
+- **Data Collection**: ❌ Incomplete (missing source handlers)
+- **Frontend Display**: ❌ Broken (wrong data structure)
 
-## 📈 **PERFORMANCE OPTIMIZATION**
+### **Target Performance**
+- **AI Orchestrator**: ✅ Success rate >90%
+- **Data Collection**: ✅ All source types working
+- **Frontend Display**: ✅ Proper Axie Infinity format
+- **Response Time**: <5 seconds for comprehensive research
 
-### **Caching Strategy**
-- **Query Classification**: Cache classification results
-- **Search Results**: 30-minute cache duration
-- **API Responses**: Cache external API responses
-- **Data Processing**: Cache processed data structures
+## 🔧 **Debugging Strategy**
 
-### **Concurrency Control**
-- **Parallel Requests**: Multiple API calls in parallel where possible
-- **Request Queuing**: Queue requests to respect rate limits
-- **Resource Management**: Efficient memory and CPU usage
+### **Step 1: Verify AI Orchestrator**
+- Check backend logs for AI orchestrator errors
+- Verify API key configuration
+- Test individual data collection functions
 
-### **Response Time Optimization**
-- **Query Classification**: 0-2 seconds for known cases
-- **Simple Queries**: 5-10 seconds
-- **Complex Queries**: 25-45 seconds
-- **Cached Queries**: 2-5 seconds
+### **Step 2: Fix Source Type Handlers**
+- Add missing cases to `collectFromSourceWithRealFunctions()`
+- Test each source type individually
+- Verify data collection success
 
----
+### **Step 3: Validate Data Structure**
+- Ensure consistent `ProjectResearch` format
+- Test frontend display with fixed data
+- Verify interactive sources functionality
 
-## 🚀 **DEPLOYMENT ARCHITECTURE**
+## 📚 **Key Files for Debugging**
 
-### **Frontend Deployment (Vercel)**
-- **Framework**: React with TypeScript
-- **Build Process**: Automatic build and deployment
-- **Environment**: Production-optimized
-- **CDN**: Global content delivery network
+1. **`backend/src/index.ts`** - Main API endpoint and data transformation
+2. **`backend/src/ai-research-orchestrator.ts`** - AI research orchestration
+3. **`frontend/src/App.tsx`** - Frontend display logic
+4. **`frontend/src/mockData.ts`** - Expected data format reference
 
-### **Backend Deployment (Render)**
-- **Runtime**: Node.js with TypeScript
-- **Environment**: Production with auto-scaling
-- **Database**: No persistent database (stateless)
-- **Monitoring**: Built-in health checks and logging
+## 🎯 **Next Steps**
 
-### **Environment Configuration**
-- **Development**: Local environment with `.env` files
-- **Production**: Environment variables in deployment platforms
-- **API Keys**: Securely stored in deployment environments
-
----
-
-## 🔄 **MONITORING & MAINTENANCE**
-
-### **Health Monitoring**
-- **Health Endpoint**: `/api/health` for system status
-- **Performance Metrics**: Response time and success rate tracking
-- **Error Tracking**: Comprehensive error logging and reporting
-
-### **Data Quality Monitoring**
-- **Coverage Tracking**: Monitor data point coverage
-- **Source Reliability**: Track source success rates
-- **Confidence Metrics**: Monitor confidence score distribution
-
-### **Performance Monitoring**
-- **Response Times**: Track query response times
-- **Success Rates**: Monitor search success rates
-- **API Usage**: Track external API usage and costs
+1. **Immediate**: Fix missing source type handlers
+2. **Short-term**: Debug AI orchestrator failures
+3. **Medium-term**: Implement comprehensive testing
+4. **Long-term**: Optimize performance and add new features
 
 ---
 
-**📝 Note:** This architecture is designed for scalability, reliability, and maintainability. The modular design allows for easy updates and enhancements while maintaining the core principles of dynamic data discovery and AI-driven research.
+**Last Updated**: 2025-09-03  
+**Status**: 🔴 Critical Issues Identified  
+**Priority**: Fix data collection and AI orchestrator

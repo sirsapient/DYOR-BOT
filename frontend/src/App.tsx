@@ -566,9 +566,10 @@ function App() {
                 <div className="crown-jewel-title">AI ANALYSIS SUMMARY</div>
                 <div className="ai-summary-content expanded">
                   <div className="ai-summary-paragraphs">
-                    {research.aiSummary
+                    {/* Handle both string and object formats for backward compatibility */}
+                    {(typeof research.aiSummary === 'string' ? research.aiSummary : research.aiSummary?.aiSummary || '')
                       .split('\n\n') // Split into sections
-                      .map((section, sectionIndex) => {
+                      .map((section: string, sectionIndex: number) => {
                         const lines = section.split('\n');
                         const firstLine = lines[0];
                         
@@ -584,7 +585,7 @@ function App() {
                                 <div className="section-content">
                                   {sectionContent
                                     .split('\n')
-                                    .map((paragraph, paraIndex) => {
+                                    .map((paragraph: string, paraIndex: number) => {
                                       // Handle subsection headers (##)
                                       if (paragraph.startsWith('## ')) {
                                         const subsectionTitle = paragraph.replace('## ', '');
@@ -626,7 +627,7 @@ function App() {
                         // Handle content without main headers
                         return (
                           <div key={sectionIndex} className="ai-summary-section">
-                            {lines.map((line, lineIndex) => {
+                            {lines.map((line: string, lineIndex: number) => {
                               if (line.startsWith('## ')) {
                                 const subsectionTitle = line.replace('## ', '');
                                 return (
