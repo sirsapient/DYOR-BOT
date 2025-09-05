@@ -73,7 +73,16 @@ export const API_KEYS: { [key: string]: APIKeyConfig } = {
     url: 'https://docs.opensea.io/reference/api-overview',
     rateLimit: 'Rate limited',
     status: process.env.OPENSEA_API_KEY ? 'active' : 'missing',
-    fallback: 'Alternative NFT marketplaces'
+    fallback: 'Magic Eden for Solana NFTs'
+  },
+  
+  magiceden: {
+    name: 'Magic Eden',
+    key: process.env.MAGIC_EDEN_API_KEY || null,
+    url: 'https://docs.magiceden.io/',
+    rateLimit: 'Rate limited',
+    status: process.env.MAGIC_EDEN_API_KEY ? 'active' : 'missing',
+    fallback: 'OpenSea for Ethereum NFTs'
   },
   
   twitter: {
@@ -312,6 +321,8 @@ export function getBlockchainSupportStatus(): {
 
   return { fullySupported, partiallySupported, unsupported };
 }
+
+
 
 
 

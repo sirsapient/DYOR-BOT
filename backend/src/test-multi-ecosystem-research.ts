@@ -388,7 +388,8 @@ class MultiEcosystemTestRunner {
           }),
           findOfficialSourcesForEstablishedProject: async (projectName: string, aliases: string[]) => ({}),
           searchContractAddressWithLLM: async (projectName: string) => null,
-          getFinancialDataFromAlternativeSources: async (projectName: string) => ({ marketCap: 1000000, price: 1.0 })
+          getFinancialDataFromAlternativeSources: async (projectName: string) => ({ marketCap: 1000000, price: 1.0 }),
+          searchNFTs: async (projectName: string) => Promise.resolve([])
         };
       
       const researchResult = await conductAIOrchestratedResearch(project.name, this.anthropicApiKey, undefined, dataCollectionFunctions);

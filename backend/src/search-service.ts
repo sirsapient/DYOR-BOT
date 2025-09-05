@@ -1,5 +1,7 @@
-// Free Search Service using DuckDuckGo Instant Answer API
-// This replaces SerpAPI functionality with a free alternative
+// Enhanced Search Service with Universal API Manager
+// This replaces SerpAPI functionality with intelligent API coordination
+
+import { universalAPIManager } from './universal-api-manager';
 
 interface SearchResult {
   title: string;
@@ -94,68 +96,45 @@ export class FreeSearchService {
   async search(query: string, maxResults: number = 5): Promise<SearchResult[]> {
     const cacheKey = `${query}_${maxResults}`;
     
-    // NEW: Check enhanced cache first
+    // Check enhanced cache first
     const cached = this.cache.get(cacheKey);
     if (cached) {
       console.log(`📋 Using cached search results for: ${query}`);
       return cached;
     }
 
-    console.log(`🔍 Free search for: ${query}`);
+    console.log(`🔍 Enhanced search for: ${query}`);
     
     try {
-      // NEW: Try DuckDuckGo API first (fastest)
-      const response = await fetch(`https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-        },
-        signal: AbortSignal.timeout(5000) // 5 second timeout
+      // Get optimal API coordination for search
+      const coordination = universalAPIManager.getOptimalAPICoordination('search', {
+        maxCost: 0,
+        maxLatency: 5000,
+        minSuccessRate: 80
       });
+
+      console.log(`📊 Using ${coordination.primaryAPI} for search (confidence: ${(coordination.confidence * 100).toFixed(1)}%)`);
+
+      // Try primary API first
+      const response = await universalAPIManager.makeAPICall(
+        coordination.primaryAPI,
+        this.getSearchEndpoint(coordination.primaryAPI, query),
+        { 
+          method: 'GET',
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+          }
+        },
+        'high'
+      );
       
       if (!response.ok) {
-        console.log(`❌ DuckDuckGo API failed: ${response.status}, trying parallel web scraping fallback`);
-        const fallbackResults = await this.getParallelWebScrapingResults(query, maxResults);
-        if (fallbackResults.length > 0) {
-          this.cache.set(cacheKey, fallbackResults);
-          console.log(`✅ Found ${fallbackResults.length} results via parallel web scraping for: ${query}`);
-          return fallbackResults;
-        }
-        return this.getFallbackResults(query);
+        console.log(`❌ Primary search API failed: ${response.status}, trying fallbacks`);
+        return await this.tryFallbackAPIs(coordination.fallbackAPIs, query, maxResults, cacheKey);
       }
 
-      const data: DuckDuckGoResponse = await response.json();
-      const results: SearchResult[] = [];
-
-      // Extract results from Abstract and RelatedTopics
-      if (data.Abstract && data.AbstractURL) {
-        results.push({
-          title: query,
-          link: data.AbstractURL,
-          snippet: data.Abstract
-        });
-      }
-
-      // Add related topics
-      if (data.RelatedTopics) {
-        for (const topic of data.RelatedTopics.slice(0, maxResults - results.length)) {
-          results.push({
-            title: topic.Text.split(' - ')[0] || topic.Text,
-            link: topic.FirstURL,
-            snippet: topic.Text
-          });
-        }
-      }
-
-      // Add additional results
-      if (data.Results) {
-        for (const result of data.Results.slice(0, maxResults - results.length)) {
-          results.push({
-            title: result.Text.split(' - ')[0] || result.Text,
-            link: result.FirstURL,
-            snippet: result.Text
-          });
-        }
-      }
+      const data = await response.json();
+      const results = this.parseSearchResults(data, coordination.primaryAPI, query, maxResults);
 
       // NEW: Early termination check
       if (this.shouldTerminateEarly(results.length, this.calculateConfidence(results))) {
@@ -1189,6 +1168,131 @@ export class FreeSearchService {
       size: this.cache.size(),
       entries: Array.from(this.cache['cache'].keys())
     };
+  }
+
+  // Helper method to get search endpoint for different APIs
+  private getSearchEndpoint(apiName: string, query: string): string {
+    switch (apiName) {
+      case 'duckduckgo':
+        return `/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`;
+      case 'searx':
+        return `/?q=${encodeURIComponent(query)}&format=json`;
+      case 'brave':
+        return `/?q=${encodeURIComponent(query)}&format=json`;
+      default:
+        return `/?q=${encodeURIComponent(query)}`;
+    }
+  }
+
+  // Helper method to try fallback APIs
+  private async tryFallbackAPIs(fallbackAPIs: string[], query: string, maxResults: number, cacheKey: string): Promise<SearchResult[]> {
+    for (const fallbackAPI of fallbackAPIs) {
+      try {
+        console.log(`🔄 Trying fallback: ${fallbackAPI}`);
+        const response = await universalAPIManager.makeAPICall(
+          fallbackAPI,
+          this.getSearchEndpoint(fallbackAPI, query),
+          { 
+            method: 'GET',
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            }
+          },
+          'medium'
+        );
+
+        if (response.ok) {
+          const data = await response.json();
+          const results = this.parseSearchResults(data, fallbackAPI, query, maxResults);
+          if (results.length > 0) {
+            this.cache.set(cacheKey, results);
+            console.log(`✅ Found ${results.length} results via fallback ${fallbackAPI}`);
+            return results;
+          }
+        }
+      } catch (error) {
+        console.log(`❌ Fallback ${fallbackAPI} failed: ${(error as Error).message}`);
+      }
+    }
+
+    // If all APIs fail, try parallel web scraping as last resort
+    console.log(`🔍 All search APIs failed, trying parallel web scraping fallback`);
+    const fallbackResults = await this.getParallelWebScrapingResults(query, maxResults);
+    if (fallbackResults.length > 0) {
+      this.cache.set(cacheKey, fallbackResults);
+      console.log(`✅ Found ${fallbackResults.length} results via parallel web scraping`);
+      return fallbackResults;
+    }
+
+    return this.getFallbackResults(query);
+  }
+
+  // Helper method to parse search results based on API type
+  private parseSearchResults(data: any, apiName: string, query?: string, maxResults: number = 5): SearchResult[] {
+    const results: SearchResult[] = [];
+
+    switch (apiName) {
+      case 'duckduckgo':
+        // Extract results from Abstract and RelatedTopics
+        if (data.Abstract && data.AbstractURL) {
+          results.push({
+            title: query || 'Search Result',
+            link: data.AbstractURL,
+            snippet: data.Abstract
+          });
+        }
+
+        // Add related topics
+        if (data.RelatedTopics) {
+          for (const topic of data.RelatedTopics.slice(0, maxResults - results.length)) {
+            results.push({
+              title: topic.Text.split(' - ')[0] || topic.Text,
+              link: topic.FirstURL,
+              snippet: topic.Text
+            });
+          }
+        }
+
+        // Add additional results
+        if (data.Results) {
+          for (const result of data.Results.slice(0, maxResults - results.length)) {
+            results.push({
+              title: result.Text.split(' - ')[0] || result.Text,
+              link: result.FirstURL,
+              snippet: result.Text
+            });
+          }
+        }
+        break;
+
+      case 'searx':
+        // Parse SearX results (implement based on actual API response)
+        if (data.results && Array.isArray(data.results)) {
+          for (const result of data.results.slice(0, maxResults)) {
+            results.push({
+              title: result.title || '',
+              link: result.url || '',
+              snippet: result.content || ''
+            });
+          }
+        }
+        break;
+
+      case 'brave':
+        // Parse Brave results (implement based on actual API response)
+        if (data.web && data.web.results && Array.isArray(data.web.results)) {
+          for (const result of data.web.results.slice(0, maxResults)) {
+            results.push({
+              title: result.title || '',
+              link: result.url || '',
+              snippet: result.description || ''
+            });
+          }
+        }
+        break;
+    }
+
+    return results;
   }
 
   private async crawlWebsiteForSources(websiteUrl: string, projectName: string): Promise<{

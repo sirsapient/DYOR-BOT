@@ -1,5 +1,7 @@
-// NFT Service for OpenSea and Magic Eden APIs
-// Handles NFT data collection for web3 games
+// Enhanced NFT Service with Universal API Manager
+// Handles NFT data collection for web3 games with intelligent API coordination
+
+import { universalAPIManager } from './universal-api-manager';
 
 interface NFTCollectionData {
   collectionName: string;
@@ -92,18 +94,40 @@ export class NFTService {
       return cached.data;
     }
 
-    console.log(`🔍 Searching NFTs for: ${projectName}`);
+    console.log(`🎨 Enhanced NFT search for: ${projectName}`);
+    
+    // Get optimal API coordination for NFT search
+    const coordination = universalAPIManager.getOptimalAPICoordination('nft', {
+      maxCost: 0.01,
+      maxLatency: 10000,
+      minSuccessRate: 85
+    });
+
+    console.log(`📊 Using ${coordination.primaryAPI} for NFT search (confidence: ${(coordination.confidence * 100).toFixed(1)}%)`);
     
     const results: NFTCollectionData[] = [];
     
     try {
-      // Search OpenSea (Ethereum)
-      const openseaResults = await this.searchOpenSea(projectName);
-      results.push(...openseaResults);
-      
-      // Search Magic Eden (Solana)
-      const magicEdenResults = await this.searchMagicEden(projectName);
-      results.push(...magicEdenResults);
+      // Try primary API first
+      const primaryResults = await this.searchWithAPI(coordination.primaryAPI, projectName);
+      results.push(...primaryResults);
+      console.log(`✅ Found ${primaryResults.length} results from ${coordination.primaryAPI}`);
+
+      // Try fallback APIs if we don't have enough results
+      if (results.length < 3) {
+        for (const fallbackAPI of coordination.fallbackAPIs) {
+          try {
+            console.log(`🔄 Trying NFT fallback: ${fallbackAPI}`);
+            const fallbackResults = await this.searchWithAPI(fallbackAPI, projectName);
+            results.push(...fallbackResults);
+            console.log(`✅ Found ${fallbackResults.length} additional results from ${fallbackAPI}`);
+
+            if (results.length >= 5) break; // Stop if we have enough results
+          } catch (fallbackError) {
+            console.log(`❌ NFT fallback ${fallbackAPI} failed: ${(fallbackError as Error).message}`);
+          }
+        }
+      }
       
       // Cache results
       this.cache.set(cacheKey, { data: results, timestamp: Date.now() + this.CACHE_DURATION });
@@ -115,6 +139,141 @@ export class NFTService {
       console.error(`❌ Error searching NFTs for ${projectName}:`, error);
       return [];
     }
+  }
+
+  // Enhanced method to search with Universal API Manager
+  private async searchWithAPI(apiName: string, projectName: string): Promise<NFTCollectionData[]> {
+    const endpoint = this.getNFTEndpoint(apiName, projectName);
+    
+    const response = await universalAPIManager.makeAPICall(
+      apiName,
+      endpoint,
+      { 
+        method: 'GET',
+        headers: this.getNFTHeaders(apiName)
+      },
+      'high'
+    );
+
+    if (!response.ok) {
+      throw new Error(`API request failed: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return this.parseNFTResults(data, apiName);
+  }
+
+  // Helper method to get NFT endpoint for different APIs
+  private getNFTEndpoint(apiName: string, projectName: string): string {
+    switch (apiName) {
+      case 'opensea':
+        return `/collections?search=${encodeURIComponent(projectName)}&limit=5`;
+      case 'magiceden':
+        return `/collections?offset=0&limit=20`;
+      default:
+        return `/search?q=${encodeURIComponent(projectName)}`;
+    }
+  }
+
+  // Helper method to get NFT headers for different APIs
+  private getNFTHeaders(apiName: string): Record<string, string> {
+    const headers: Record<string, string> = {
+      'Accept': 'application/json',
+      'User-Agent': 'DYOR-BOT/1.0'
+    };
+
+    switch (apiName) {
+      case 'opensea':
+        if (this.OPENSEA_API_KEY) {
+          headers['X-API-KEY'] = this.OPENSEA_API_KEY;
+        }
+        break;
+      case 'magiceden':
+        if (this.MAGIC_EDEN_API_KEY) {
+          headers['Authorization'] = `Bearer ${this.MAGIC_EDEN_API_KEY}`;
+        }
+        break;
+    }
+
+    return headers;
+  }
+
+  // Helper method to parse NFT results based on API type
+  private parseNFTResults(data: any, apiName: string): NFTCollectionData[] {
+    switch (apiName) {
+      case 'opensea':
+        return this.parseOpenSeaResults(data);
+      case 'magiceden':
+        return this.parseMagicEdenResults(data);
+      default:
+        return [];
+    }
+  }
+
+  // Parse OpenSea API results
+  private parseOpenSeaResults(data: any): NFTCollectionData[] {
+    if (!data.collections || !Array.isArray(data.collections)) {
+      return [];
+    }
+
+    const results: NFTCollectionData[] = [];
+    
+    for (const collection of data.collections.slice(0, 5)) {
+      if (collection.name && collection.stats) {
+        const slug = collection.slug || collection.name.toLowerCase().replace(/\s+/g, '-');
+        
+        results.push({
+          collectionName: collection.name,
+          marketplace: 'opensea',
+          collectionUrl: `https://opensea.io/collection/${slug}`,
+          floorPrice: collection.stats.floor_price || 0,
+          floorPriceCurrency: 'ETH',
+          totalSupply: collection.stats.total_supply || null,
+          network: 'ethereum',
+          description: collection.description || '',
+          imageUrl: collection.image_url || '',
+          volume24h: collection.stats.one_day_volume || 0,
+          volumeTotal: collection.stats.total_volume || 0,
+          owners: collection.stats.num_owners || 0,
+          listed: collection.stats.num_listings || 0
+        });
+      }
+    }
+    
+    return results;
+  }
+
+  // Parse Magic Eden API results
+  private parseMagicEdenResults(data: any): NFTCollectionData[] {
+    if (!Array.isArray(data)) {
+      return [];
+    }
+
+    const results: NFTCollectionData[] = [];
+    
+    for (const collection of data.slice(0, 5)) {
+      if (collection.name) {
+        const symbol = collection.symbol || collection.name.toLowerCase().replace(/\s+/g, '');
+        
+        results.push({
+          collectionName: collection.name,
+          marketplace: 'magiceden',
+          collectionUrl: `https://magiceden.io/collections/${symbol}`,
+          floorPrice: collection.floorPrice || 0,
+          floorPriceCurrency: 'SOL',
+          totalSupply: collection.supply || null,
+          network: 'solana',
+          description: collection.description || '',
+          imageUrl: collection.image || '',
+          volume24h: collection.volume24h || 0,
+          volumeTotal: collection.volumeTotal || 0,
+          owners: collection.owners || 0,
+          listed: collection.listedCount || 0
+        });
+      }
+    }
+    
+    return results;
   }
 
   private async searchOpenSea(projectName: string): Promise<NFTCollectionData[]> {
@@ -164,8 +323,8 @@ export class NFTService {
 
   private async searchMagicEden(projectName: string): Promise<NFTCollectionData[]> {
     try {
-      // Magic Eden API endpoint for collection search
-      const searchUrl = `https://api-mainnet.magiceden.io/v2/collections?search=${encodeURIComponent(projectName)}&limit=5`;
+      // Magic Eden API endpoint for collections (with proper pagination)
+      const searchUrl = `https://api-mainnet.magiceden.io/v2/collections?offset=0&limit=20`;
       
       const headers: Record<string, string> = {
         'Accept': 'application/json',
@@ -185,9 +344,15 @@ export class NFTService {
       
       const collections = await response.json();
       
+      // Filter collections by project name (case-insensitive)
+      const filteredCollections = collections.filter((collection: any) => 
+        collection.name && collection.name.toLowerCase().includes(projectName.toLowerCase())
+      );
+      
       const results: NFTCollectionData[] = [];
       
-      for (const collection of collections) {
+      // Limit to top 5 matches
+      for (const collection of filteredCollections.slice(0, 5)) {
         try {
           const collectionData = await this.getMagicEdenCollectionData(collection.symbol);
           if (collectionData) {
@@ -256,41 +421,47 @@ export class NFTService {
 
   private async getMagicEdenCollectionData(symbol: string): Promise<NFTCollectionData | null> {
     try {
-      const url = `https://api-mainnet.magiceden.io/v2/collections/${symbol}/stats`;
+      // Get collection info and stats
+      const [collectionResponse, statsResponse] = await Promise.all([
+        fetch(`https://api-mainnet.magiceden.io/v2/collections/${symbol}`, {
+          headers: {
+            'Accept': 'application/json',
+            'User-Agent': 'DYOR-BOT/1.0',
+            ...(this.MAGIC_EDEN_API_KEY && { 'Authorization': `Bearer ${this.MAGIC_EDEN_API_KEY}` })
+          }
+        }),
+        fetch(`https://api-mainnet.magiceden.io/v2/collections/${symbol}/stats`, {
+          headers: {
+            'Accept': 'application/json',
+            'User-Agent': 'DYOR-BOT/1.0',
+            ...(this.MAGIC_EDEN_API_KEY && { 'Authorization': `Bearer ${this.MAGIC_EDEN_API_KEY}` })
+          }
+        })
+      ]);
       
-      const headers: Record<string, string> = {
-        'Accept': 'application/json',
-        'User-Agent': 'DYOR-BOT/1.0'
-      };
-      
-      if (this.MAGIC_EDEN_API_KEY) {
-        headers['Authorization'] = `Bearer ${this.MAGIC_EDEN_API_KEY}`;
-      }
-      
-      const response = await fetch(url, { headers });
-      
-      if (!response.ok) {
+      if (!collectionResponse.ok || !statsResponse.ok) {
         return null;
       }
       
-      const data: MagicEdenCollectionResponse = await response.json();
+      const collectionData = await collectionResponse.json();
+      const statsData = await statsResponse.json();
       
       // Get lifetime value data
       const lifetimeValue = await this.getMagicEdenLifetimeValue(symbol);
       
       return {
-        collectionName: data.name,
+        collectionName: collectionData.name,
         marketplace: 'magiceden',
         collectionUrl: `https://magiceden.io/collections/${symbol}`,
-        floorPrice: data.floor,
+        floorPrice: statsData.floorPrice,
         floorPriceCurrency: 'SOL',
-        totalSupply: data.supply,
+        totalSupply: collectionData.supply || null,
         network: 'solana',
-        description: data.description,
-        imageUrl: data.image,
-        volume24h: data.volume24h,
-        volumeTotal: data.volumeTotal,
-        listed: data.listed,
+        description: collectionData.description,
+        imageUrl: collectionData.image,
+        volume24h: statsData.volume24hr || null,
+        volumeTotal: statsData.volumeAll || null,
+        listed: statsData.listedCount || null,
         lifetimeValue: lifetimeValue || undefined
       };
       

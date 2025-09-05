@@ -15,6 +15,10 @@ import { generateConfidenceMetrics, ConfidenceMetrics } from './confidence-indic
 import { conductAIOrchestratedResearch, AIResearchOrchestrator } from './ai-research-orchestrator';
 import { GameStoreAPIService } from './game-store-apis';
 import { NFTService } from './nft-service';
+import { projectDatabase } from './project-database';
+import { handleDebugRequest, testRealDataAvailability, compareFindingsWithReality } from './debug-endpoint';
+import { batchDiscovery } from './batch-project-discovery';
+import { sectorDatabasePopulator } from './sector-database-populator';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -29,6 +33,424 @@ app.get('/', (req: any, res: any) => {
 
 app.get('/api/health', (req: any, res: any) => {
   res.json({ status: 'ok' });
+});
+
+// Debug endpoint for data collection testing
+app.post('/api/debug', async (req: any, res: any) => {
+  try {
+    const { projectName } = req.body;
+    
+    if (!projectName) {
+      return res.status(400).json({ error: 'Project name is required' });
+    }
+    
+    const anthropicApiKey = process.env.ANTHROPIC_API_KEY;
+    if (!anthropicApiKey) {
+      return res.status(500).json({ error: 'ANTHROPIC_API_KEY not configured' });
+    }
+    
+    console.log(`🔍 DEBUG: Received debug request for ${projectName}`);
+    
+    // Run comprehensive debug
+    const debugResult = await handleDebugRequest(projectName, anthropicApiKey);
+    
+    // Check if debug failed
+    if ('error' in debugResult) {
+      return res.json(debugResult);
+    }
+    
+    // Test real data availability
+    const realDataTest = await testRealDataAvailability(projectName);
+    
+    // Compare our findings with reality
+    const comparison = await compareFindingsWithReality(debugResult.debugResult, realDataTest);
+    
+    const fullDebugReport = {
+      ...debugResult,
+      realDataTest,
+      comparison,
+      timestamp: new Date().toISOString()
+    };
+    
+    res.json(fullDebugReport);
+    
+  } catch (error) {
+    console.error('Debug request failed:', error);
+    res.status(500).json({ 
+      error: 'Debug request failed', 
+      details: error instanceof Error ? error.message : String(error) 
+    });
+  }
+});
+
+// Database statistics endpoint
+app.get('/api/database/stats', (req: any, res: any) => {
+  try {
+    const stats = projectDatabase.getDatabaseStats();
+    res.json(stats);
+  } catch (error) {
+    console.error('Database stats request failed:', error);
+    res.status(500).json({ 
+      error: 'Database stats request failed', 
+      details: error instanceof Error ? error.message : String(error) 
+    });
+  }
+});
+
+// Search projects in database
+app.get('/api/database/search', (req: any, res: any) => {
+  try {
+    const { query } = req.query;
+    
+    if (!query) {
+      return res.status(400).json({ error: 'Search query is required' });
+    }
+    
+    const results = projectDatabase.searchProjects(query as string);
+    res.json({
+      query,
+      results,
+      total: results.length,
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('Database search failed:', error);
+    res.status(500).json({ 
+      error: 'Database search failed', 
+      details: error instanceof Error ? error.message : String(error) 
+    });
+  }
+});
+
+// Batch Project Discovery Endpoints
+app.post('/api/batch-discovery/start', (req: any, res: any) => {
+  try {
+    const { config } = req.body;
+    
+    if (config) {
+      // Update configuration if provided
+      batchDiscovery.updateConfig(config);
+    }
+    
+    batchDiscovery.startDiscovery();
+    
+    res.json({
+      message: 'Batch discovery started',
+      config: batchDiscovery.getConfig(),
+      status: 'running',
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('Failed to start batch discovery:', error);
+    res.status(500).json({ 
+      error: 'Failed to start batch discovery', 
+      details: error instanceof Error ? error.message : String(error) 
+    });
+  }
+});
+
+app.post('/api/batch-discovery/stop', (req: any, res: any) => {
+  try {
+    batchDiscovery.stopDiscovery();
+    
+    res.json({
+      message: 'Batch discovery stopped',
+      status: 'stopped',
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('Failed to stop batch discovery:', error);
+    res.status(500).json({ 
+      error: 'Failed to stop batch discovery', 
+      details: error instanceof Error ? error.message : String(error) 
+    });
+  }
+});
+
+app.get('/api/batch-discovery/stats', (req: any, res: any) => {
+  try {
+    const stats = batchDiscovery.getStats();
+    const queueStatus = batchDiscovery.getQueueStatus();
+    
+    res.json({
+      stats,
+      queueStatus,
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('Failed to get batch discovery stats:', error);
+    res.status(500).json({ 
+      error: 'Failed to get batch discovery stats', 
+      details: error instanceof Error ? error.message : String(error) 
+    });
+  }
+});
+
+app.post('/api/batch-discovery/add-projects', (req: any, res: any) => {
+  try {
+    const { projects } = req.body;
+    
+    if (!projects || !Array.isArray(projects)) {
+      return res.status(400).json({ error: 'Projects array is required' });
+    }
+    
+    batchDiscovery.addProjectsToQueue(projects);
+    
+    res.json({
+      message: `Added ${projects.length} projects to discovery queue`,
+      addedProjects: projects,
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('Failed to add projects to queue:', error);
+    res.status(500).json({ 
+      error: 'Failed to add projects to queue', 
+      details: error instanceof Error ? error.message : String(error) 
+    });
+  }
+});
+
+// Validation Queue Management Endpoints
+app.get('/api/batch-discovery/validation-queue', (req: any, res: any) => {
+  try {
+    const validationStatus = batchDiscovery.getValidationQueueStatus();
+    res.json(validationStatus);
+  } catch (error) {
+    console.error('Failed to get validation queue status:', error);
+    res.status(500).json({ 
+      error: 'Failed to get validation queue status', 
+      details: error instanceof Error ? error.message : String(error) 
+    });
+  }
+});
+
+app.get('/api/batch-discovery/validation-item/:projectName', (req: any, res: any) => {
+  try {
+    const { projectName } = req.params;
+    const validationItem = batchDiscovery.getValidationItem(projectName);
+    
+    if (!validationItem) {
+      return res.status(404).json({ error: 'Validation item not found' });
+    }
+    
+    res.json(validationItem);
+  } catch (error) {
+    console.error('Failed to get validation item:', error);
+    res.status(500).json({ 
+      error: 'Failed to get validation item', 
+      details: error instanceof Error ? error.message : String(error) 
+    });
+  }
+});
+
+app.post('/api/batch-discovery/validation-resolve/:projectName', (req: any, res: any) => {
+  try {
+    const { projectName } = req.params;
+    const { action, notes } = req.body;
+    
+    if (!action || !['approve', 'reject', 'skip'].includes(action)) {
+      return res.status(400).json({ error: 'Action must be approve, reject, or skip' });
+    }
+    
+    const removed = batchDiscovery.removeFromValidationQueue(projectName);
+    
+    if (!removed) {
+      return res.status(404).json({ error: 'Project not found in validation queue' });
+    }
+    
+    res.json({
+      message: `Project ${projectName} ${action}ed and removed from validation queue`,
+      action,
+      notes,
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('Failed to resolve validation item:', error);
+    res.status(500).json({ 
+      error: 'Failed to resolve validation item', 
+      details: error instanceof Error ? error.message : String(error) 
+    });
+  }
+});
+
+app.post('/api/batch-discovery/validation-resume', (req: any, res: any) => {
+  try {
+    batchDiscovery.resumeFromValidation();
+    
+    res.json({
+      message: 'Discovery resumed from validation pause',
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('Failed to resume discovery:', error);
+    res.status(500).json({ 
+      error: 'Failed to resume discovery', 
+      details: error instanceof Error ? error.message : String(error) 
+    });
+  }
+});
+
+// Sector Database Population Endpoints
+app.post('/api/sector-database/start', (req: any, res: any) => {
+  try {
+    sectorDatabasePopulator.startPopulation();
+    
+    res.json({
+      message: 'Sector database population started',
+      timestamp: new Date().toISOString(),
+      totalSectors: 8,
+      totalProjects: 80
+    });
+    
+  } catch (error) {
+    console.error('Failed to start sector database population:', error);
+    res.status(500).json({ 
+      error: 'Failed to start sector database population', 
+      details: error instanceof Error ? error.message : String(error) 
+    });
+  }
+});
+
+app.post('/api/sector-database/stop', (req: any, res: any) => {
+  try {
+    sectorDatabasePopulator.stopPopulation();
+    
+    res.json({
+      message: 'Sector database population stopped',
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('Failed to stop sector database population:', error);
+    res.status(500).json({ 
+      error: 'Failed to stop sector database population', 
+      details: error instanceof Error ? error.message : String(error) 
+    });
+  }
+});
+
+app.get('/api/sector-database/stats', (req: any, res: any) => {
+  try {
+    const stats = sectorDatabasePopulator.getStats();
+    const progress = sectorDatabasePopulator.getProgress();
+    const currentStatus = sectorDatabasePopulator.getCurrentStatus();
+    
+    res.json({
+      stats,
+      progress: `${progress.toFixed(1)}%`,
+      currentStatus,
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('Failed to get sector database stats:', error);
+    res.status(500).json({ 
+      error: 'Failed to get sector database stats', 
+      details: error instanceof Error ? error.message : String(error) 
+    });
+  }
+});
+
+app.get('/api/sector-database/sectors', (req: any, res: any) => {
+  try {
+    const sectors = sectorDatabasePopulator.getAllSectors();
+    
+    res.json({
+      sectors,
+      totalSectors: sectors.length,
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('Failed to get sectors:', error);
+    res.status(500).json({ 
+      error: 'Failed to get sectors', 
+      details: error instanceof Error ? error.message : String(error) 
+    });
+  }
+});
+
+app.get('/api/sector-database/sectors/:sectorName', (req: any, res: any) => {
+  try {
+    const { sectorName } = req.params;
+    const sector = sectorDatabasePopulator.getSectorInfo(sectorName);
+    
+    if (!sector) {
+      return res.status(404).json({ error: 'Sector not found' });
+    }
+    
+    res.json({
+      sector,
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('Failed to get sector info:', error);
+    res.status(500).json({ 
+      error: 'Failed to get sector info', 
+      details: error instanceof Error ? error.message : String(error) 
+    });
+  }
+});
+
+app.post('/api/sector-database/sectors/:sectorName/projects', (req: any, res: any) => {
+  try {
+    const { sectorName } = req.params;
+    const { projectName, rank } = req.body;
+    
+    if (!projectName) {
+      return res.status(400).json({ error: 'Project name is required' });
+    }
+    
+    const success = sectorDatabasePopulator.addProjectToSector(sectorName, projectName, rank);
+    
+    if (!success) {
+      return res.status(400).json({ error: 'Failed to add project to sector' });
+    }
+    
+    res.json({
+      message: `Project ${projectName} added to sector ${sectorName}`,
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('Failed to add project to sector:', error);
+    res.status(500).json({ 
+      error: 'Failed to add project to sector', 
+      details: error instanceof Error ? error.message : String(error) 
+    });
+  }
+});
+
+app.delete('/api/sector-database/sectors/:sectorName/projects/:projectName', (req: any, res: any) => {
+  try {
+    const { sectorName, projectName } = req.params;
+    
+    const success = sectorDatabasePopulator.removeProjectFromSector(sectorName, projectName);
+    
+    if (!success) {
+      return res.status(400).json({ error: 'Failed to remove project from sector' });
+    }
+    
+    res.json({
+      message: `Project ${projectName} removed from sector ${sectorName}`,
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('Failed to remove project from sector:', error);
+    res.status(500).json({ 
+      error: 'Failed to remove project from sector', 
+      details: error instanceof Error ? error.message : String(error) 
+    });
+  }
 });
 
 // Ronin Network Functions (moved to top for scope)
@@ -1765,9 +2187,11 @@ function calculateMatchScore(projectName: string, resultName: string, resultSymb
 // Add this function before the /api/research endpoint
 async function transformAIOrchestratorDataToFrontendFormat(
   aiResult: any,
-  projectName: string
+  projectName?: string
 ): Promise<any> {
-  console.log(`🔄 Transforming AI orchestrator data for ${projectName}`);
+  // Extract project name from aiResult if not provided
+  const projectNameToUse = projectName || aiResult.projectName || 'Unknown Project';
+  console.log(`🔄 Transforming AI orchestrator data for ${projectNameToUse}`);
   
   // Extract key findings from the AI results
   const keyFindings = {
@@ -1940,10 +2364,10 @@ async function transformAIOrchestratorDataToFrontendFormat(
   }
   
   // Generate AI summary using the same academic report format as traditional research
-  const prompt = `You are a senior research analyst specializing in Web3 and gaming projects. Write a comprehensive academic report about ${projectName} based on the collected data. Your report should educate readers about the project and provide actionable insights.
+  const prompt = `You are a senior research analyst specializing in Web3 and gaming projects. Write a comprehensive academic report about ${projectNameToUse} based on the collected data. Your report should educate readers about the project and provide actionable insights.
 
 PROJECT INFORMATION:
-Project Name: ${projectName}
+Project Name: ${projectNameToUse}
 Data Sources Analyzed: ${dataSourcesCount}
 Total Data Points: ${totalDataPoints}
 Confidence Level: ${confidencePercentage}%
@@ -2270,44 +2694,18 @@ app.post('/api/research', async (req: any, res: any) => {
             ]
           }
         },
-        aiSummary: `# Executive Summary
-
-${projectName} research completed with basic data collection from ${fallbackResult.sourcesFound} sources.
-
-## Project Overview
-
-${projectName} is a ${fallbackResult.projectType} project with active development and community engagement.
-
-## Key Strengths
-
-${fallbackResult.studioBackground ? `- **Experienced Team**: ${fallbackResult.studioBackground}` : ''}
-${fallbackResult.githubRepository ? `- **Open Source**: Active development on GitHub` : ''}
-${fallbackResult.twitterFollowers ? `- **Social Presence**: ${fallbackResult.twitterFollowers} Twitter followers` : ''}
-${fallbackResult.discordMembers ? `- **Community**: ${fallbackResult.discordMembers} Discord members` : ''}
-
-## Technical Assessment
-
-${fallbackResult.technologyStack ? `- **Technology**: ${fallbackResult.technologyStack}` : ''}
-${fallbackResult.smartContracts?.length ? `- **Smart Contracts**: ${fallbackResult.smartContracts.length} contracts deployed` : ''}
-${fallbackResult.securityAudits?.length ? `- **Security**: ${fallbackResult.securityAudits.length} audits completed` : ''}
-
-## Financial Data
-
-${fallbackResult.marketCap ? `- **Market Cap**: ${fallbackResult.marketCap}` : ''}
-${fallbackResult.tokenPrice ? `- **Token Price**: ${fallbackResult.tokenPrice}` : ''}
-${fallbackResult.volume24h ? `- **24h Volume**: ${fallbackResult.volume24h}` : ''}
-
-## Investment Recommendation
-
-Based on basic analysis, ${projectName} shows ${fallbackResult.confidence >= 70 ? 'strong' : fallbackResult.confidence >= 50 ? 'moderate' : 'limited'} potential with ${fallbackResult.totalDataPoints} data points collected.
-
-## Risk Assessment
-
-**Overall Risk Level**: ${fallbackResult.confidence >= 80 ? 'Low' : fallbackResult.confidence >= 60 ? 'Medium' : 'High'}
-**Data Quality**: ${fallbackResult.dataQuality}
-**Sources Verified**: ${fallbackResult.sourcesFound}
-
-This assessment is based on basic data collection from multiple sources.`,
+        aiSummary: await transformAIOrchestratorDataToFrontendFormat({
+          projectName: projectName,
+          totalDataPoints: fallbackResult.totalDataPoints,
+          successfulSources: fallbackResult.sourcesFound,
+          confidence: fallbackResult.confidence / 100, // Convert percentage to decimal
+          findings: fallbackResult,
+          researchPlan: {
+            projectType: fallbackResult.projectType || 'Web3Game',
+            researchAreas: ['basic_research'],
+            priority: 'medium'
+          }
+        }, projectName),
         dataPointSummaries: {
           financial: {
             title: "Financial Data",
@@ -2333,6 +2731,19 @@ This assessment is based on basic data collection from multiple sources.`,
       };
       
       console.log(`[SUCCESS] Fallback research completed for ${projectName} with ${fallbackResult.totalDataPoints} data points`);
+      
+      // Store reference data in database
+      try {
+        const discoveredUrls = frontendData.discoveredUrls || {};
+        const cleanUrls = Object.fromEntries(
+          Object.entries(discoveredUrls).filter(([_, value]) => value !== undefined)
+        ) as { [key: string]: string };
+        await projectDatabase.addProjectReference(projectName, frontendData, cleanUrls);
+        console.log(`💾 DATABASE: Stored reference data for ${projectName}`);
+      } catch (error) {
+        console.error(`❌ DATABASE: Failed to store reference data for ${projectName}:`, error);
+      }
+      
       res.json(frontendData);
       return;
     }
@@ -2357,7 +2768,11 @@ This assessment is based on basic data collection from multiple sources.`,
       findOfficialSourcesForEstablishedProject,
       searchContractAddressWithLLM,
       getFinancialDataFromAlternativeSources,
-      fetchGameStoreData
+      fetchGameStoreData,
+      searchNFTs: async (projectName: string) => {
+        const nftService = NFTService.getInstance();
+        return await nftService.searchNFTs(projectName);
+      }
     };
 
     // Prepare basic info
@@ -2366,19 +2781,194 @@ This assessment is based on basic data collection from multiple sources.`,
       aliases: tokenSymbol ? [projectName, tokenSymbol] : [projectName],
     };
 
-    const aiResult = await conductAIOrchestratedResearch(
-      projectName,
-      anthropicApiKey,
-      basicInfo,
-      enhancedDataCollectionFunctions
-    );
-    
-    if (!aiResult || !aiResult.success) {
-      console.log(`❌ AI research failed for ${projectName}`);
-      return res.status(500).json({ 
-        error: 'AI research failed', 
-        details: aiResult?.reason || 'Unknown error' 
-      });
+    let aiResult;
+    try {
+      console.log(`[INFO] Attempting AI orchestrated research for: ${projectName}`);
+      aiResult = await conductAIOrchestratedResearch(
+        projectName,
+        anthropicApiKey,
+        basicInfo,
+        enhancedDataCollectionFunctions
+      );
+      
+      if (!aiResult || !aiResult.success) {
+        console.log(`❌ AI research failed for ${projectName}, falling back to batch search`);
+        throw new Error(aiResult?.reason || 'AI research failed');
+      }
+    } catch (aiError) {
+      console.log(`⚠️ AI research failed for ${projectName}: ${aiError instanceof Error ? aiError.message : 'Unknown error'}`);
+      console.log(`[INFO] Falling back to batch search for: ${projectName}`);
+      
+      // Use fallback research when AI orchestrator fails
+      const fallbackResult = await conductBatchSearch(projectName);
+      const frontendData = {
+        projectName: fallbackResult.projectName,
+        projectType: fallbackResult.projectType,
+        discoveredUrls: {
+          ai_research: `AI Research with ${fallbackResult.totalDataPoints} data points`,
+          research_methodology: 'Comprehensive batch search research',
+          data_sources: `${fallbackResult.sourcesFound} sources analyzed`,
+          confidence_score: `${Math.round(fallbackResult.confidence)}% confidence`,
+          research_status: 'Batch search completed successfully'
+        },
+        gameData: {
+          projectType: fallbackResult.projectType,
+          projectDescription: fallbackResult.gameDescription || `Basic research for ${projectName}`,
+          downloadLinks: [
+            {
+              platform: 'ai_research',
+              url: '#',
+              description: `AI Research Results (${fallbackResult.totalDataPoints} data points)`
+            },
+            {
+              platform: 'research_methodology',
+              url: '#',
+              description: 'Comprehensive batch search research'
+            },
+            {
+              platform: 'data_sources',
+              url: '#',
+              description: `${fallbackResult.sourcesFound} sources analyzed`
+            },
+            {
+              platform: 'confidence_metrics',
+              url: '#',
+              description: `${Math.round(fallbackResult.confidence)}% confidence score`
+            }
+          ],
+          confidence: fallbackResult.confidence,
+          dataQuality: fallbackResult.dataQuality,
+          sourcesFound: fallbackResult.sourcesFound,
+          totalDataPoints: fallbackResult.totalDataPoints
+        },
+        keyFindings: {
+          positives: [
+            fallbackResult.studioBackground ? "Experienced development team" : null,
+            fallbackResult.githubRepository ? "Open source development" : null,
+            fallbackResult.twitterFollowers ? "Strong social media presence" : null,
+            fallbackResult.discordMembers ? "Active community" : null
+          ].filter(Boolean),
+          negatives: [
+            !fallbackResult.documentation ? "Limited documentation" : null,
+            !fallbackResult.securityAudits?.length ? "No security audits found" : null
+          ].filter(Boolean),
+          redFlags: []
+        },
+        confidence: {
+          overall: {
+            grade: fallbackResult.confidence >= 80 ? "A" : fallbackResult.confidence >= 60 ? "B" : "C",
+            score: fallbackResult.confidence,
+            level: fallbackResult.confidence >= 80 ? "very_high" : fallbackResult.confidence >= 60 ? "high" : fallbackResult.confidence >= 40 ? "medium" : "low",
+            description: `Data quality: ${fallbackResult.dataQuality} with ${fallbackResult.sourcesFound} sources`
+          },
+          breakdown: {
+            dataCompleteness: {
+              score: Math.min(100, (fallbackResult.totalDataPoints / 30) * 100),
+              found: fallbackResult.totalDataPoints,
+              total: 30,
+              missing: []
+            },
+            sourceReliability: {
+              score: fallbackResult.dataQuality === 'high' ? 90 : fallbackResult.dataQuality === 'medium' ? 70 : 50,
+              official: fallbackResult.officialWebsite ? 1 : 0,
+              verified: fallbackResult.sourcesFound - (fallbackResult.officialWebsite ? 1 : 0),
+              scraped: 0
+            },
+            dataFreshness: {
+              score: 95,
+              averageAge: 1.5,
+              oldestSource: 'Recent data collection'
+            }
+          },
+          sourceDetails: [
+            {
+              name: 'fallback_research',
+              displayName: 'Basic Research',
+              found: true,
+              quality: fallbackResult.dataQuality,
+              reliability: 'verified',
+              dataPoints: fallbackResult.totalDataPoints,
+              lastUpdated: new Date().toISOString(),
+              confidence: fallbackResult.confidence,
+              icon: '🔍',
+              description: `Basic research from ${fallbackResult.sourcesFound} sources`
+            }
+          ],
+          limitations: [
+            'Basic research results may be limited',
+            'AI analysis not available due to error'
+          ],
+          strengths: [
+            `Basic data collection from ${fallbackResult.sourcesFound} sources`,
+            `Real-time analysis with ${fallbackResult.totalDataPoints} data points`,
+            'Reliable fallback research method'
+          ],
+          userGuidance: {
+            trustLevel: fallbackResult.confidence >= 80 ? 'high' : fallbackResult.confidence >= 60 ? 'medium' : 'low',
+            useCase: 'Suitable for basic project assessment',
+            warnings: [
+              'Data is collected dynamically and may change',
+              'Verify critical information from official sources'
+            ],
+            additionalResearch: [
+              'Check official project documentation',
+              'Verify team information on LinkedIn',
+              'Review community discussions and sentiment'
+            ]
+          }
+        },
+        aiSummary: await transformAIOrchestratorDataToFrontendFormat({
+          projectName: projectName,
+          totalDataPoints: fallbackResult.totalDataPoints,
+          successfulSources: fallbackResult.sourcesFound,
+          confidence: fallbackResult.confidence / 100, // Convert percentage to decimal
+          findings: fallbackResult,
+          researchPlan: {
+            projectType: fallbackResult.projectType || 'Web3Game',
+            researchAreas: ['basic_research'],
+            priority: 'medium'
+          }
+        }, projectName),
+        dataPointSummaries: {
+          financial: {
+            title: "Financial Data",
+            summary: fallbackResult.marketCap ? `Market cap: ${fallbackResult.marketCap}, Token: ${fallbackResult.tokenSymbol || 'N/A'}` : "Financial data being collected",
+            confidence: fallbackResult.marketCap ? 85 : 60
+          },
+          team: {
+            title: "Team Analysis", 
+            summary: fallbackResult.studioBackground ? `Team: ${fallbackResult.teamSize || 'Unknown'} members, ${fallbackResult.companyLocation || 'Location unknown'}` : "Team data being collected",
+            confidence: fallbackResult.studioBackground ? 80 : 60
+          },
+          technical: {
+            title: "Technical Assessment",
+            summary: fallbackResult.technologyStack ? `Tech: ${fallbackResult.technologyStack}` : "Technical data being collected",
+            confidence: fallbackResult.technologyStack ? 75 : 60
+          },
+          community: {
+            title: "Community Health",
+            summary: fallbackResult.twitterFollowers ? `Social: ${fallbackResult.twitterFollowers} followers, ${fallbackResult.discordMembers || '0'} Discord members` : "Community data being collected",
+            confidence: fallbackResult.twitterFollowers ? 85 : 60
+          }
+        }
+      };
+      
+      console.log(`[SUCCESS] Fallback research completed for ${projectName} with ${fallbackResult.totalDataPoints} data points`);
+      
+      // Store reference data in database
+      try {
+        const discoveredUrls = frontendData.discoveredUrls || {};
+        const cleanUrls = Object.fromEntries(
+          Object.entries(discoveredUrls).filter(([_, value]) => value !== undefined)
+        ) as { [key: string]: string };
+        await projectDatabase.addProjectReference(projectName, frontendData, cleanUrls);
+        console.log(`💾 DATABASE: Stored reference data for ${projectName}`);
+      } catch (error) {
+        console.error(`❌ DATABASE: Failed to store reference data for ${projectName}:`, error);
+      }
+      
+      res.json(frontendData);
+      return;
     }
     
     // Convert AI result to proper ProjectResearch format (same as Axie Infinity mock data)
@@ -2439,55 +3029,7 @@ This assessment is based on basic data collection from multiple sources.`,
         telegramMembers: undefined
       },
       sourcesUsed: aiResult.successfulSources > 0 ? ['AI Orchestrated Research'] : [],
-      aiSummary: `# Executive Summary
-
-${projectName} research completed with AI orchestrated data collection from ${aiResult.successfulSources} sources.
-
-## Project Overview
-
-${projectName} is a Web3 project that has been analyzed using our comprehensive research system. While limited data was available during this analysis, we've provided the best possible assessment based on available information.
-
-## Key Findings
-
-${aiResult.totalDataPoints > 0 ? 
-  `- **Data Collection**: Successfully gathered ${aiResult.totalDataPoints} data points from ${aiResult.successfulSources} sources
-- **Analysis Quality**: ${aiResult.confidence >= 0.8 ? 'High' : aiResult.confidence >= 0.6 ? 'Medium' : 'Low'} confidence analysis completed
-- **Research Coverage**: Comprehensive search across multiple data sources` :
-  `- **Limited Data Available**: No specific data points were found during this search
-- **Research Attempted**: Comprehensive search across multiple data sources was performed
-- **Recommendation**: Additional manual research may be needed for complete assessment`}
-
-## Technical Assessment
-
-- **Project Type**: Web3Game (default classification based on search context)
-- **Data Quality**: ${aiResult.confidence >= 0.8 ? 'high' : aiResult.confidence >= 0.6 ? 'medium' : 'low'}
-- **Sources Attempted**: Multiple data sources including whitepaper, team verification, and smart contracts
-- **Research Status**: ${aiResult.earlyTerminated ? 'Early termination due to limited data' : 'Complete analysis'}
-
-## Investment Recommendation
-
-${aiResult.totalDataPoints > 0 ? 
-  `Based on AI analysis, ${projectName} shows ${aiResult.confidence >= 0.7 ? 'strong' : aiResult.confidence >= 0.5 ? 'moderate' : 'limited'} potential with ${aiResult.totalDataPoints} data points collected.` :
-  `Due to limited available data, we cannot provide a comprehensive investment recommendation for ${projectName} at this time.`}
-
-## Risk Assessment
-
-**Overall Risk Level**: ${aiResult.confidence >= 0.8 ? 'Low' : aiResult.confidence >= 0.6 ? 'Medium' : 'High'}
-**Data Quality**: ${aiResult.confidence >= 0.8 ? 'high' : aiResult.confidence >= 0.6 ? 'medium' : 'low'}
-**Sources Verified**: ${aiResult.successfulSources}
-
-## Additional Research Needed
-
-${aiResult.totalDataPoints === 0 ? 
-  `- **Manual Verification**: Check official project website and documentation
-- **Community Research**: Review social media presence and community discussions
-- **Technical Analysis**: Verify smart contracts and blockchain data
-- **Team Background**: Research team members and company information` :
-  `- **Data Verification**: Cross-reference findings with official sources
-- **Community Engagement**: Monitor social media and community channels
-- **Ongoing Monitoring**: Track project development and updates`}
-
-This assessment is based on AI-powered data collection from multiple sources. ${aiResult.totalDataPoints === 0 ? 'Due to limited data availability, additional manual research is recommended.' : ''}`,
+      aiSummary: await transformAIOrchestratorDataToFrontendFormat(aiResult, projectName),
       confidence: {
         overall: {
           score: Math.round(aiResult.confidence * 100),
@@ -2595,43 +3137,83 @@ This assessment is based on AI-powered data collection from multiple sources. ${
         sourcesFound: aiResult.successfulSources,
         totalDataPoints: aiResult.totalDataPoints
       },
-      // Interactive Sources for left column
-      interactiveSources: aiResult.totalDataPoints > 0 ? [
-        {
-          name: "AI Research Results",
-          url: "#",
-          category: "official" as const,
-          type: "ai_analysis",
-          description: `AI-powered research with ${aiResult.totalDataPoints} data points from ${aiResult.successfulSources} sources`,
-          lastUpdated: new Date().toISOString(),
-          reliability: aiResult.confidence >= 0.8 ? "high" : aiResult.confidence >= 0.6 ? "medium" : "low",
-          verified: true
-        },
-        {
-          name: "Research Methodology",
-          url: "#",
-          category: "technical" as const,
-          type: "documentation",
-          description: "Comprehensive AI orchestrated research across multiple data sources",
-          lastUpdated: new Date().toISOString(),
-          reliability: "high",
-          verified: true
-        }
-      ] : [
-        {
-          name: "Research Attempted",
-          url: "#",
-          category: "technical" as const,
-          type: "ai_analysis",
-          description: "AI research attempted but limited data found",
-          lastUpdated: new Date().toISOString(),
-          reliability: "low",
-          verified: true
-        }
-      ]
+      // Interactive Sources for left column - Build from discovered URLs
+      interactiveSources: [] as any[]
     };
     
     console.log(`[SUCCESS] AI orchestrated research completed for ${projectName} with ${aiResult.totalDataPoints} data points`);
+    
+    // Build interactive sources from discovered URLs
+    const interactiveSources = [];
+    
+    // Add discovered URLs as interactive sources
+    if (frontendData.discoveredUrls) {
+      Object.entries(frontendData.discoveredUrls).forEach(([sourceType, url]) => {
+        if (url && url !== 'undefined' && url !== 'null') {
+          const sourceName = sourceType.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
+          const category = sourceType.includes('github') ? 'technical' :
+                         sourceType.includes('twitter') || sourceType.includes('discord') ? 'social' :
+                         sourceType.includes('whitepaper') || sourceType.includes('documentation') ? 'official' :
+                         sourceType.includes('website') ? 'official' : 'community';
+          
+          interactiveSources.push({
+            name: sourceName,
+            url: url,
+            category: category as 'official' | 'social' | 'financial' | 'technical' | 'community',
+            type: sourceType,
+            description: `Discovered ${sourceType} source`,
+            lastUpdated: new Date().toISOString(),
+            reliability: "high" as 'high' | 'medium' | 'low',
+            verified: true
+          });
+        }
+      });
+    }
+    
+    // Add AI research summary if we have data
+    if (aiResult.totalDataPoints > 0) {
+      interactiveSources.unshift({
+        name: "AI Research Results",
+        url: "#",
+        category: "official" as const,
+        type: "ai_analysis",
+        description: `AI-powered research with ${aiResult.totalDataPoints} data points from ${aiResult.successfulSources} sources`,
+        lastUpdated: new Date().toISOString(),
+        reliability: aiResult.confidence >= 0.8 ? "high" : aiResult.confidence >= 0.6 ? "medium" : "low",
+        verified: true
+      });
+    }
+    
+    // Fallback if no sources found
+    if (interactiveSources.length === 0) {
+      interactiveSources.push({
+        name: "Research Attempted",
+        url: "#",
+        category: "technical" as const,
+        type: "ai_analysis",
+        description: "AI research attempted but limited data found",
+        lastUpdated: new Date().toISOString(),
+        reliability: "low",
+        verified: true
+      });
+    }
+    
+    // Update frontendData with interactive sources
+    frontendData.interactiveSources = interactiveSources;
+    
+    // Store reference data in database
+    try {
+      const discoveredUrls = frontendData.discoveredUrls || {};
+      // Filter out undefined values to match expected type
+              const cleanUrls = Object.fromEntries(
+          Object.entries(discoveredUrls).filter(([_, value]) => value !== undefined)
+        ) as { [key: string]: string };
+        await projectDatabase.addProjectReference(projectName, frontendData, cleanUrls);
+      console.log(`💾 DATABASE: Stored reference data for ${projectName}`);
+    } catch (error) {
+      console.error(`❌ DATABASE: Failed to store reference data for ${projectName}:`, error);
+    }
+    
     res.json(frontendData);
     
   } catch (error) {
@@ -2711,7 +3293,11 @@ app.post('/api/research-enhanced', async (req: any, res: any) => {
       findOfficialSourcesForEstablishedProject,
       searchContractAddressWithLLM,
       getFinancialDataFromAlternativeSources,
-      fetchGameStoreData
+      fetchGameStoreData,
+      searchNFTs: async (projectName: string) => {
+        const nftService = NFTService.getInstance();
+        return await nftService.searchNFTs(projectName);
+      }
     };
 
     // Conduct enhanced research
@@ -2908,7 +3494,11 @@ app.post('/api/research-hybrid', async (req: any, res: any) => {
         discoverOfficialUrlsWithAI,
         findOfficialSourcesForEstablishedProject,
         searchContractAddressWithLLM,
-        getFinancialDataFromAlternativeSources
+        getFinancialDataFromAlternativeSources,
+        searchNFTs: async (projectName: string) => {
+          const nftService = NFTService.getInstance();
+          return await nftService.searchNFTs(projectName);
+        }
       }
     );
 

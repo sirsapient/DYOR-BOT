@@ -1,0 +1,502 @@
+[
+  {
+    "projectName": "Zerebro",
+    "aliases": [
+      "Web3Game"
+    ],
+    "contractAddresses": {},
+    "knownUrls": {
+      "ai_research": "AI Research with 20 data points",
+      "research_methodology": "Comprehensive batch search research",
+      "data_sources": "5 sources analyzed",
+      "confidence_score": "75% confidence",
+      "research_status": "Batch search completed successfully"
+    },
+    "projectType": "Web3Game",
+    "firstDiscovered": "2025-09-03T14:36:11.736Z",
+    "lastUpdated": "2025-09-03T14:36:11.736Z",
+    "searchCount": 1,
+    "dataQuality": "low",
+    "tags": [
+      "Web3Game",
+      "ai_research",
+      "research_methodology",
+      "data_sources",
+      "confidence_score",
+      "research_status"
+    ],
+    "notes": []
+  },
+  {
+    "projectName": "The Sandbox",
+    "aliases": [
+      "Web3Game"
+    ],
+    "contractAddresses": {},
+    "knownUrls": {
+      "ai_research": "AI Research with 732 data points",
+      "research_methodology": "Comprehensive AI orchestrated research",
+      "data_sources": "4 sources analyzed",
+      "confidence_score": "100% confidence"
+    },
+    "projectType": "Web3Game",
+    "firstDiscovered": "2025-09-03T15:11:17.604Z",
+    "lastUpdated": "2025-09-04T02:12:06.210Z",
+    "searchCount": 4,
+    "dataQuality": "low",
+    "tags": [
+      "Web3Game",
+      "ai_research",
+      "research_methodology",
+      "data_sources",
+      "confidence_score"
+    ],
+    "notes": []
+  },
+  {
+    "projectName": "Decentraland",
+    "aliases": [
+      "Web3Game"
+    ],
+    "contractAddresses": {},
+    "knownUrls": {
+      "ai_research": "AI Research with 1267 data points",
+      "research_methodology": "Comprehensive AI orchestrated research",
+      "data_sources": "5 sources analyzed",
+      "confidence_score": "100% confidence"
+    },
+    "projectType": "Web3Game",
+    "firstDiscovered": "2025-09-03T15:15:31.870Z",
+    "lastUpdated": "2025-09-03T18:40:45.729Z",
+    "searchCount": 2,
+    "dataQuality": "low",
+    "tags": [
+      "Web3Game",
+      "ai_research",
+      "research_methodology",
+      "data_sources",
+      "confidence_score"
+    ],
+    "notes": []
+  },
+  {
+    "projectName": "Uniswap",
+    "aliases": [
+      "Web3Game"
+    ],
+    "contractAddresses": {},
+    "knownUrls": {
+      "ai_research": "AI Research with 20 data points",
+      "research_methodology": "Comprehensive batch search research",
+      "data_sources": "5 sources analyzed",
+      "confidence_score": "75% confidence",
+      "research_status": "Batch search completed successfully"
+    },
+    "projectType": "Web3Game",
+    "firstDiscovered": "2025-09-03T15:17:04.194Z",
+    "lastUpdated": "2025-09-03T15:17:04.194Z",
+    "searchCount": 1,
+    "dataQuality": "low",
+    "tags": [
+      "Web3Game",
+      "ai_research",
+      "research_methodology",
+      "data_sources",
+      "confidence_score",
+      "research_status"
+    ],
+    "notes": []
+  },
+  {
+    "projectName": "Aave",
+    "aliases": [
+      "Web3Game"
+    ],
+    "contractAddresses": {},
+    "knownUrls": {
+      "ai_research": "AI Research with 428 data points",
+      "research_methodology": "Comprehensive AI orchestrated research",
+      "data_sources": "3 sources analyzed",
+      "confidence_score": "100% confidence"
+    },
+    "projectType": "Web3Game",
+    "firstDiscovered": "2025-09-03T15:30:13.320Z",
+    "lastUpdated": "2025-09-04T02:12:38.274Z",
+    "searchCount": 3,
+    "dataQuality": "low",
+    "tags": [
+      "Web3Game",
+      "ai_research",
+      "research_methodology",
+      "data_sources",
+      "confidence_score"
+    ],
+    "notes": []
+  },
+  {
+    "projectName": "OpenSea",
+    "aliases": [
+      "Web3Game"
+    ],
+    "contractAddresses": {},
+    "knownUrls": {
+      "ai_research": "AI Research with 20 data points",
+      "research_methodology": "Comprehensive batch search research",
+      "data_sources": "5 sources analyzed",
+      "confidence_score": "75% confidence",
+      "research_status": "Batch search completed successfully"
+    },
+    "projectType": "Web3Game",
+    "firstDiscovered": "2025-09-03T15:32:01.517Z",
+    "lastUpdated": "2025-09-03T21:07:54.572Z",
+    "searchCount": 2,
+    "dataQuality": "low",
+    "tags": [
+      "Web3Game",
+      "ai_research",
+      "research_methodology",
+      "data_sources",
+      "confidence_score",
+      "research_status"
+    ],
+    "notes": []
+  },
+  {
+    "projectName": "Fetch.ai",
+    "aliases": [
+      "Web3Game"
+    ],
+    "contractAddresses": {},
+    "knownUrls": {
+      "ai_research": "AI Research with 393 data points",
+      "research_methodology": "Comprehensive AI orchestrated research",
+      "data_sources": "2 sources analyzed",
+      "confidence_score": "100% confidence"
+    },
+    "projectType": "Web3Game",
+    "firstDiscovered": "2025-09-03T15:51:27.917Z",
+    "lastUpdated": "2025-09-03T20:59:04.891Z",
+    "searchCount": 2,
+    "dataQuality": "low",
+    "tags": [
+      "Web3Game",
+      "ai_research",
+      "research_methodology",
+      "data_sources",
+      "confidence_score"
+    ],
+    "notes": []
+  },
+  {
+    "projectName": "Polygon",
+    "aliases": [
+      "Web3Game"
+    ],
+    "contractAddresses": {},
+    "knownUrls": {
+      "ai_research": "AI Research with 430 data points",
+      "research_methodology": "Comprehensive AI orchestrated research",
+      "data_sources": "2 sources analyzed",
+      "confidence_score": "100% confidence"
+    },
+    "projectType": "Web3Game",
+    "firstDiscovered": "2025-09-03T16:36:02.803Z",
+    "lastUpdated": "2025-09-04T02:13:05.363Z",
+    "searchCount": 3,
+    "dataQuality": "low",
+    "tags": [
+      "Web3Game",
+      "ai_research",
+      "research_methodology",
+      "data_sources",
+      "confidence_score"
+    ],
+    "notes": []
+  },
+  {
+    "projectName": "Solana",
+    "aliases": [
+      "Web3Game"
+    ],
+    "contractAddresses": {},
+    "knownUrls": {
+      "ai_research": "AI Research with 509 data points",
+      "research_methodology": "Comprehensive AI orchestrated research",
+      "data_sources": "3 sources analyzed",
+      "confidence_score": "100% confidence"
+    },
+    "projectType": "Web3Game",
+    "firstDiscovered": "2025-09-03T16:37:24.662Z",
+    "lastUpdated": "2025-09-03T21:06:25.790Z",
+    "searchCount": 2,
+    "dataQuality": "low",
+    "tags": [
+      "Web3Game",
+      "ai_research",
+      "research_methodology",
+      "data_sources",
+      "confidence_score"
+    ],
+    "notes": []
+  },
+  {
+    "projectName": "MakerDAO",
+    "aliases": [
+      "Web3Game"
+    ],
+    "contractAddresses": {},
+    "knownUrls": {
+      "ai_research": "AI Research with 68 data points",
+      "research_methodology": "Comprehensive AI orchestrated research",
+      "data_sources": "2 sources analyzed",
+      "confidence_score": "100% confidence"
+    },
+    "projectType": "Web3Game",
+    "firstDiscovered": "2025-09-03T18:11:12.493Z",
+    "lastUpdated": "2025-09-03T21:07:13.921Z",
+    "searchCount": 2,
+    "dataQuality": "low",
+    "tags": [
+      "Web3Game",
+      "ai_research",
+      "research_methodology",
+      "data_sources",
+      "confidence_score"
+    ],
+    "notes": []
+  },
+  {
+    "projectName": "Dogecoin",
+    "aliases": [
+      "Web3Game"
+    ],
+    "contractAddresses": {},
+    "knownUrls": {
+      "ai_research": "AI Research with 45 data points",
+      "research_methodology": "Comprehensive AI orchestrated research",
+      "data_sources": "2 sources analyzed",
+      "confidence_score": "90% confidence"
+    },
+    "projectType": "Web3Game",
+    "firstDiscovered": "2025-09-04T01:54:10.913Z",
+    "lastUpdated": "2025-09-04T01:54:10.913Z",
+    "searchCount": 1,
+    "dataQuality": "low",
+    "tags": [
+      "Web3Game",
+      "ai_research",
+      "research_methodology",
+      "data_sources",
+      "confidence_score"
+    ],
+    "notes": []
+  },
+  {
+    "projectName": "Compound",
+    "aliases": [
+      "Web3Game"
+    ],
+    "contractAddresses": {},
+    "knownUrls": {
+      "ai_research": "AI Research with 65 data points",
+      "research_methodology": "Comprehensive AI orchestrated research",
+      "data_sources": "2 sources analyzed",
+      "confidence_score": "100% confidence"
+    },
+    "projectType": "Web3Game",
+    "firstDiscovered": "2025-09-04T01:56:30.179Z",
+    "lastUpdated": "2025-09-04T01:56:30.179Z",
+    "searchCount": 1,
+    "dataQuality": "low",
+    "tags": [
+      "Web3Game",
+      "ai_research",
+      "research_methodology",
+      "data_sources",
+      "confidence_score"
+    ],
+    "notes": []
+  },
+  {
+    "projectName": "Arbitrum",
+    "aliases": [
+      "Web3Game"
+    ],
+    "contractAddresses": {},
+    "knownUrls": {
+      "ai_research": "AI Research with 419 data points",
+      "research_methodology": "Comprehensive AI orchestrated research",
+      "data_sources": "2 sources analyzed",
+      "confidence_score": "100% confidence"
+    },
+    "projectType": "Web3Game",
+    "firstDiscovered": "2025-09-04T02:00:07.753Z",
+    "lastUpdated": "2025-09-04T02:00:07.753Z",
+    "searchCount": 1,
+    "dataQuality": "low",
+    "tags": [
+      "Web3Game",
+      "ai_research",
+      "research_methodology",
+      "data_sources",
+      "confidence_score"
+    ],
+    "notes": []
+  },
+  {
+    "projectName": "Bored Ape Yacht Club",
+    "aliases": [
+      "Web3Game"
+    ],
+    "contractAddresses": {},
+    "knownUrls": {
+      "ai_research": "AI Research with 43 data points",
+      "research_methodology": "Comprehensive AI orchestrated research",
+      "data_sources": "2 sources analyzed",
+      "confidence_score": "86% confidence"
+    },
+    "projectType": "Web3Game",
+    "firstDiscovered": "2025-09-04T02:17:42.599Z",
+    "lastUpdated": "2025-09-04T02:17:42.599Z",
+    "searchCount": 1,
+    "dataQuality": "low",
+    "tags": [
+      "Web3Game",
+      "ai_research",
+      "research_methodology",
+      "data_sources",
+      "confidence_score"
+    ],
+    "notes": []
+  },
+  {
+    "projectName": "CryptoPunks",
+    "aliases": [
+      "Web3Game"
+    ],
+    "contractAddresses": {},
+    "knownUrls": {
+      "ai_research": "AI Research with 230 data points",
+      "research_methodology": "Comprehensive AI orchestrated research",
+      "data_sources": "3 sources analyzed",
+      "confidence_score": "100% confidence"
+    },
+    "projectType": "Web3Game",
+    "firstDiscovered": "2025-09-04T02:19:06.659Z",
+    "lastUpdated": "2025-09-04T02:19:06.659Z",
+    "searchCount": 1,
+    "dataQuality": "low",
+    "tags": [
+      "Web3Game",
+      "ai_research",
+      "research_methodology",
+      "data_sources",
+      "confidence_score"
+    ],
+    "notes": []
+  },
+  {
+    "projectName": "Curve Finance",
+    "aliases": [
+      "Web3Game"
+    ],
+    "contractAddresses": {},
+    "knownUrls": {
+      "ai_research": "AI Research with 54 data points",
+      "research_methodology": "Comprehensive AI orchestrated research",
+      "data_sources": "3 sources analyzed",
+      "confidence_score": "100% confidence"
+    },
+    "projectType": "Web3Game",
+    "firstDiscovered": "2025-09-04T02:22:22.184Z",
+    "lastUpdated": "2025-09-04T02:22:22.184Z",
+    "searchCount": 1,
+    "dataQuality": "low",
+    "tags": [
+      "Web3Game",
+      "ai_research",
+      "research_methodology",
+      "data_sources",
+      "confidence_score"
+    ],
+    "notes": []
+  },
+  {
+    "projectName": "Optimism",
+    "aliases": [
+      "Web3Game"
+    ],
+    "contractAddresses": {},
+    "knownUrls": {
+      "ai_research": "AI Research with 244 data points",
+      "research_methodology": "Comprehensive AI orchestrated research",
+      "data_sources": "3 sources analyzed",
+      "confidence_score": "100% confidence"
+    },
+    "projectType": "Web3Game",
+    "firstDiscovered": "2025-09-04T02:38:32.760Z",
+    "lastUpdated": "2025-09-04T02:38:32.760Z",
+    "searchCount": 1,
+    "dataQuality": "low",
+    "tags": [
+      "Web3Game",
+      "ai_research",
+      "research_methodology",
+      "data_sources",
+      "confidence_score"
+    ],
+    "notes": []
+  },
+  {
+    "projectName": "SingularityNET",
+    "aliases": [
+      "Web3Game"
+    ],
+    "contractAddresses": {},
+    "knownUrls": {
+      "ai_research": "AI Research with 455 data points",
+      "research_methodology": "Comprehensive AI orchestrated research",
+      "data_sources": "2 sources analyzed",
+      "confidence_score": "100% confidence"
+    },
+    "projectType": "Web3Game",
+    "firstDiscovered": "2025-09-04T02:40:08.955Z",
+    "lastUpdated": "2025-09-04T02:40:08.955Z",
+    "searchCount": 1,
+    "dataQuality": "low",
+    "tags": [
+      "Web3Game",
+      "ai_research",
+      "research_methodology",
+      "data_sources",
+      "confidence_score"
+    ],
+    "notes": []
+  },
+  {
+    "projectName": "Elumia",
+    "aliases": [
+      "Web3Game"
+    ],
+    "contractAddresses": {},
+    "knownUrls": {
+      "ai_research": "AI Research with 135 data points",
+      "research_methodology": "Comprehensive AI orchestrated research",
+      "data_sources": "2 sources analyzed",
+      "confidence_score": "100% confidence"
+    },
+    "projectType": "Web3Game",
+    "firstDiscovered": "2025-09-05T14:05:53.077Z",
+    "lastUpdated": "2025-09-05T14:05:53.077Z",
+    "searchCount": 1,
+    "dataQuality": "low",
+    "tags": [
+      "Web3Game",
+      "ai_research",
+      "research_methodology",
+      "data_sources",
+      "confidence_score"
+    ],
+    "notes": []
+  }
+]

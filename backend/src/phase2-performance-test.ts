@@ -49,7 +49,8 @@ async function testPhase2Performance() {
         discoverOfficialUrlsWithAI: async () => ({ website: 'https://example.com' }),
         findOfficialSourcesForEstablishedProject: async () => ({ website: 'https://example.com', twitter: 'https://twitter.com/example' }),
         searchContractAddressWithLLM: async () => '0x123...',
-        getFinancialDataFromAlternativeSources: async () => ({ marketCap: 1000000 })
+        getFinancialDataFromAlternativeSources: async () => ({ marketCap: 1000000 }),
+        searchNFTs: async () => Promise.resolve([])
       };
       
       const result = await conductAIOrchestratedResearch(
